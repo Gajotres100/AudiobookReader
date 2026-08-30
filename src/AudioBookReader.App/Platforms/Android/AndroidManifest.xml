@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+	<!-- Network is needed only to fetch the speech model once. Nothing about a book ever leaves
+	     the device: import, alignment and reading are entirely local. -->
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+	<!-- Playback survives the app being backgrounded, and alignment keeps running with the screen
+	     off. Android 14 requires the type to be declared alongside the permission. -->
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+	<!-- Both services show a notification: transport controls for playback, progress for
+	     alignment. Required at runtime from Android 13. -->
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+	<!-- Alignment runs long enough that the device would otherwise sleep through it. -->
+	<uses-permission android:name="android.permission.WAKE_LOCK" />
+
+	<!-- Deliberately absent: MANAGE_EXTERNAL_STORAGE and READ_EXTERNAL_STORAGE. Books are chosen
+	     through the system file picker and copied into app storage, so the app never needs access
+	     to the user's whole filesystem — which Play restricts heavily and would demand a
+	     justification for. -->
+
+	<application
+		android:allowBackup="true"
+		android:icon="@mipmap/appicon"
+		android:roundIcon="@mipmap/appicon_round"
+		android:supportsRtl="true">
+
+		<service
+			android:name=".Playback.PlaybackService"
+			android:exported="true"
+			android:foregroundServiceType="mediaPlayback">
+			<intent-filter>
+				<action android:name="androidx.media3.session.MediaSessionService" />
+			</intent-filter>
+		</service>
+
+		<service
+			android:name=".Alignment.AlignmentService"
+			android:exported="false"
+			android:foregroundServiceType="dataSync" />
+
+	</application>
+</manifest>

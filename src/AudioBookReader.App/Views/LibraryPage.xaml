@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="AudioBookReader.App.Views.LibraryPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
+    x:DataType="vm:LibraryViewModel"
+    Title="Moje knjige">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="+ Audio" Command="{Binding ImportAudioCommand}" />
+        <ToolbarItem Text="+ Knjiga" Command="{Binding ImportEbookCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <VerticalStackLayout
+            Grid.Row="0"
+            Padding="16,12"
+            IsVisible="{Binding IsBusy}"
+            Spacing="8">
+            <ActivityIndicator IsRunning="{Binding IsBusy}" />
+            <Label HorizontalOptions="Center" Text="{Binding BusyMessage}" />
+        </VerticalStackLayout>
+
+        <Label
+            Grid.Row="1"
+            Margin="16,12"
+            IsVisible="{Binding HasError}"
+            Text="{Binding Error}"
+            TextColor="#C0392B" />
+
+        <VerticalStackLayout
+            Grid.Row="2"
+            Padding="32"
+            IsVisible="{Binding IsEmpty}"
+            Spacing="12"
+            VerticalOptions="Center">
+            <Label
+                FontSize="18"
+                HorizontalTextAlignment="Center"
+                Text="Još nema knjiga" />
+            <Label
+                HorizontalTextAlignment="Center"
+                Text="Dodaj audioknjigu, e-knjigu, ili oboje. Ako dodaš oboje za isti naslov, tekst će pratiti naraciju."
+                TextColor="Gray" />
+        </VerticalStackLayout>
+
+        <CollectionView
+            x:Name="BookList"
+            Grid.Row="2"
+            ItemsSource="{Binding Books}"
+            SelectionMode="None">
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:BookCard">
+                    <SwipeView>
+                        <SwipeView.RightItems>
+                            <SwipeItems Mode="Execute">
+                                <SwipeItem
+                                    BackgroundColor="#C0392B"
+                                    Command="{Binding Path=BindingContext.DeleteCommand, Source={x:Reference BookList}}"
+                                    CommandParameter="{Binding .}"
+                                    Text="Obriši" />
+                            </SwipeItems>
+                        </SwipeView.RightItems>
+
+                    <Grid Padding="16,12" ColumnDefinitions="64,*,Auto">
+
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer
+                                Command="{Binding Path=BindingContext.OpenCommand, Source={x:Reference BookList}}"
+                                CommandParameter="{Binding .}" />
+                        </Grid.GestureRecognizers>
+
+                        <Image
+                            Grid.Column="0"
+                            Aspect="AspectFill"
+                            HeightRequest="64"
+                            IsVisible="{Binding HasCover}"
+                            Source="{Binding CoverPath}"
+                            WidthRequest="64" />
+
+                        <VerticalStackLayout
+                            Grid.Column="1"
+                            Padding="12,0"
+                            Spacing="2">
+                            <Label
+                                FontAttributes="Bold"
+                                LineBreakMode="TailTruncation"
+                                Text="{Binding Title}" />
+                            <Label
+                                FontSize="13"
+                                LineBreakMode="TailTruncation"
+                                Text="{Binding Author}"
+                                TextColor="Gray" />
+                            <Label
+                                FontSize="12"
+                                Text="{Binding Subtitle}"
+                                TextColor="Gray" />
+                            <Label
+                                FontSize="11"
+                                IsVisible="{Binding HasSyncBadge}"
+                                Text="{Binding SyncBadge}"
+                                TextColor="Gray" />
+                            <ProgressBar IsVisible="{Binding HasProgress}" Progress="{Binding Progress}" />
+                        </VerticalStackLayout>
+
+                        <Label
+                            Grid.Column="2"
+                            FontSize="16"
+                            Text="{Binding MediaBadge}"
+                            VerticalOptions="Center" />
+                    </Grid>
+                    </SwipeView>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

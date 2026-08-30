@@ -1,0 +1,91 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!-- Android only for now. iOS is written for but cannot be built without a Mac, and the
+		     Whisper runtime does ship ios-device binaries, so adding it later is a target change
+		     rather than a rewrite. -->
+		<TargetFrameworks>net10.0-android</TargetFrameworks>
+
+		<OutputType>Exe</OutputType>
+		<RootNamespace>AudioBookReader.App</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+
+		<MauiXamlInflator>SourceGen</MauiXamlInflator>
+
+		<ApplicationTitle>AudioBook Reader</ApplicationTitle>
+		<ApplicationId>com.ngaic.audiobookreader</ApplicationId>
+
+		<ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+
+		<!-- Android 10. The thermal-status API that drives CPU backoff arrives in 29, so this floor
+		     removes a pile of version guards for devices that are long gone anyway. -->
+		<SupportedOSPlatformVersion>29.0</SupportedOSPlatformVersion>
+
+		<!-- Whisper.net.Runtime ships android-arm64-v8a, android-x86_64 and android-x86 only, with
+		     no armeabi-v7a. Naming the architectures explicitly keeps the build from producing a
+		     package whose native libraries are missing, which would otherwise only surface at
+		     runtime. Google Play requires 64-bit regardless; android-x64 is here for the emulator.
+
+		     These are the exact strings Whisper.net.Runtime.targets tests against to decide which
+		     .so files to pack, so they are not interchangeable with the older AndroidSupportedAbis
+		     spelling — which this SDK has dropped anyway. -->
+		<RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+
+		<!-- The Media3 bindings declare tight upper bounds on AndroidX Lifecycle (< 2.9.3) while
+		     MAUI brings 2.11. Google ships these libraries as one coordinated release and 2.11 is
+		     compatible with 2.9 consumers, so the constraint is the binding's packaging being
+		     conservative rather than a real conflict — and there is no version satisfying both.
+		     Silenced because two dozen repeats of it on every build would bury warnings that do
+		     matter. -->
+		<NoWarn>$(NoWarn);NU1608</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+
+		<MauiImage Include="Resources\Images\*" />
+		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
+
+		<MauiFont Include="Resources\Fonts\*" />
+		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+
+		<!-- Playback: ExoPlayer for the engine, Session for the foreground service, lock screen
+		     controls and headset buttons. -->
+		<PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.10.1.1" />
+		<PackageReference Include="Xamarin.AndroidX.Media3.Session" Version="1.10.1.2" />
+
+		<!-- On-device recognition for alignment. The model itself is downloaded at first use rather
+		     than shipped, to keep the package small and satisfy Play's size expectations. -->
+		<PackageReference Include="Whisper.net" Version="1.9.1" />
+		<PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
+
+		<!-- The native SQLite the Core library's sqlite-net expects. -->
+		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+
+		<!-- Media3 and MAUI disagree about how new AndroidX should be, and NuGet resolves the
+		     halves independently: core 1.19 with core-ktx 1.16, collection 1.6 with
+		     collection-ktx 1.5. Recent AndroidX folded the -ktx artifacts into their base
+		     libraries, so the mismatched pairs ship the same classes twice and dexing fails with
+		     "Type ... is defined multiple times". Pinning each -ktx to its base library's version
+		     is what keeps a single copy of each class in the package. -->
+		<PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="1.19.0.1" />
+		<PackageReference Include="Xamarin.AndroidX.Collection.Ktx" Version="1.6.0.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\AudioBookReader.Core\AudioBookReader.Core.csproj" />
+	</ItemGroup>
+
+</Project>

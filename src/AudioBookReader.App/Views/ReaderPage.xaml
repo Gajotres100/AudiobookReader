@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="AudioBookReader.App.Views.ReaderPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
+    x:DataType="vm:ReaderViewModel"
+    Shell.NavBarIsVisible="False"
+    Title="{Binding Title}">
+
+    <!--
+        The page is the text. Controls appear on a tap and go away again when the narration starts,
+        because at that point the book is being read rather than operated.
+    -->
+
+    <ContentPage.Resources>
+        <Style x:Key="Chrome" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="TextColor" Value="{AppThemeBinding Light=#2A2D34, Dark=#E7EAF0}" />
+        </Style>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!--  Says why the text is not following, instead of leaving a dead control to explain itself.  -->
+        <Label
+            Grid.Row="0"
+            Padding="16,10"
+            BackgroundColor="#2A2438"
+            FontSize="12"
+            IsVisible="{Binding ShowFollowHint}"
+            Text="{Binding FollowHint}"
+            TextColor="#CFC7E0" />
+
+        <!--  A map covers only the chapters a run has reached; say so instead of standing still.  -->
+        <Label
+            Grid.Row="0"
+            Padding="16,10"
+            BackgroundColor="#2A2438"
+            FontSize="12"
+            IsVisible="{Binding HasFollowStatus}"
+            Text="{Binding FollowStatus}"
+            TextColor="#CFC7E0" />
+
+        <ActivityIndicator
+            Grid.Row="1"
+            HorizontalOptions="Center"
+            IsRunning="{Binding IsBusy}"
+            IsVisible="{Binding IsBusy}"
+            VerticalOptions="Center" />
+
+        <WebView
+            x:Name="Reader"
+            Grid.Row="1"
+            Navigated="OnReaderNavigated"
+            Navigating="OnReaderNavigating" />
+
+        <!--  Controls  -->
+        <VerticalStackLayout
+            Grid.Row="2"
+            BackgroundColor="{AppThemeBinding Light=#F1EDE5,
+                                              Dark=#15181E}"
+            IsVisible="{Binding ChromeVisible}"
+            Padding="10,6"
+            Spacing="2">
+
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+                <Button
+                    Grid.Column="0"
+                    Command="{Binding CloseCommand}"
+                    Style="{StaticResource Chrome}"
+                    Text="✕" />
+
+                <Button
+                    Grid.Column="1"
+                    Command="{Binding TogglePlayCommand}"
+                    FontSize="18"
+                    IsVisible="{Binding HasAudio}"
+                    Style="{StaticResource Chrome}"
+                    Text="{Binding PlayLabel}" />
+
+                <Button
+                    Grid.Column="3"
+                    Command="{Binding ChooseThemeCommand}"
+                    Style="{StaticResource Chrome}"
+                    Text="{Binding ThemeName}" />
+
+                <Button
+                    Grid.Column="4"
+                    Command="{Binding ChooseFontCommand}"
+                    Style="{StaticResource Chrome}"
+                    Text="{Binding FontName}" />
+            </Grid>
+
+            <!--  Nudges the highlight against the voice; only meaningful while following.  -->
+            <HorizontalStackLayout
+                HorizontalOptions="Center"
+                IsVisible="{Binding CanFollow}"
+                Spacing="8">
+                <Button
+                    Command="{Binding NudgeSyncEarlierCommand}"
+                    Style="{StaticResource Chrome}"
+                    Text="◀ ranije" />
+                <Label
+                    FontSize="12"
+                    Text="{Binding SyncOffsetText}"
+                    TextColor="Gray"
+                    VerticalOptions="Center" />
+                <Button
+                    Command="{Binding NudgeSyncLaterCommand}"
+                    Style="{StaticResource Chrome}"
+                    Text="kasnije ▶" />
+            </HorizontalStackLayout>
+
+            <Slider
+                x:Name="PageSlider"
+                DragCompleted="OnPageSliderChanged"
+                IsVisible="{Binding ShowPageSlider}"
+                Maximum="{Binding PageCount}"
+                Minimum="1"
+                Value="{Binding PageNumber, Mode=OneWay}" />
+
+            <Label
+                Padding="0,4"
+                FontSize="11"
+                HorizontalTextAlignment="Center"
+                Text="{Binding DocumentLabel}"
+                TextColor="Gray">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding TogglePageSliderCommand}" />
+                </Label.GestureRecognizers>
+            </Label>
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AudioBookReader.App/AudioBookReader.App.csproj" />
+    <Project Path="src/AudioBookReader.Core/AudioBookReader.Core.csproj" />
+    <Project Path="src/AudioBookReader.Tuner/AudioBookReader.Tuner.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AudioBookReader.Core.Tests/AudioBookReader.Core.Tests.csproj" />
+  </Folder>
+</Solution>

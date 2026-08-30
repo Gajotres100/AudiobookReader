@@ -1,0 +1,55 @@
+namespace AudioBookReader.App.Services;
+
+/// <summary>
+/// The app's handle on playback.
+///
+/// View models talk to this and never to the platform service, so a page can be created and torn
+/// down without playback noticing — which is the whole point of the player living in a service.
+/// Position is read on demand rather than pushed: the only thing that needs it continuously is a
+/// scrubber on a visible page, and having that page poll is simpler than keeping a listener alive
+/// across the service's lifetime.
+/// </summary>
+public partial class PlaybackController
+{
+    /// <summary>Book currently loaded, so a page can tell whether it is looking at what is playing.</summary>
+    public int? BookId { get; private set; }
+
+    public partial bool IsPlaying { get; }
+    public partial long PositionMs { get; }
+    public partial long DurationMs { get; }
+    public partial float Speed { get; }
+    public partial TimeSpan? SleepRemaining { get; }
+
+    /// <summary>Starts the playback service if it is not running and waits for it to come up.</summary>
+    public partial Task<bool> ConnectAsync(CancellationToken ct = default);
+
+    public partial void Play();
+    public partial void Pause();
+    public partial void SeekTo(long positionMs);
+    public partial void Nudge(long deltaMs);
+    public partial void SetSpeed(float speed);
+
+    public partial void SleepAfter(TimeSpan delay);
+
+    /// <summary>Stops when playback reaches a position — how "until the end of this chapter" is done.</summary>
+    public partial void SleepAtPosition(long positionMs);
+
+    public partial void CancelSleep();
+
+    private partial void LoadCore(string audioPath, long startMs, float speed);
+
+    public async Task<bool> LoadAsync(int bookId, string audioPath, long startMs, float speed, CancellationToken ct = default)
+    {
+        if (!await ConnectAsync(ct)) return false;
+
+        LoadCore(audioPath, startMs, speed);
+        BookId = bookId;
+        return true;
+    }
+
+    public void TogglePlayPause()
+    {
+        if (IsPlaying) Pause();
+        else Play();
+    }
+}

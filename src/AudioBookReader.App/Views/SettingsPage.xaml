@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="AudioBookReader.App.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
+    x:DataType="vm:SettingsViewModel"
+    Title="Postavke">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="20">
+
+            <Label FontAttributes="Bold" FontSize="17" Text="Kako se tekst uparuje s naracijom" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label
+                    Grid.Column="0"
+                    Text="Mjeri dok čitaš, umjesto poravnanja unaprijed"
+                    VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding LiveRefinement}" />
+            </Grid>
+
+            <Label
+                FontSize="12"
+                Text="Uobičajeno poravnanje posluša desetinu snimke i ostatak procijeni — brzo je, ali ostane oko sekunde i pol odstupanja. Ovako se ne poravnava ništa unaprijed: dok slušaš, obrađuje se pojas od dvije minute ispred tebe, cijeli, bez procjene. Točnije je, radi samo dok je čitač otvoren, i troši bateriju dok čitaš."
+                TextColor="Gray" />
+
+            <BoxView HeightRequest="1" Color="LightGray" />
+
+            <Label FontAttributes="Bold" FontSize="17" Text="Koliko smije opteretiti telefon" />
+            <Label
+                FontSize="13"
+                Text="Poravnanje sluša samo desetinu snimke, pa i najsporija postavka završi knjigu puno prije nego je stigneš odslušati."
+                TextColor="Gray" />
+
+            <CollectionView
+                x:Name="BudgetList"
+                ItemsSource="{Binding Budgets}"
+                SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:BudgetOption">
+                        <Grid Padding="0,10" ColumnDefinitions="28,*">
+
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnBudgetTapped" />
+                            </Grid.GestureRecognizers>
+
+                            <Label
+                                Grid.Column="0"
+                                FontSize="16"
+                                IsVisible="{Binding IsSelected}"
+                                Text="✓"
+                                VerticalOptions="Center" />
+
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label FontAttributes="Bold" Text="{Binding Name}" />
+                                <Label FontSize="13" Text="{Binding Estimate}" />
+                                <Label FontSize="12" Text="{Binding Detail}" TextColor="Gray" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <BoxView HeightRequest="1" Color="LightGray" />
+
+            <Label FontAttributes="Bold" FontSize="17" Text="Kad smije raditi" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label
+                    Grid.Column="0"
+                    Text="Samo dok se puni"
+                    VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding ChargingOnly}" />
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label
+                    Grid.Column="0"
+                    Text="Samo dok je ekran ugašen"
+                    VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding ScreenOffOnly}" />
+            </Grid>
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="{Binding MinimumBatteryText}" />
+                <Slider
+                    Maximum="90"
+                    Minimum="0"
+                    Value="{Binding MinimumBatteryPercent}" />
+            </VerticalStackLayout>
+
+            <Label
+                FontSize="12"
+                Text="Poravnanje se samo pauzira i nastavlja — nikad ne gubi napredak. Uz to se automatski usporava ako se telefon zagrije, bez obzira na odabranu postavku."
+                TextColor="Gray" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
