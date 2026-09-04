@@ -20,6 +20,18 @@ public static class ContentHash
     public static async Task<string> ComputeAsync(string path, CancellationToken ct = default)
     {
         await using var stream = File.OpenRead(path);
+        return await ComputeAsync(stream, ct);
+    }
+
+    /// <summary>
+    /// The same hash, from an already-open stream.
+    ///
+    /// Needed because a book may live outside app storage — referenced where the user keeps it
+    /// rather than copied in — and then there is no path to open, only a stream the platform hands
+    /// over. The stream must be seekable, which the samples depend on.
+    /// </summary>
+    public static async Task<string> ComputeAsync(Stream stream, CancellationToken ct = default)
+    {
         var length = stream.Length;
 
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);

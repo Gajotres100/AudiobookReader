@@ -75,6 +75,13 @@ public partial class LibraryViewModel(
     [ObservableProperty]
     public partial string BusyMessage { get; set; } = "";
 
+    /// <summary>0..1 through the copy, or 0 while the source will not say how large it is.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBusyFraction))]
+    public partial double BusyFraction { get; set; }
+
+    public bool HasBusyFraction => BusyFraction > 0;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
     public partial string? Error { get; set; }
@@ -98,18 +105,18 @@ public partial class LibraryViewModel(
     private Task ImportAudioAsync() => ImportAsync(
         picker.PickAudioAsync(),
         "Učitavam audioknjigu…",
-        (stream, name, ct) => importer.ImportAudioAsync(stream, name, null, ct));
+        (picked, progress, ct) => importer.ImportAudioAsync(picked, null, progress, ct));
 
     [RelayCommand]
     private Task ImportEbookAsync() => ImportAsync(
         picker.PickEbookAsync(),
         "Čitam e-knjigu…",
-        (stream, name, ct) => importer.ImportEbookAsync(stream, name, null, ct));
+        (picked, progress, ct) => importer.ImportEbookAsync(picked, null, progress, ct));
 
     private async Task ImportAsync(
-        Task<FileResult?> pick,
+        Task<PickedMedia?> pick,
         string busyMessage,
-        Func<Stream, string, CancellationToken, Task<Book>> import)
+        Func<PickedMedia, IProgress<ImportProgress>, CancellationToken, Task<Book>> import)
     {
         Error = null;
 
@@ -118,15 +125,21 @@ public partial class LibraryViewModel(
 
         IsBusy = true;
         BusyMessage = busyMessage;
+        BusyFraction = 0;
 
         try
         {
-            AppLog.Info($"import starting: '{picked.FileName}' from '{picked.FullPath}'");
+            AppLog.Info($"import starting: '{picked.FileName}' from '{picked.Location}'");
 
-            // Reading through the FileResult rather than its path: on Android the picker hands back
-            // a content URI that is not a real filesystem path.
-            await using var stream = await picked.OpenReadAsync();
-            await import(stream, picked.FileName, CancellationToken.None);
+            var progress = new Progress<ImportProgress>(p =>
+            {
+                BusyMessage = p.Message;
+                BusyFraction = p.Fraction;
+            });
+
+            // The importer is handed the pick itself, not a stream: whether the file can be left
+            // where it is — which is what makes an import instant — is its decision to make.
+            await import(picked, progress, CancellationToken.None);
 
             await LoadAsync();
         }
@@ -139,6 +152,7 @@ public partial class LibraryViewModel(
         {
             IsBusy = false;
             BusyMessage = "";
+            BusyFraction = 0;
         }
     }
 

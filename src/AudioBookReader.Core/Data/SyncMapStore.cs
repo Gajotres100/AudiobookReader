@@ -21,22 +21,30 @@ public class SyncMapStore(string directory)
 
     public bool Exists(int bookId) => File.Exists(PathFor(bookId));
 
-    public async Task<SyncMap?> LoadAsync(int bookId)
+    /// <summary>
+    /// Reads a book's map.
+    ///
+    /// Parsing happens on a worker thread rather than wherever this was awaited from. The file is
+    /// small in bytes but large in objects — a densely measured book runs to tens of thousands of
+    /// anchors — and deserializing that where the caller happens to be standing meant opening a
+    /// book froze the screen while it worked.
+    /// </summary>
+    public Task<SyncMap?> LoadAsync(int bookId) => Task.Run(() =>
     {
         var path = PathFor(bookId);
         if (!File.Exists(path)) return null;
 
         try
         {
-            await using var stream = File.OpenRead(path);
-            return await JsonSerializer.DeserializeAsync(stream, SyncMapJsonContext.Default.SyncMap);
+            using var stream = File.OpenRead(path);
+            return JsonSerializer.Deserialize(stream, SyncMapJsonContext.Default.SyncMap);
         }
         catch (JsonException)
         {
             // A corrupt map is not worth failing the book over; alignment can rebuild it.
             return null;
         }
-    }
+    });
 
     public async Task SaveAsync(int bookId, SyncMap map)
     {

@@ -39,16 +39,6 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings) : Observ
     [ObservableProperty]
     public partial string SelectedBudgetName { get; set; } = "";
 
-    /// <summary>
-    /// Measure what is being read, as it is read, instead of sampling the whole book beforehand.
-    ///
-    /// Presented as one choice rather than two settings because that is what it is: either the
-    /// whole book is mapped roughly in advance, or the few minutes around the listener are mapped
-    /// exactly and nothing else is.
-    /// </summary>
-    [ObservableProperty]
-    public partial bool LiveRefinement { get; set; }
-
     [ObservableProperty]
     public partial bool ChargingOnly { get; set; }
 
@@ -71,7 +61,6 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings) : Observ
             Budgets.Add(new BudgetOption(preset, preset.Name == current.Name));
 
         SelectedBudgetName = current.Name;
-        LiveRefinement = settings.LiveRefinement;
         ChargingOnly = settings.ChargingOnly;
         ScreenOffOnly = settings.ScreenOffOnly;
         MinimumBatteryPercent = settings.MinimumBatteryPercent;
@@ -82,8 +71,6 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings) : Observ
         settings.Budget = option.Budget;
         Load();
     }
-
-    partial void OnLiveRefinementChanged(bool value) => settings.LiveRefinement = value;
 
     partial void OnChargingOnlyChanged(bool value) => settings.ChargingOnly = value;
 

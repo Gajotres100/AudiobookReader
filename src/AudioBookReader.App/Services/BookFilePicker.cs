@@ -1,5 +1,9 @@
 namespace AudioBookReader.App.Services;
 
+/// <summary>A chosen file: where it is, and what it is called.</summary>
+/// <param name="Location">A path, or a <c>content://</c> URI when the file stays where the user keeps it.</param>
+public record PickedMedia(string Location, string FileName);
+
 /// <summary>
 /// Picks a book file.
 ///
@@ -12,13 +16,18 @@ namespace AudioBookReader.App.Services;
 ///
 /// So the file is accepted here and judged by what it actually contains: the importer refuses
 /// audio with no readable duration and text it cannot parse, and says so.
+///
+/// The system picker is asked for directly rather than through the cross-platform one, which
+/// copies the chosen file into the app's cache before handing it over. For a half-gigabyte
+/// audiobook that meant the file was copied twice and the wait doubled, for a copy that is thrown
+/// away — and it hid the document behind a cache path, so the file could never simply be left where
+/// it was.
 /// </summary>
-public class BookFilePicker
+public partial class BookFilePicker
 {
-    public Task<FileResult?> PickAudioAsync(string prompt = "Odaberi audioknjigu") => PickAsync(prompt);
+    public Task<PickedMedia?> PickAudioAsync(string prompt = "Odaberi audioknjigu") => PickAsync(prompt);
 
-    public Task<FileResult?> PickEbookAsync(string prompt = "Odaberi e-knjigu") => PickAsync(prompt);
+    public Task<PickedMedia?> PickEbookAsync(string prompt = "Odaberi e-knjigu") => PickAsync(prompt);
 
-    private static Task<FileResult?> PickAsync(string prompt) =>
-        FilePicker.Default.PickAsync(new PickOptions { PickerTitle = prompt });
+    private partial Task<PickedMedia?> PickAsync(string prompt);
 }

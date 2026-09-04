@@ -76,58 +76,80 @@ public class ChapterAligner(
             var transcript = await transcriber.TranscribeAsync(request.AudioPath, probe.StartMs, probe.DurationMs, ct);
             var words = transcript.Words;
 
-            if (words.Count == 0)
+            if (words.Count > 0)
             {
-                // Distinguishing "heard nothing" from "heard something unrecognizable" is the
-                // difference between a decoding problem and a matching problem, and the anchors
-                // alone cannot tell them apart afterwards.
-                log?.Invoke($"ch{request.ChapterIndex} probe@{probe.StartMs}ms: no speech recognised");
-            }
-            else
-            {
-                var match = TranscriptMatcher.MatchNear(
-                    book,
-                    [.. words.Select(w => w.Value)],
-                    book.TokenIndexAtChar(predictedChar),
-                    radius,
-                    _settings.MinConfidence);
+                // Located one timed phrase at a time rather than as a single block. A probe found
+                // only at its two ends is a straight line drawn across everything in between, and
+                // the longer the probe the worse that line fits — which is what kept probes short
+                // and therefore expensive, since recognition costs the same for ten seconds as for
+                // thirty. Phrase by phrase, a long probe is a run of anchors instead of a guess.
+                var located = 0;
 
-                if (match is not null)
+                foreach (var phrase in transcript.Phrases)
                 {
-                    // Both ends of the probe, timed by when those words were actually spoken rather
-                    // than by when the probe happened to begin. The pair costs nothing beyond the
-                    // recognition already done, and it pins the stretch the probe covers instead of
-                    // leaving its far end to interpolation.
+                    ct.ThrowIfCancellationRequested();
+
+                    var expected = lastAccepted is { } anchor
+                        ? (int)Math.Round(anchor.CharOffset + charsPerMs * (phrase.StartMs - anchor.AudioMs))
+                        : predictedChar;
+
+                    // Once a phrase in this probe has been placed, the next one is seconds away and
+                    // must be searched for accordingly. A ten-word phrase is short enough to occur
+                    // plausibly elsewhere in a novel, so hunting for it across hundreds of words
+                    // finds confident nonsense — measurably worse than not looking at all, because
+                    // a wrong anchor drags the interpolation around it.
+                    var reach = located > 0 ? _settings.PhraseRadiusTokens : radius;
+
+                    var found = TranscriptMatcher.MatchNear(
+                        book,
+                        [.. phrase.Words.Select(w => w.Value)],
+                        book.TokenIndexAtChar(expected),
+                        reach,
+                        _settings.MinConfidence);
+
+                    if (found is null) continue;
+
                     var opening = new Anchor(
-                        words[match.Value.TranscriptStart].AtMs,
-                        match.Value.CharOffset,
-                        match.Value.Confidence);
+                        phrase.Words[found.Value.TranscriptStart].AtMs,
+                        found.Value.CharOffset,
+                        found.Value.Confidence);
 
                     var closing = new Anchor(
-                        words[match.Value.TranscriptEnd].AtMs,
-                        match.Value.EndCharOffset,
-                        match.Value.Confidence);
+                        phrase.Words[found.Value.TranscriptEnd].AtMs,
+                        found.Value.EndCharOffset,
+                        found.Value.Confidence);
 
                     anchors.Add(opening);
 
-                    // Only when it says something the opening does not; a one-word match, or a
-                    // recognizer reporting a single instant for the lot, gives no second point.
                     if (closing.AudioMs > opening.AudioMs && closing.CharOffset > opening.CharOffset)
                         anchors.Add(closing);
 
-                    matches++;
                     charsPerMs = UpdateRate(charsPerMs, lastAccepted, opening);
                     lastAccepted = anchors[^1];
+                    located++;
+                }
+
+                if (located > 0)
+                {
+                    matches++;
                     radius = _settings.SearchRadiusTokens;
                 }
                 else
                 {
                     log?.Invoke(
-                        $"ch{request.ChapterIndex} probe@{probe.StartMs}ms: {words.Count} words, no match within " +
-                        $"{radius} of char {predictedChar} — heard: \"{Preview(transcript.Text)}\"");
+                        $"ch{request.ChapterIndex} probe@{probe.StartMs}ms: {words.Count} words in " +
+                        $"{transcript.Phrases.Count} phrases, none matched within {radius} of char " +
+                        $"{predictedChar} — heard: \"{Preview(transcript.Text)}\"");
 
                     radius = Math.Min(radius * 3, _settings.MaximumSearchRadiusTokens);
                 }
+            }
+            else
+            {
+                // Distinguishing "heard nothing" from "heard something unrecognizable" is the
+                // difference between a decoding problem and a matching problem, and the anchors
+                // alone cannot tell them apart afterwards.
+                log?.Invoke($"ch{request.ChapterIndex} probe@{probe.StartMs}ms: no speech recognised");
             }
 
             progress?.Report(new AlignmentProgress(request.ChapterIndex, i + 1, probes.Count, matches));

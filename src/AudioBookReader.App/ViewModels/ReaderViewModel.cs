@@ -14,10 +14,15 @@ public partial class ReaderViewModel(
     SyncMapStore syncMaps,
     BookTextExtractors extractors,
     PlaybackController playback,
-    AlignmentQueue alignment,
-    AlignmentSettingsStore settings) : ObservableObject, IDisposable
+    LiveSyncRunner liveSync) : ObservableObject, IDisposable
 {
     private Book? _book;
+
+    /// <summary>
+    /// Whether this book measures the passage being read as it is read, rather than having been
+    /// aligned in advance. A property of the book, chosen on its own page.
+    /// </summary>
+    private bool MeasuresWhileReading => _book?.MeasureWhileReading == true;
     private BookText? _text;
     private BookSync? _sync;
     private IDispatcherTimer? _ticker;
@@ -272,14 +277,27 @@ public partial class ReaderViewModel(
     [NotifyPropertyChangedFor(nameof(DocumentLabel))]
     public partial int PageCount { get; set; }
 
+    /// <summary>The chapter the eye is on, which scrolling changes without any page turn.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DocumentLabel))]
+    public partial string CurrentChapterTitle { get; set; } = "";
+
     public string DocumentLabel
     {
         get
         {
             if (_text is null) return "";
 
-            var document = $"{SpineIndex + 1} / {_text.Spine.Count}";
-            return PageCount > 1 ? $"{document}   ·   str. {PageNumber} / {PageCount}" : document;
+            var pages = PageCount > 1 ? $"str. {PageNumber} / {PageCount}" : "";
+            var chapter = CurrentChapterTitle;
+
+            return (chapter, pages) switch
+            {
+                ("", "") => $"{SpineIndex + 1} / {_text.Spine.Count}",
+                (_, "") => chapter,
+                ("", _) => pages,
+                _ => $"{chapter}   ·   {pages}",
+            };
         }
     }
 
@@ -289,10 +307,29 @@ public partial class ReaderViewModel(
     /// </summary>
     public int EntryPage { get; private set; }
 
-    public void OnPagesReported(int page, int count)
+    public void OnPagesReported(int page, int count, int topSentence)
     {
         PageNumber = page;
         PageCount = count;
+
+        CurrentChapterTitle = ChapterTitleAtSentence(topSentence);
+    }
+
+    /// <summary>
+    /// Which of the ebook's own chapters a sentence falls in.
+    ///
+    /// The ebook's chapters, not the library's: for a paired book those come from the audiobook's
+    /// marks and carry no text ranges until alignment has run, so they cannot name where the reader
+    /// is looking in a book that has not been aligned.
+    /// </summary>
+    private string ChapterTitleAtSentence(int sentenceIndex)
+    {
+        if (_text is null || sentenceIndex < 0 || sentenceIndex >= _text.Sentences.Count) return "";
+
+        var offset = _text.Sentences[sentenceIndex].Start;
+
+        var chapter = _readerChapters.LastOrDefault(c => c.TextStart is { } start && start <= offset);
+        return chapter?.Title ?? "";
     }
 
     /// <summary>Slider for moving through the pages of the chapter, hidden until asked for.</summary>
@@ -410,7 +447,11 @@ public partial class ReaderViewModel(
 
             // Following measures the passage being read while it is read, so it belongs to the
             // reader's lifetime: started here, stopped when the page goes away.
-            if (_book.IsPaired && settings.LiveRefinement) alignment.StartFollowing(BookId);
+            if (_book.IsPaired && MeasuresWhileReading)
+            {
+                liveSync.Progress += OnLiveSyncProgress;
+                liveSync.Start(BookId);
+            }
 
             await ShowStartingDocumentAsync();
             StartTicking();
@@ -507,6 +548,48 @@ public partial class ReaderViewModel(
             _lastSentence = sentence.Index;
             HighlightRequested?.Invoke(this, sentence.Index);
         }
+
+        await MoveNarrationToAsync(index, start);
+    }
+
+    /// <summary>
+    /// Takes the narration to the chapter the reader just jumped to.
+    ///
+    /// Without this the two halves come apart: the text is at chapter two and the voice is still in
+    /// chapter one, so following either drags the page back or measures a passage nobody is
+    /// reading. Moving the audio is also what lets sync on the fly pick the chapter up — it works
+    /// forward from wherever playback is, so putting playback in the right place is the whole
+    /// instruction it needs.
+    /// </summary>
+    private async Task MoveNarrationToAsync(int chapterIndex, int textStart)
+    {
+        if (_book?.HasAudio != true) return;
+
+        // Best evidence first: a map that already covers this passage knows exactly when it is read.
+        if (_sync?.AudioPositionAtSentence(_lastSentence) is { } known)
+        {
+            playback.SeekTo(known);
+            return;
+        }
+
+        var chapters = await database.GetChaptersAsync(BookId);
+
+        // Failing that, the book's own chapter marks. Matching them by position rather than by
+        // index, because an ebook's front matter routinely gives it chapters the audio has not.
+        var target = chapters.Count == _readerChapters.Count
+            ? chapters.FirstOrDefault(c => c.Index == chapterIndex)
+            : null;
+
+        if (target?.StartMs is { } at)
+        {
+            playback.SeekTo(at);
+            return;
+        }
+
+        // Nothing lines up, so place it by proportion — sync on the fly will correct it within a
+        // window or two, and being a minute out beats being a chapter out.
+        if (_text is { PlainText.Length: > 0 } text && _book.DurationMs > 0)
+            playback.SeekTo((long)(_book.DurationMs * (textStart / (double)text.PlainText.Length)));
     }
 
     private DateTime _lastMapCheck = DateTime.MinValue;
@@ -602,7 +685,7 @@ public partial class ReaderViewModel(
 
         // No map yet is exactly the state a finishing alignment gets us out of, so keep looking —
         // and while following, the map grows under us continuously, so keep looking regardless.
-        if (_sync is null || settings.LiveRefinement) MaybeRefreshSyncMap();
+        if (_sync is null || MeasuresWhileReading) MaybeRefreshSyncMap();
 
         if (!IsFollowing || _sync is null || !playback.IsPlaying)
         {
@@ -626,7 +709,7 @@ public partial class ReaderViewModel(
 
             var chapter = _sync.ChapterAt(at);
 
-            FollowStatus = settings.LiveRefinement
+            FollowStatus = MeasuresWhileReading
                 ? "Mjerim ovaj dio — tekst kreće za koji trenutak."
                 : chapter is null
                     ? "Ovaj dio knjige još nije poravnan."
@@ -695,7 +778,7 @@ public partial class ReaderViewModel(
         {
             // Nothing has measured this passage yet, so there is no audio position to jump to.
             // Saying so beats a press that silently does nothing.
-            FollowStatus = settings.LiveRefinement
+            FollowStatus = MeasuresWhileReading
                 ? "Ovaj dio još nije izmjeren — pusti zvuk pa će ga izmjeriti."
                 : "Ovaj dio još nije poravnan.";
         }
@@ -720,13 +803,18 @@ public partial class ReaderViewModel(
     [RelayCommand]
     private Task CloseAsync() => Shell.Current.GoToAsync("..");
 
+    /// <summary>Only shown while nothing more important has the status line.</summary>
+    private void OnLiveSyncProgress(object? sender, string message)
+    {
+        if (_sync is null || !CanFollow) FollowStatus = message;
+    }
+
     public void Dispose()
     {
         _ticker?.Stop();
 
-        // Only a run this page started. A whole-book alignment the user asked for on the book page
-        // is theirs to stop, and closing the reader is not that.
-        if (alignment.Status.IsFollowing) alignment.Stop();
+        liveSync.Progress -= OnLiveSyncProgress;
+        liveSync.Stop();
     }
 
     /// <summary>
@@ -761,21 +849,19 @@ public partial class ReaderViewModel(
                 transition: opacity 140ms linear; z-index: 10;
               }
               #size.on { opacity: 1; }
-              /* Scrolled programmatically rather than moved with a transform: an element with
-                 overflow:hidden clips its own later columns, so translating it would slide a box
-                 whose content past the first page had already been cut away. overflow:hidden still
-                 permits scripted scrolling, which is exactly what is wanted — pages, no scrollbar,
-                 no dragging. */
+              /* One continuous column, scrolled downwards. Text that flows on rather than breaking
+                 into fixed pages is what the reader asked for and what a phone does naturally: a
+                 sentence is never cut in half by a page edge, and the thumb already knows how to
+                 move it. */
               #content {
                 box-sizing: border-box;
                 height: 100%;
-                padding: 22px 20px;
-                overflow: hidden;
-                scroll-behavior: smooth;
-                column-width: calc(100vw - 40px);
-                column-gap: 40px;
-                column-fill: auto;
+                padding: 22px 20px 40vh;
+                overflow-y: auto;
+                overflow-x: hidden;
+                -webkit-overflow-scrolling: touch;
               }
+              #content::-webkit-scrollbar { width: 0; }
               img { max-width: 100%; max-height: 76vh; height: auto; }
               p { margin: 0 0 0.85em; }
               h1, h2, h3 { margin: 0 0 0.6em; }
@@ -794,35 +880,45 @@ public partial class ReaderViewModel(
             </div>
             <script>
               var content = document.getElementById('content');
-              var page = 0, pageCount = 1, current = -1;
+              var pageCount = 1, current = -1, reported = '';
 
-              function step() { return window.innerWidth; }
+              // A "page" is one screenful. The text scrolls freely, but the slider and the counter
+              // still need a unit, and a screenful is the one the reader can see.
+              function step() { return content.clientHeight; }
+
+              function pageNow() {
+                return Math.max(0, Math.round(content.scrollTop / step()));
+              }
 
               function measure() {
-                // scrollWidth spans every column, so it gives the page count directly.
-                pageCount = Math.max(1, Math.round(content.scrollWidth / step()));
-                if (page > pageCount - 1) page = pageCount - 1;
-                apply();
+                pageCount = Math.max(1, Math.ceil(content.scrollHeight / step()));
+                report();
               }
 
-              function apply() {
-                content.scrollLeft = page * step();
-                location.href = 'abr://pages/' + (page + 1) + '/' + pageCount;
+              function report() {
+                var page = pageNow();
+                var top = topSentence();
+
+                // The sentence travels with the page so the host can name the chapter being read.
+                // Scrolling is the only thing that moves it, and the host has no other way to know.
+                var state = page + '/' + pageCount + '/' + top;
+                if (state === reported) return;
+
+                reported = state;
+                location.href = 'abr://pages/' + (page + 1) + '/' + pageCount + '/' + top;
               }
 
-              // -1 means "the last page", used when arriving backwards from the next document.
+              // -1 means "the end", used when arriving backwards from the document after this one.
               function goToPage(n) {
-                page = n < 0 ? pageCount - 1 : Math.max(0, Math.min(n, pageCount - 1));
-                apply();
+                var page = n < 0 ? pageCount - 1 : Math.max(0, Math.min(n, pageCount - 1));
+                content.scrollTop = page * step();
+                report();
               }
 
-              function turn(forward) {
-                if (forward && page < pageCount - 1) { page++; apply(); return; }
-                if (!forward && page > 0) { page--; apply(); return; }
-
-                // Past the edge of this document, so the host moves to the next or previous one.
-                location.href = forward ? 'abr://page/next' : 'abr://page/previous';
-              }
+              content.addEventListener('scroll', function () {
+                clearTimeout(window.__scrollReport);
+                window.__scrollReport = setTimeout(report, 120);
+              }, { passive: true });
 
               function highlight(idx) {
                 if (idx === current) return;
@@ -832,19 +928,42 @@ public partial class ReaderViewModel(
                 parts.forEach(function (e) { e.classList.add('hl'); });
                 current = idx;
 
-                // Turn to whichever page the sentence fell on rather than scrolling to it.
-                if (parts.length) {
-                  var left = parts[0].getBoundingClientRect().left + content.scrollLeft;
-                  goToPage(Math.floor(left / step()));
-                }
+                if (!parts.length) return;
+
+                // Scrolled only when the sentence has left the comfortable band, and then brought
+                // to a third of the way down rather than to the top. Following the voice line by
+                // line would keep the page in constant motion, which is unreadable; letting it
+                // reach the bottom edge before moving means the reader can always see what comes
+                // next.
+                var box = parts[0].getBoundingClientRect();
+                var height = content.clientHeight;
+
+                if (box.top > height * 0.12 && box.bottom < height * 0.78) return;
+
+                content.scrollTo({
+                  top: content.scrollTop + box.top - height * 0.32,
+                  behavior: 'smooth'
+                });
               }
 
-              // The first sentence on the current page, used to remember the reading position.
+              // Puts a sentence back where the eye was after the text has reflowed under it — which
+              // it does whenever the size or the face changes.
+              function keepInView(idx) {
+                if (idx === '-1') return;
+
+                var parts = document.querySelectorAll('[data-idx="' + idx + '"]');
+                if (!parts.length) return;
+
+                content.scrollTop += parts[0].getBoundingClientRect().top - content.clientHeight * 0.12;
+                report();
+              }
+
+              // The first sentence visible, used to remember the reading position.
               function topSentence() {
                 var spans = document.querySelectorAll('[data-idx]');
                 for (var i = 0; i < spans.length; i++) {
                   var box = spans[i].getBoundingClientRect();
-                  if (box.right > 0 && box.left < step()) return spans[i].getAttribute('data-idx');
+                  if (box.bottom > 0 && box.top < content.clientHeight) return spans[i].getAttribute('data-idx');
                 }
                 return '-1';
               }
@@ -900,22 +1019,20 @@ public partial class ReaderViewModel(
                 var dx = e.changedTouches[0].clientX - startX;
                 var dy = e.changedTouches[0].clientY - startY;
 
-                if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)) {
+                // Down the page belongs to the text now, so only sideways is a gesture: it moves
+                // between the book's documents, which is the one thing scrolling cannot do.
+                if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
                   swiped = true;
-                  turn(dx < 0);
+                  location.href = dx < 0 ? 'abr://page/next' : 'abr://page/previous';
                   return;
                 }
 
-                // A pull downwards opens the chapter list — there is no vertical scrolling to
-                // confuse it with.
-                if (dy > 80 && Math.abs(dy) > Math.abs(dx)) {
-                  swiped = true;
-                  location.href = 'abr://chapters';
-                }
+                // A finger that moved at all was scrolling, not tapping.
+                if (Math.abs(dx) > 12 || Math.abs(dy) > 12) swiped = true;
               }, { passive: true });
 
               document.addEventListener('click', function (e) {
-                // Neither a swipe nor a completed hold should also count as a tap.
+                // Neither a scroll nor a completed hold should also count as a tap.
                 if (swiped) { swiped = false; return; }
                 if (held) { held = false; return; }
 
@@ -936,14 +1053,7 @@ public partial class ReaderViewModel(
                 rule.textContent = 'span.hl { background: ' + hl + '; border-radius: 3px; }';
 
                 measure();
-
-                if (anchor !== '-1') {
-                  var parts = document.querySelectorAll('[data-idx="' + anchor + '"]');
-                  if (parts.length) {
-                    var left = parts[0].getBoundingClientRect().left + content.scrollLeft;
-                    goToPage(Math.floor(left / step()));
-                  }
-                }
+                keepInView(anchor);
               }
 
               // Pinch to resize the text.
@@ -991,14 +1101,7 @@ public partial class ReaderViewModel(
                 document.body.style.fontSize = size + 'px';
                 showSize(size);
                 measure();
-
-                if (anchor !== '-1') {
-                  var parts = document.querySelectorAll('[data-idx="' + anchor + '"]');
-                  if (parts.length) {
-                    var left = parts[0].getBoundingClientRect().left + content.scrollLeft;
-                    goToPage(Math.floor(left / step()));
-                  }
-                }
+                keepInView(anchor);
               }, { passive: true });
 
               document.addEventListener('touchend', function (e) {

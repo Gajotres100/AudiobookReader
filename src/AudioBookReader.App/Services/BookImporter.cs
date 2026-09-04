@@ -5,6 +5,10 @@ using AudioBookReader.Core.Models;
 
 namespace AudioBookReader.App.Services;
 
+/// <summary>How far an import has got, for a screen that would otherwise look frozen.</summary>
+/// <param name="Fraction">0..1, or 0 when the source will not say how large it is.</param>
+public record ImportProgress(string Message, double Fraction);
+
 /// <summary>
 /// Brings a file into the library: copies it into app storage, reads what it can from it, and
 /// either creates a book or attaches it to one.
@@ -17,24 +21,45 @@ public class BookImporter(
     LibraryService library,
     LibraryDatabase database,
     SyncMapStore syncMaps,
-    BookTextExtractors extractors)
+    BookTextExtractors extractors,
+    MediaReferences references)
 {
     public bool IsAudio(string fileName) => AudioBookProbe.IsSupportedAudioFile(fileName);
 
     public bool IsEbook(string fileName) => extractors.CanHandle(fileName);
 
     /// <summary>Imports an audiobook as a new book, or attaches it to <paramref name="attachTo"/>.</summary>
+    /// <summary>
+    /// Imports an audiobook, leaving the file where the user keeps it when the system allows.
+    ///
+    /// An audiobook is hundreds of megabytes and copying one takes half a minute and twice the
+    /// storage — for a file the system will happily keep serving in place. So the copy is not made
+    /// unless it has to be, which is why this is instant for the common case of simply adding
+    /// something to listen to. A book that is later paired with its text gets copied in then, since
+    /// alignment is the one job that reads the file over and over for hours.
+    /// </summary>
     public async Task<Book> ImportAudioAsync(
-        Stream source,
-        string fileName,
+        PickedMedia picked,
         int? attachTo = null,
+        IProgress<ImportProgress>? progress = null,
         CancellationToken ct = default)
     {
-        var path = await CopyInAsync(source, fileName, ct);
+        var referenced = references.TryHold(picked.Location);
+        var location = picked.Location;
+
+        if (!referenced)
+        {
+            await using var source = references.OpenRead(picked.Location);
+            location = await CopyInAsync(source, picked.FileName, progress, ct);
+        }
+
+        AppLog.Info($"audio import: {(referenced ? "referenced" : "copied")} '{location}'");
 
         try
         {
-            var info = await AudioBookProbe.ProbeAsync(path, ct);
+            progress?.Report(new ImportProgress("Čitam poglavlja…", 1));
+
+            var info = await ProbeAsync(location, picked.FileName, referenced, ct);
 
             // Whether this is an audiobook is decided by what the decoder found, not by the name.
             // A file with no readable duration is not something that can be played, whatever it is
@@ -42,14 +67,14 @@ public class BookImporter(
             if (info.DurationMs <= 0)
                 throw new NotSupportedException("Ovo ne izgleda kao audio datoteka — nije pronađen zvučni zapis.");
 
-            var hash = await ContentHash.ComputeAsync(path, ct);
+            var hash = await HashAsync(location, ct);
 
             var coverPath = info.Cover is { Length: > 0 }
-                ? await SaveCoverAsync(info.Cover, Path.GetFileNameWithoutExtension(fileName), ct)
+                ? await SaveCoverAsync(info.Cover, Path.GetFileNameWithoutExtension(picked.FileName), ct)
                 : null;
 
             var attachment = new AudioAttachment(
-                path, hash, info.DurationMs, info.Chapters, info.Title, info.Author, coverPath);
+                location, hash, info.DurationMs, info.Chapters, info.Title, info.Author, coverPath);
 
             return attachTo is { } bookId
                 ? await library.AttachAudioAsync(bookId, attachment)
@@ -57,24 +82,90 @@ public class BookImporter(
         }
         catch
         {
-            // The copy is made before the file can be inspected, so a rejected import has to take
-            // it back out again or app storage fills with files no book refers to.
-            TryDelete(path);
+            // A copy is made before the file can be inspected, so a rejected import has to take it
+            // back out again or app storage fills with files no book refers to. A reference owns
+            // nothing, but the permission it took should not be kept either.
+            if (referenced) references.Release(location);
+            else TryDelete(location);
+
             throw;
         }
     }
 
-    /// <summary>Imports an ebook as a new book, or attaches it to <paramref name="attachTo"/>.</summary>
-    public async Task<Book> ImportEbookAsync(
-        Stream source,
-        string fileName,
-        int? attachTo = null,
+    private Task<AudioBookInfo> ProbeAsync(string location, string fileName, bool referenced, CancellationToken ct)
+    {
+        if (!referenced) return AudioBookProbe.ProbeAsync(location, ct);
+
+        var stream = references.OpenRead(location);
+        return ProbeAndCloseAsync(stream, fileName, ct);
+    }
+
+    private static async Task<AudioBookInfo> ProbeAndCloseAsync(Stream stream, string fileName, CancellationToken ct)
+    {
+        await using (stream)
+            return await AudioBookProbe.ProbeAsync(stream, fileName, ct);
+    }
+
+    private async Task<string> HashAsync(string location, CancellationToken ct)
+    {
+        await using var stream = references.OpenRead(location);
+        return await ContentHash.ComputeAsync(stream, ct);
+    }
+
+    /// <summary>
+    /// Makes sure a book's audio is a local copy, copying it in if it is only referenced.
+    ///
+    /// Called when a book gains its second medium and becomes a read-along. Alignment reads the
+    /// audio in short bursts over hours; a reference can point at a cloud document that would be
+    /// fetched afresh every time, or at a card the user can pull out mid-run. The identity hash is
+    /// unchanged by copying, so alignment already done is not invalidated.
+    /// </summary>
+    public async Task<Book?> EnsureLocalAudioAsync(
+        int bookId,
+        IProgress<ImportProgress>? progress = null,
         CancellationToken ct = default)
     {
-        var path = await CopyInAsync(source, fileName, ct);
+        var book = await database.GetBookAsync(bookId);
+        if (book?.AudioPath is not { } location || !references.IsReference(location)) return book;
+
+        progress?.Report(new ImportProgress("Pripremam za poravnanje…", 0));
+
+        var name = Path.GetFileName(location.TrimEnd('/'));
+        if (string.IsNullOrWhiteSpace(name) || !Path.HasExtension(name)) name = $"{book.Title}.m4b";
+
+        await using (var source = references.OpenRead(location))
+            book.AudioPath = await CopyInAsync(source, name, progress, ct);
+
+        await database.UpdateBookAsync(book);
+        references.Release(location);
+
+        AppLog.Info($"audio copied in for alignment: '{book.AudioPath}'");
+        return book;
+    }
+
+    /// <summary>Imports an ebook as a new book, or attaches it to <paramref name="attachTo"/>.</summary>
+    /// <summary>
+    /// Imports an ebook, always copying it in.
+    ///
+    /// Unlike an audiobook this is a few megabytes and copies faster than the eye notices, and the
+    /// text is read repeatedly — every page turn, every alignment pass — so owning it is worth the
+    /// space it costs.
+    /// </summary>
+    public async Task<Book> ImportEbookAsync(
+        PickedMedia picked,
+        int? attachTo = null,
+        IProgress<ImportProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        await using var source = references.OpenRead(picked.Location);
+
+        var fileName = picked.FileName;
+        var path = await CopyInAsync(source, fileName, progress, ct);
 
         try
         {
+            progress?.Report(new ImportProgress("Čitam tekst…", 1));
+
             var extracted = await extractors.ExtractAsync(path, ct);
 
             if (extracted.Text.PlainText.Length == 0)
@@ -167,20 +258,91 @@ public class BookImporter(
         // under the other one would break a book the user did not touch.
         if (await database.FindBookByMediaPathAsync(path) is not null) return;
 
+        // A referenced file is the user's own, sitting wherever they keep it. Removing it from the
+        // library gives back the permission and nothing else — deleting someone's audiobook because
+        // they tidied their library would be unforgivable.
+        if (references.IsReference(path))
+        {
+            references.Release(path);
+            return;
+        }
+
         if (path.StartsWith(AppPaths.Books, StringComparison.OrdinalIgnoreCase) && File.Exists(path))
             File.Delete(path);
     }
 
-    private static async Task<string> CopyInAsync(Stream source, string fileName, CancellationToken ct)
+    /// <summary>
+    /// Copies the picked file into app storage, saying how far along it is.
+    ///
+    /// An audiobook is often several hundred megabytes, so this is the slow part of an import and
+    /// there is no making it instant — but a screen that sits still for half a minute reads as a
+    /// hung app, while the same wait with a percentage on it reads as work.
+    /// </summary>
+    private static async Task<string> CopyInAsync(
+        Stream source,
+        string fileName,
+        IProgress<ImportProgress>? progress,
+        CancellationToken ct)
     {
         Directory.CreateDirectory(AppPaths.Books);
 
         var path = UniquePath(AppPaths.Books, SafeName(fileName));
 
-        await using (var destination = File.Create(path))
-            await source.CopyToAsync(destination, ct);
+        // A megabyte at a time. The picker hands back a stream from a content provider, and each
+        // read crosses a process boundary — the default eighty-kilobyte buffer pays that toll more
+        // than ten times as often.
+        const int bufferSize = 1024 * 1024;
+
+        var total = TotalLength(source);
+        var buffer = new byte[bufferSize];
+
+        long copied = 0;
+        var lastPercent = -1;
+        var lastMegabytes = -1L;
+
+        await using (var destination = new FileStream(
+            path, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize, useAsync: true))
+        {
+            int read;
+            while ((read = await source.ReadAsync(buffer, ct)) > 0)
+            {
+                await destination.WriteAsync(buffer.AsMemory(0, read), ct);
+                copied += read;
+
+                if (total > 0)
+                {
+                    var percent = (int)(copied * 100 / total);
+                    if (percent == lastPercent) continue;
+
+                    lastPercent = percent;
+                    progress?.Report(new ImportProgress($"Kopiram… {percent}%", copied / (double)total));
+                }
+                else
+                {
+                    // Some providers will not give a length. Megabytes still show movement.
+                    var megabytes = copied / (1024 * 1024);
+                    if (megabytes == lastMegabytes) continue;
+
+                    lastMegabytes = megabytes;
+                    progress?.Report(new ImportProgress($"Kopiram… {megabytes} MB", 0));
+                }
+            }
+        }
 
         return path;
+    }
+
+    /// <summary>The source's size, or zero when it will not say — content streams often will not.</summary>
+    private static long TotalLength(Stream source)
+    {
+        try
+        {
+            return source.CanSeek ? source.Length : 0;
+        }
+        catch (NotSupportedException)
+        {
+            return 0;
+        }
     }
 
     private static async Task<string> SaveCoverAsync(byte[] cover, string name, CancellationToken ct)

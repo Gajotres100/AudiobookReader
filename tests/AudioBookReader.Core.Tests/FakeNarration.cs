@@ -61,8 +61,12 @@ public sealed class FakeNarration(
     /// <summary>How long the narrator stays silent at the start of each probe.</summary>
     public long PauseMs { get; } = pauseMs;
 
-    /// <summary>Segments a real recognizer would report, each with the time it was spoken.</summary>
-    private const int SegmentsPerProbe = 3;
+    /// <summary>
+    /// How long a stretch the recognizer times as one segment. whisper breaks at phrase
+    /// boundaries, which land every few seconds, so a longer probe yields proportionally more
+    /// segments rather than the same number of longer ones.
+    /// </summary>
+    private const long SegmentMs = 3_500;
 
     public Task<Transcript> TranscribeAsync(string audioPath, long startMs, long durationMs, CancellationToken ct = default)
     {
@@ -82,11 +86,12 @@ public sealed class FakeNarration(
         if (endMs <= speechStart) return Task.FromResult(Transcript.Empty);
 
         var segments = new List<TranscriptSegment>();
+        var count = (int)Math.Max(1, (endMs - speechStart) / SegmentMs);
 
-        for (var i = 0; i < SegmentsPerProbe; i++)
+        for (var i = 0; i < count; i++)
         {
-            var from = speechStart + (endMs - speechStart) * i / SegmentsPerProbe;
-            var to = speechStart + (endMs - speechStart) * (i + 1) / SegmentsPerProbe;
+            var from = speechStart + (endMs - speechStart) * i / count;
+            var to = speechStart + (endMs - speechStart) * (i + 1) / count;
 
             var heard = Text[CharAt(from)..CharAt(to)];
             if (heard.Length == 0) continue;

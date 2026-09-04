@@ -81,6 +81,14 @@
                     Style="{StaticResource Chrome}"
                     Text="{Binding PlayLabel}" />
 
+                <!--  Was a downward swipe; that gesture now belongs to scrolling the text.  -->
+                <Button
+                    Grid.Column="2"
+                    Command="{Binding JumpToChapterCommand}"
+                    IsEnabled="{Binding HasChapters}"
+                    Style="{StaticResource Chrome}"
+                    Text="Poglavlja" />
+
                 <Button
                     Grid.Column="3"
                     Command="{Binding ChooseThemeCommand}"

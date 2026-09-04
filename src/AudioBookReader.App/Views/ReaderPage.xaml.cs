@@ -135,9 +135,15 @@ public partial class ReaderPage : ContentPage
         {
             e.Cancel = true;
 
-            var parts = e.Url[PagesScheme.Length..].Split('/');
-            if (parts.Length == 2 && int.TryParse(parts[0], out var page) && int.TryParse(parts[1], out var count))
-                _viewModel.OnPagesReported(page, count);
+            var parts = e.Url[PagesScheme.Length..].TrimEnd('/').Split('/');
+
+            if (parts.Length >= 2 && int.TryParse(parts[0], out var page) && int.TryParse(parts[1], out var count))
+            {
+                // The sentence at the top rides along so the footer can name the chapter; a page
+                // count on its own cannot, since scrolling never changes the document.
+                var top = parts.Length >= 3 && int.TryParse(parts[2], out var sentence) ? sentence : -1;
+                _viewModel.OnPagesReported(page, count, top);
+            }
 
             return;
         }

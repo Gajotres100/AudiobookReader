@@ -54,6 +54,54 @@ public partial class BookPage : ContentPage
         return base.OnBackButtonPressed();
     }
 
+    private CancellationTokenSource? _holdingBookmark;
+
+    /// <summary>
+    /// Distinguishes a tap on the flag from a hold.
+    ///
+    /// MAUI has no long-press gesture, so it is timed here: holding past the threshold saves the
+    /// spot and marks the press as spent, and a release before then opens the list instead.
+    /// </summary>
+    private async void OnBookmarkPressed(object? sender, EventArgs e)
+    {
+        _holdingBookmark?.Cancel();
+        _holdingBookmark = new CancellationTokenSource();
+
+        var token = _holdingBookmark.Token;
+
+        try
+        {
+            await Task.Delay(450, token);
+            if (token.IsCancellationRequested) return;
+
+            _holdingBookmark = null;
+            _viewModel.AddBookmarkCommand.Execute(null);
+        }
+        catch (TaskCanceledException)
+        {
+            // Released early, so it was a tap.
+        }
+    }
+
+    private void OnBookmarkReleased(object? sender, EventArgs e)
+    {
+        // Null means the hold already fired and saved a bookmark; this release is its tail.
+        if (_holdingBookmark is null) return;
+
+        _holdingBookmark.Cancel();
+        _holdingBookmark = null;
+
+        _viewModel.OpenBookmarksCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// Tells the view model how wide the bar is, since the played part is drawn in pixels.
+    /// </summary>
+    private void OnTrackSizeChanged(object? sender, EventArgs e)
+    {
+        if (sender is VisualElement element) _viewModel.TrackWidth = element.Width;
+    }
+
     /// <summary>
     /// Seeks only once the finger lifts. Seeking on every value change would fight the once-a-second
     /// position update and make the thumb jump around under the user.

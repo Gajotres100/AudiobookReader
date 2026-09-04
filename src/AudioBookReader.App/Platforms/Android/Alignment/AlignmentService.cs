@@ -19,10 +19,6 @@ namespace AudioBookReader.App.Platforms.Android.Alignment;
 public class AlignmentService : Service
 {
     public const string ActionStart = "com.ngaic.audiobookreader.ALIGN_START";
-
-    /// <summary>Measure the passage being listened to, rather than sampling the whole book.</summary>
-    public const string ActionFollow = "com.ngaic.audiobookreader.ALIGN_FOLLOW";
-
     public const string ActionStop = "com.ngaic.audiobookreader.ALIGN_STOP";
     public const string ExtraBookId = "bookId";
 
@@ -54,9 +50,10 @@ public class AlignmentService : Service
 
         _cancellation = new CancellationTokenSource();
 
-        _ = intent?.Action == ActionFollow
-            ? FollowAsync(bookId, _cancellation.Token)
-            : RunAsync(bookId, _cancellation.Token);
+        // Only the whole-book run lives here. Sync on the fly runs in the app itself, because it
+        // only ever works while the reader is on screen and so needs neither a service nor the
+        // notification a service is obliged to post.
+        _ = RunAsync(bookId, _cancellation.Token);
 
         // Not sticky: a book half-aligned when the process died should resume because the user
         // asked again, not because Android silently restarted the service with a stale intent.
@@ -120,102 +117,6 @@ public class AlignmentService : Service
         }
     }
 
-    /// <summary>
-    /// Measures the passage being listened to, for as long as the reader stays open.
-    ///
-    /// Unlike the whole-book run this has no end of its own — it follows the playhead and is
-    /// stopped when the reader closes. The environment gate is deliberately not applied: the user
-    /// is holding the phone and reading, so "only while charging" and "only while the screen is
-    /// off" would switch the feature off exactly when it is wanted.
-    /// </summary>
-    private async Task FollowAsync(int bookId, CancellationToken ct)
-    {
-        var services = IPlatformApplication.Current?.Services;
-        var queue = services?.GetService<AlignmentQueue>();
-
-        try
-        {
-            if (services is null)
-                throw new InvalidOperationException("The app is not started; nothing to align with.");
-
-            AcquireWakeLock();
-
-            var database = services.GetRequiredService<LibraryDatabase>();
-            var syncMaps = services.GetRequiredService<SyncMapStore>();
-            var extractors = services.GetRequiredService<BookTextExtractors>();
-            var models = services.GetRequiredService<WhisperModelStore>();
-            var playback = services.GetRequiredService<PlaybackController>();
-            var budget = services.GetRequiredService<AlignmentSettingsStore>().Budget;
-
-            var book = await database.GetBookAsync(bookId)
-                ?? throw new InvalidOperationException($"No book with id {bookId}.");
-
-            if (!book.IsPaired) return;
-
-            var modelPath = await EnsureModelAsync(models, queue, bookId, ct);
-
-            var chapters = await database.GetChaptersAsync(bookId);
-            var extracted = await extractors.ExtractAsync(book.EbookPath!, ct);
-            var text = extracted.Text.PlainText;
-
-            var map = await syncMaps.LoadAsync(bookId) is { } existing
-                      && existing.MatchesPair(book.AudioHash, book.EbookHash)
-                ? existing
-                : new SyncMap { AudioHash = book.AudioHash, EbookHash = book.EbookHash };
-
-            await using var transcriber = WhisperTranscriber.Create(modelPath, budget);
-
-            var aligner = new LiveAligner(
-                TokenizedText.Create(text),
-                chapters,
-                transcriber,
-                text.Length,
-                throttle: new ThermalAwareThrottle(budget),
-                log: AppLog.Info);
-
-            queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.Following, "Pratim naraciju…"));
-
-            var lastReported = 0L;
-
-            var progress = new Progress<LiveAlignmentProgress>(p =>
-            {
-                // Only when the second changes: this fires every fifteen seconds of audio, and the
-                // notification is the only place it shows.
-                var ahead = Math.Max(0, p.AtMs - playback.PositionMs) / 1000;
-                if (ahead == lastReported) return;
-
-                lastReported = ahead;
-
-                var message = $"Pratim naraciju — izmjereno {ahead} s unaprijed";
-                queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.Following, message));
-                Notify(message, percent: 0);
-            });
-
-            await aligner.RunAsync(
-                book.AudioPath!,
-                map,
-                () => playback.BookId == bookId ? playback.PositionMs : 0,
-                () => syncMaps.SaveAsync(bookId, map),
-                progress,
-                ct);
-        }
-        catch (System.OperationCanceledException)
-        {
-            queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.Stopped, ""));
-        }
-        catch (Exception ex)
-        {
-            AppLog.Error("live alignment", ex);
-            queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.Failed, ex.Message));
-        }
-        finally
-        {
-            ReleaseWakeLock();
-            StopForeground(StopForegroundFlags.Remove);
-            StopSelf();
-        }
-    }
-
     private async Task<string> EnsureModelAsync(
         WhisperModelStore models,
         AlignmentQueue? queue,
@@ -267,7 +168,7 @@ public class AlignmentService : Service
 
         // The user needs to know why nothing is moving, or a paused run reads as a broken one.
         var message = gate.BlockedReason
-            ?? $"Poglavlje {progress.ChapterIndex + 1} od {chapterCount}";
+            ?? $"Poravnavanje u tijeku — poglavlje {progress.ChapterIndex + 1} od {chapterCount}";
 
         if (gate.BlockedReason is null && thermal.Status >= ThermalStatus.Moderate)
             message += " — usporeno zbog topline";
@@ -306,7 +207,9 @@ public class AlignmentService : Service
         return new Notification.Builder(this, ChannelId)
             .SetContentTitle("Poravnanje teksta")
             .SetContentText(message)
-            .SetSmallIcon(global::Android.Resource.Drawable.StatSysDownload)
+            // Not the download glyph: nothing is being fetched, and a download icon on a job that
+            // runs for the better part of an hour invites the user to wonder what is being sent.
+            .SetSmallIcon(global::Android.Resource.Drawable.StatNotifySync)
             .SetProgress(100, percent, indeterminate: percent <= 0)
             .SetOngoing(true)
             .SetOnlyAlertOnce(true)

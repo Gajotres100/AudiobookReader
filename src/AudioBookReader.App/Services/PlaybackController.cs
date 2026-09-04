@@ -50,6 +50,36 @@ public partial class PlaybackController
     public void TogglePlayPause()
     {
         if (IsPlaying) Pause();
-        else Play();
+        else
+        {
+            _ = EnsureNotificationsAllowedAsync();
+            Play();
+        }
+    }
+
+    private bool _askedAboutNotifications;
+
+    /// <summary>
+    /// Asks for notification permission the first time something is played.
+    ///
+    /// Without it the lock screen and shade show nothing at all — no play, no pause, no skip —
+    /// because from Android 13 a denied permission silently suppresses the media notification the
+    /// session would otherwise publish. Asked here rather than at startup so the request arrives
+    /// attached to the thing it is for.
+    /// </summary>
+    private async Task EnsureNotificationsAllowedAsync()
+    {
+        if (_askedAboutNotifications) return;
+        _askedAboutNotifications = true;
+
+        try
+        {
+            if (await Permissions.CheckStatusAsync<Permissions.PostNotifications>() != PermissionStatus.Granted)
+                await Permissions.RequestAsync<Permissions.PostNotifications>();
+        }
+        catch (Exception)
+        {
+            // An older Android with no such permission, or a refusal. Playback works either way.
+        }
     }
 }

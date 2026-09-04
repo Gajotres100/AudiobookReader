@@ -21,6 +21,12 @@
             Spacing="8">
             <ActivityIndicator IsRunning="{Binding IsBusy}" />
             <Label HorizontalOptions="Center" Text="{Binding BusyMessage}" />
+
+            <!--  Copying a whole audiobook takes time; without a number it reads as a hang.  -->
+            <ProgressBar
+                Margin="40,6,40,0"
+                IsVisible="{Binding HasBusyFraction}"
+                Progress="{Binding BusyFraction}" />
         </VerticalStackLayout>
 
         <Label

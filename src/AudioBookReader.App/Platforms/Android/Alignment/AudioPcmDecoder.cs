@@ -18,10 +18,132 @@ internal static class AudioPcmDecoder
 
     private const int DequeueTimeoutUs = 10_000;
 
+    /// <summary>
+    /// Keeps one file open across probes.
+    ///
+    /// Opening it is not cheap: the container has to be parsed, a hardware decoder claimed,
+    /// configured and started — and an audiobook is aligned in hundreds of short probes, so doing
+    /// that once per probe was measured at a second each, a fifth of the whole run spent switching
+    /// a decoder on and off. Seeking a decoder that is already running costs nothing by comparison.
+    /// </summary>
+    internal sealed class Session : IDisposable
+    {
+        private readonly MediaExtractor _extractor;
+        private readonly MediaCodec _codec;
+
+        public string Path { get; }
+
+        private readonly int _sourceRate;
+        private readonly int _channels;
+
+        private Session(string path, MediaExtractor extractor, MediaCodec codec, int sourceRate, int channels)
+        {
+            Path = path;
+            _extractor = extractor;
+            _codec = codec;
+            _sourceRate = sourceRate;
+            _channels = channels;
+        }
+
+        public static Session Open(string path)
+        {
+            var extractor = new MediaExtractor();
+            SetSource(extractor, path);
+
+            var trackIndex = FindAudioTrack(extractor)
+                ?? throw new InvalidOperationException($"No audio track in '{path}'.");
+
+            var format = extractor.GetTrackFormat(trackIndex);
+            extractor.SelectTrack(trackIndex);
+
+            var mime = format.GetString(MediaFormat.KeyMime)
+                ?? throw new InvalidOperationException("Audio track has no MIME type.");
+
+            var codec = MediaCodec.CreateDecoderByType(mime)
+                ?? throw new InvalidOperationException($"No decoder for '{mime}'.");
+
+            codec.Configure(format, surface: null, crypto: null, flags: MediaCodecConfigFlags.None);
+            codec.Start();
+
+            return new Session(
+                path,
+                extractor,
+                codec,
+                format.GetInteger(MediaFormat.KeySampleRate),
+                format.GetInteger(MediaFormat.KeyChannelCount));
+        }
+
+        public float[] Decode(long startMs, long durationMs, CancellationToken ct)
+        {
+            var startUs = startMs * 1_000;
+            var endUs = (startMs + durationMs) * 1_000;
+
+            // Whatever the decoder still holds belongs to the previous probe, and seeking without
+            // clearing it would prepend someone else's audio to this one.
+            //
+            // Flush alone: start() after flush() belongs to asynchronous mode. Calling it on a
+            // codec being driven synchronously leaves it in a state where no output buffer is ever
+            // produced, and the decode loop waits for one forever.
+            _codec.Flush();
+
+            // Seeking lands on the nearest sync point at or before the target, so the leading
+            // samples are decoded and then dropped rather than assumed to start on time.
+            _extractor.SeekTo(startUs, MediaExtractorSeekTo.PreviousSync);
+
+            var mono = DecodeRange(_codec, _extractor, _channels, _sourceRate, startUs, endUs, ct);
+            return Resample(mono, _sourceRate);
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                _codec.Stop();
+            }
+            catch (Java.Lang.IllegalStateException)
+            {
+                // Already stopped; nothing to salvage and nothing worth reporting.
+            }
+
+            _codec.Dispose();
+            _extractor.Dispose();
+        }
+    }
+
+    private static void SetSource(MediaExtractor extractor, string path)
+    {
+        // Alignment normally works on a local copy, but a book can be referenced where the user
+        // keeps it, and then the extractor has to be pointed at the provider instead of a path.
+        if (path.StartsWith("content://", StringComparison.OrdinalIgnoreCase))
+        {
+            extractor.SetDataSource(
+                global::Android.App.Application.Context,
+                global::Android.Net.Uri.Parse(path)!,
+                headers: null);
+        }
+        else
+        {
+            extractor.SetDataSource(path);
+        }
+    }
+
     public static float[] Decode(string path, long startMs, long durationMs, CancellationToken ct)
     {
         using var extractor = new MediaExtractor();
-        extractor.SetDataSource(path);
+
+        // Alignment normally works on a local copy, but a book can be referenced where the user
+        // keeps it, and then the extractor has to be pointed at the provider instead of a path.
+        if (path.StartsWith("content://", StringComparison.OrdinalIgnoreCase))
+        {
+            extractor.SetDataSource(
+                global::Android.App.Application.Context,
+                global::Android.Net.Uri.Parse(path)!,
+                headers: null);
+        }
+        else
+        {
+            extractor.SetDataSource(path);
+        }
 
         var trackIndex = FindAudioTrack(extractor)
             ?? throw new InvalidOperationException($"No audio track in '{path}'.");
@@ -83,6 +205,12 @@ internal static class AudioPcmDecoder
         var info = new MediaCodec.BufferInfo();
         var inputDone = false;
 
+        // A decoder that stops producing output is a decoder in a state this loop cannot fix, and
+        // waiting for it forever turns a bad probe into a hung alignment. Ten seconds of nothing is
+        // far past any legitimate stall.
+        var idle = 0;
+        const int idleLimit = 1_000_000 / DequeueTimeoutUs * 10;
+
         while (true)
         {
             ct.ThrowIfCancellationRequested();
@@ -90,7 +218,15 @@ internal static class AudioPcmDecoder
             if (!inputDone) inputDone = FeedInput(codec, extractor);
 
             var outputIndex = codec.DequeueOutputBuffer(info, DequeueTimeoutUs);
-            if (outputIndex < 0) continue;
+
+            if (outputIndex < 0)
+            {
+                if (++idle < idleLimit) continue;
+
+                throw new TimeoutException("The audio decoder stopped producing output.");
+            }
+
+            idle = 0;
 
             if (info.Size > 0 && codec.GetOutputBuffer(outputIndex) is { } buffer)
                 AppendMono(samples, buffer, info, channels, sourceRate, startUs, endUs);

@@ -35,20 +35,42 @@ public static class AudioBookProbe
     public static Task<AudioBookInfo> ProbeAsync(string path, CancellationToken ct = default) =>
         Task.Run(() => Directory.Exists(path) ? ProbeFolder(path) : ProbeFile(path), ct);
 
-    private static AudioBookInfo ProbeFile(string path)
+    /// <summary>
+    /// Reads the same information from an open stream.
+    ///
+    /// A book the user keeps where it is — referenced rather than copied into app storage — has no
+    /// path this code can open, only a stream from the platform. Chapters are the reason this goes
+    /// through the tag reader rather than the system's metadata service: chapter marks are what
+    /// makes an audiobook navigable, and nothing else reports them.
+    /// </summary>
+    /// <param name="fileName">Used for the extension, which tells the tag reader what it is holding.</param>
+    public static Task<AudioBookInfo> ProbeAsync(
+        Stream stream,
+        string fileName,
+        CancellationToken ct = default) =>
+        Task.Run(() => ProbeStream(stream, fileName), ct);
+
+    private static AudioBookInfo ProbeStream(Stream stream, string fileName)
     {
-        var track = new Track(path);
+        var track = new Track(stream, Path.GetExtension(fileName));
+        return Describe(track, fileName, fileName);
+    }
+
+    private static AudioBookInfo ProbeFile(string path) => Describe(new Track(path), path, path);
+
+    private static AudioBookInfo Describe(Track track, string reference, string nameSource)
+    {
         var durationMs = (long)Math.Round(track.DurationMs);
 
         var chapters = BuildChapters(track, durationMs);
         var (cover, mime) = ExtractCover(track);
 
         return new AudioBookInfo(
-            Title: FirstNonEmpty(track.Album, track.Title, Path.GetFileNameWithoutExtension(path)),
+            Title: FirstNonEmpty(track.Album, track.Title, Path.GetFileNameWithoutExtension(nameSource)),
             Author: FirstNonEmpty(track.AlbumArtist, track.Artist, track.Composer),
             DurationMs: durationMs,
             Chapters: chapters,
-            Files: [path],
+            Files: [reference],
             Cover: cover,
             CoverMimeType: mime);
     }

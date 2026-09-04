@@ -52,12 +52,19 @@
                     Style="{StaticResource Icon}"
                     Text="⏱" />
 
+                <!--
+                    Tap opens the list, hold saves the spot. A flag glyph rather than the emoji:
+                    the rest of this bar is flat monochrome text, and a coloured pictogram among
+                    them read as something pasted in from another app.
+                -->
                 <Button
                     Grid.Column="3"
-                    Command="{Binding AddBookmarkCommand}"
+                    FontSize="20"
                     IsVisible="{Binding HasAudio}"
+                    Pressed="OnBookmarkPressed"
+                    Released="OnBookmarkReleased"
                     Style="{StaticResource Icon}"
-                    Text="🔖" />
+                    Text="⚑" />
 
                 <!--  A number says more about speed than any gauge glyph could.  -->
                 <Button
@@ -82,6 +89,15 @@
                 Style="{StaticResource Muted}"
                 Text="{Binding SleepButtonText}"
                 VerticalOptions="Center" />
+
+            <!--  Confirms a held flag actually saved something.  -->
+            <Label
+                Grid.Row="1"
+                HorizontalOptions="Center"
+                IsVisible="{Binding HasBookmarkNote}"
+                Style="{StaticResource Muted}"
+                Text="{Binding BookmarkNote}"
+                VerticalOptions="Start" />
 
             <!--  Cover, with the chapter list opening over it  -->
             <Grid Grid.Row="1" Margin="0,6">
@@ -197,13 +213,43 @@
                     Text="{Binding PositionText}"
                     VerticalOptions="Center" />
 
-                <Slider
-                    x:Name="Scrubber"
+                <!--
+                    The part already heard is a solid block sitting on the baseline; what is left
+                    is a hairline. Weight rather than tint, because weight reads at a glance — and
+                    a block that grows along a line is a different shape from the usual filled pill
+                    with a knob riding on it.
+                -->
+                <Grid
+                    x:Name="Track"
                     Grid.Column="1"
-                    DragCompleted="OnScrubberDragCompleted"
-                    Maximum="1"
-                    Minimum="0"
-                    Value="{Binding Progress, Mode=OneWay}" />
+                    Margin="10,0"
+                    HeightRequest="34"
+                    SizeChanged="OnTrackSizeChanged">
+
+                    <BoxView
+                        BackgroundColor="{AppThemeBinding Light=#C9C3B6,
+                                                          Dark=#333A46}"
+                        HeightRequest="1"
+                        VerticalOptions="Center" />
+
+                    <BoxView
+                        BackgroundColor="{AppThemeBinding Light=#2E3440,
+                                                          Dark=#9FB4E8}"
+                        HeightRequest="12"
+                        HorizontalOptions="Start"
+                        VerticalOptions="Center"
+                        WidthRequest="{Binding PlayedWidth}" />
+
+                    <Slider
+                        x:Name="Scrubber"
+                        DragCompleted="OnScrubberDragCompleted"
+                        Maximum="1"
+                        MaximumTrackColor="Transparent"
+                        Minimum="0"
+                        MinimumTrackColor="Transparent"
+                        ThumbColor="Transparent"
+                        Value="{Binding Progress, Mode=OneWay}" />
+                </Grid>
 
                 <Label
                     Grid.Column="2"
@@ -291,11 +337,41 @@
                         Text="{Binding Error}"
                         TextColor="#C0392B" />
 
+                    <!--  Copying an audiobook is the slow part of an import; say how far along it is.  -->
+                    <VerticalStackLayout IsVisible="{Binding IsImporting}" Spacing="6">
+                        <Label Style="{StaticResource Muted}" Text="{Binding ImportMessage}" />
+                        <ProgressBar Progress="{Binding ImportFraction}" />
+                    </VerticalStackLayout>
+
                     <!--  Alignment  -->
                     <VerticalStackLayout IsVisible="{Binding IsPaired}" Spacing="8">
                         <BoxView Color="{AppThemeBinding Light=#E1DCD3, Dark=#242A34}" HeightRequest="1" />
 
                         <Label FontAttributes="Bold" Text="Poravnanje teksta i naracije" />
+
+                        <!--  Two ways to the same thing, so they are a choice, not two settings.  -->
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                            <Label
+                                Grid.Row="0"
+                                Grid.Column="0"
+                                Text="Sync on the fly"
+                                VerticalOptions="Center" />
+                            <Switch
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                IsToggled="{Binding MeasuresWhileReading}" />
+
+                            <Label
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                Text="Poravnaj cijelu knjigu unaprijed"
+                                VerticalOptions="Center" />
+                            <Switch
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                IsToggled="{Binding AlignsInAdvance}" />
+                        </Grid>
+
                         <Label Style="{StaticResource Muted}" Text="{Binding AlignmentSummary}" />
 
                         <HorizontalStackLayout IsVisible="{Binding IsAligning}" Spacing="10">

@@ -61,6 +61,21 @@ public record CpuBudget
     public static readonly IReadOnlyList<CpuBudget> Presets = [Eco, Balanced, Turbo];
 
     /// <summary>
+    /// How many threads to actually ask for on this device.
+    ///
+    /// Zero means "as many as the chip can usefully give", which is not the same as all of them.
+    /// Phone CPUs are big.LITTLE: half the cores are efficiency cores that run the same work at a
+    /// fraction of the speed, and handing recognition more threads than there are fast cores makes
+    /// every step wait for the slowest of them. Half the count lands on the performance cluster on
+    /// the usual four-plus-four layouts.
+    ///
+    /// Leaving it unset was worse than either: the fastest preset never named a thread count at
+    /// all, so the choice fell to a default that knows nothing about the device.
+    /// </summary>
+    public int ResolveThreads(int processorCount) =>
+        Threads > 0 ? Threads : Math.Clamp(processorCount / 2, 2, 8);
+
+    /// <summary>
     /// Estimates how long aligning a book will take, for the figure shown next to each preset.
     ///
     /// Only a fraction of the audio ever reaches the recognizer, so the estimate is driven by the

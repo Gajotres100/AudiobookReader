@@ -1,3 +1,4 @@
+using AudioBookReader.App.Services;
 using AudioBookReader.Core.Alignment;
 using Whisper.net;
 using AndroidProcess = Android.OS.Process;
@@ -40,7 +41,12 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
             // a text we already have.
             .WithGreedySamplingStrategy(greedy => greedy.WithBestOf(1));
 
-        if (budget.Threads > 0) builder = builder.WithThreads(budget.Threads);
+        var threads = budget.ResolveThreads(Environment.ProcessorCount);
+        builder = builder.WithThreads(threads);
+
+        AppLog.Info(
+            $"whisper: preset '{budget.Name}', {threads} threads of {Environment.ProcessorCount} cores, " +
+            $"{(budget.BackgroundPriority ? "little cores" : "all cores")}, duty {budget.DutyCycle:P0}");
 
         return new WhisperTranscriber(factory, builder.Build(), budget.BackgroundPriority);
     }
@@ -56,10 +62,21 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
 
         try
         {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+
             var samples = await Task.Run(() => DecodeOnAWorkerThread(audioPath, startMs, durationMs, ct), ct);
+            var decodedMs = clock.ElapsedMilliseconds;
+
             if (samples.Length == 0) return Transcript.Empty;
 
-            return await RecognizeAsync(samples, startMs, ct);
+            var transcript = await RecognizeAsync(samples, startMs, ct);
+
+            // Split, because the two have completely different cures: recognition is the model and
+            // the CPU budget, decoding is the container and how often the hardware codec is torn
+            // down and built again.
+            Report(decodedMs, clock.ElapsedMilliseconds - decodedMs, durationMs);
+
+            return transcript;
         }
         finally
         {
@@ -67,10 +84,71 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
         }
     }
 
+    private long _probes;
+    private long _decodeMs;
+    private long _recogniseMs;
+    private long _audioMs;
+
+    /// <summary>
+    /// Reports the running cost every so often, in the terms that decide whether alignment is
+    /// worth waiting for: how much faster than real time it is getting through the audio.
+    /// </summary>
+    private void Report(long decodeMs, long recogniseMs, long durationMs)
+    {
+        _probes++;
+        _decodeMs += decodeMs;
+        _recogniseMs += recogniseMs;
+        _audioMs += durationMs;
+
+        if (_probes % 10 != 0) return;
+
+        var wall = _decodeMs + _recogniseMs;
+
+        // The thermal state travels with the numbers because it explains them: the same preset on
+        // the same phone runs at half the speed once the chip is warm, and a timing without it
+        // invites the wrong conclusion about what changed.
+        AppLog.Info(
+            $"transcribe: {_probes} probes, decode {_decodeMs / _probes} ms + recognise " +
+            $"{_recogniseMs / _probes} ms each, {_audioMs / 1000} s of audio in {wall / 1000} s " +
+            $"({(wall > 0 ? _audioMs / (double)wall : 0):0.0}x realtime), thermal {ThermalNow()}");
+    }
+
+    private static string ThermalNow()
+    {
+        try
+        {
+            var power = (global::Android.OS.PowerManager?)global::Android.App.Application.Context
+                .GetSystemService(global::Android.Content.Context.PowerService);
+
+            return power?.CurrentThermalStatus.ToString() ?? "unknown";
+        }
+        catch (Exception)
+        {
+            return "unknown";
+        }
+    }
+
+    private AudioPcmDecoder.Session? _decoder;
+
+    /// <summary>
+    /// Decodes the probe, keeping the file open between probes.
+    ///
+    /// Safe to hold one session because probes are serialized: the recognizer has decoder state of
+    /// its own, so they were already running one at a time.
+    /// </summary>
     private float[] DecodeOnAWorkerThread(string audioPath, long startMs, long durationMs, CancellationToken ct)
     {
         ApplyThreadPriority();
-        return AudioPcmDecoder.Decode(audioPath, startMs, durationMs, ct);
+
+        if (_decoder is not null && _decoder.Path != audioPath)
+        {
+            _decoder.Dispose();
+            _decoder = null;
+        }
+
+        _decoder ??= AudioPcmDecoder.Session.Open(audioPath);
+
+        return _decoder.Decode(startMs, durationMs, ct);
     }
 
     /// <summary>
@@ -123,6 +201,9 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _decoder?.Dispose();
+        _decoder = null;
+
         await _processor.DisposeAsync();
         _factory.Dispose();
         _oneAtATime.Dispose();

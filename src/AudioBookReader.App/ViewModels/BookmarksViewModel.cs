@@ -1,0 +1,202 @@
+using System.Collections.ObjectModel;
+using AudioBookReader.App.Services;
+using AudioBookReader.Core.Books;
+using AudioBookReader.Core.Data;
+using AudioBookReader.Core.Models;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+
+namespace AudioBookReader.App.ViewModels;
+
+/// <summary>One saved place, as the list shows it.</summary>
+public class BookmarkRow(Bookmark bookmark, string chapter, string where)
+{
+    public Bookmark Bookmark { get; } = bookmark;
+
+    public string Chapter { get; } = chapter;
+
+    /// <summary>Timestamp, or the position in the text when there is no audio.</summary>
+    public string Where { get; } = where;
+
+    public string Note { get; } = bookmark.Note ?? "";
+
+    public string Preview { get; } = bookmark.TextPreview ?? "";
+
+    public bool HasPreview => Preview.Length > 0;
+
+    public string Created { get; } = bookmark.CreatedUtc.ToLocalTime().ToString("d.M.yyyy. HH:mm");
+}
+
+[QueryProperty(nameof(BookId), "id")]
+public partial class BookmarksViewModel(
+    LibraryDatabase database,
+    BookTextExtractors extractors,
+    PlaybackController playback) : ObservableObject
+{
+    /// <summary>
+    /// How many a book may hold.
+    ///
+    /// Most players set no limit at all, and this one is a guard rather than a feature: the list
+    /// is meant to be scanned, and a few hundred entries stop being a list and become a second
+    /// problem. Reaching it says so instead of quietly dropping the oldest, because a bookmark the
+    /// user placed is not the app's to discard.
+    /// </summary>
+    public const int Limit = 50;
+
+    private List<Chapter> _chapters = [];
+    private BookText? _text;
+
+    [ObservableProperty]
+    public partial int BookId { get; set; }
+
+    [ObservableProperty]
+    public partial string Title { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNone))]
+    [NotifyPropertyChangedFor(nameof(CountText))]
+    public partial int Count { get; set; }
+
+    public bool HasNone => Count == 0;
+
+    public string CountText => $"{Count} / {Limit}";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMessage))]
+    public partial string Message { get; set; } = "";
+
+    public bool HasMessage => Message.Length > 0;
+
+    public ObservableCollection<BookmarkRow> Bookmarks { get; } = [];
+
+    public async Task LoadAsync()
+    {
+        var book = await database.GetBookAsync(BookId);
+        if (book is null) return;
+
+        Title = book.Title;
+        _chapters = await database.GetChaptersAsync(BookId);
+
+        // Only for the snippet beside each entry, and only when the book has text at all.
+        if (book.EbookPath is { } path && _text is null)
+        {
+            try
+            {
+                _text = (await extractors.ExtractAsync(path)).Text;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("reading text for bookmark previews", ex);
+            }
+        }
+
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        var saved = await database.GetBookmarksAsync(BookId);
+
+        Bookmarks.Clear();
+        foreach (var bookmark in saved.OrderBy(b => b.PositionMs ?? b.TextOffset ?? 0))
+            Bookmarks.Add(Describe(bookmark));
+
+        Count = Bookmarks.Count;
+    }
+
+    private BookmarkRow Describe(Bookmark bookmark)
+    {
+        var chapter = _chapters.FirstOrDefault(c => c.Index == bookmark.ChapterIndex);
+
+        var name = chapter is null || string.IsNullOrWhiteSpace(chapter.Title)
+            ? $"Poglavlje {bookmark.ChapterIndex + 1}"
+            : chapter.Title;
+
+        var where = bookmark.PositionMs is { } at
+            ? Format(at)
+            : bookmark.TextOffset is { } offset ? $"znak {offset:N0}" : "";
+
+        return new BookmarkRow(bookmark, name, where);
+    }
+
+    /// <summary>Saves the spot being listened to, or read when there is no audio.</summary>
+    [RelayCommand]
+    private async Task AddAsync()
+    {
+        Message = "";
+
+        if (Count >= Limit)
+        {
+            Message = $"Dosegnut je limit od {Limit} bookmarka. Obriši neki prije dodavanja novog.";
+            return;
+        }
+
+        var state = await database.GetReadingStateAsync(BookId);
+
+        var at = playback.BookId == BookId && playback.PositionMs > 0
+            ? playback.PositionMs
+            : state?.AudioPositionMs;
+
+        var offset = at is null ? state?.TextOffset : null;
+
+        if (at is null && offset is null)
+        {
+            Message = "Nema pozicije za spremiti — pusti knjigu ili je otvori u čitaču.";
+            return;
+        }
+
+        await database.AddBookmarkAsync(new Bookmark
+        {
+            BookId = BookId,
+            PositionMs = at,
+            TextOffset = offset,
+            ChapterIndex = ChapterAt(at) ?? 0,
+            TextPreview = PreviewAt(offset),
+            CreatedUtc = DateTime.UtcNow,
+        });
+
+        await RefreshAsync();
+    }
+
+    private int? ChapterAt(long? positionMs) =>
+        positionMs is { } at
+            ? _chapters.LastOrDefault(c => c.HasAudioRange && at >= c.StartMs)?.Index ?? 0
+            : null;
+
+    /// <summary>A line of the book at this spot, so an entry is recognizable without playing it.</summary>
+    private string? PreviewAt(int? offset)
+    {
+        if (_text is null || offset is not { } start || start >= _text.PlainText.Length) return null;
+
+        var length = Math.Min(90, _text.PlainText.Length - start);
+        return _text.PlainText.Substring(start, length).ReplaceLineEndings(" ").Trim();
+    }
+
+    [RelayCommand]
+    private async Task OpenAsync(BookmarkRow? row)
+    {
+        if (row?.Bookmark.PositionMs is { } at && playback.BookId == BookId) playback.SeekTo(at);
+
+        await Shell.Current.GoToAsync("..");
+    }
+
+    [RelayCommand]
+    private async Task DeleteAsync(BookmarkRow? row)
+    {
+        if (row is null) return;
+
+        var confirmed = await Shell.Current.DisplayAlertAsync(
+            "Obrisati bookmark?", row.Where, "Obriši", "Odustani");
+
+        if (!confirmed) return;
+
+        await database.DeleteBookmarkAsync(row.Bookmark.Id);
+        await RefreshAsync();
+    }
+
+    private static string Format(long ms)
+    {
+        var span = TimeSpan.FromMilliseconds(ms);
+        return span.TotalHours >= 1 ? span.ToString(@"h\:mm\:ss") : span.ToString(@"m\:ss");
+    }
+}

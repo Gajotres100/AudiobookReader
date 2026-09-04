@@ -14,22 +14,8 @@ public class AlignmentSettingsStore
     private const string ChargingOnlyKey = "alignment.chargingOnly";
     private const string ScreenOffOnlyKey = "alignment.screenOffOnly";
     private const string MinimumBatteryKey = "alignment.minimumBattery";
-    private const string LiveRefinementKey = "alignment.live";
-
-    /// <summary>
-    /// Align the passage being read, as it is read, instead of sampling the whole book in advance.
-    ///
-    /// The two are alternatives rather than settings of one thing. Sampling maps ten hours for
-    /// sixteen percent of the audio but leaves everything between anchors interpolated, and that
-    /// interpolation is the whole of the remaining error — measurement showed tripling the sample
-    /// rate does not touch it. This measures every second of what is actually being listened to and
-    /// nothing else, which costs about half of real time and never runs ahead of the listener.
-    /// </summary>
-    public bool LiveRefinement
-    {
-        get => Preferences.Default.Get(LiveRefinementKey, false);
-        set => Preferences.Default.Set(LiveRefinementKey, value);
-    }
+    // How a book gets its read-along — sampled in advance, or measured as it is read — is not
+    // here. It belongs to the book, is chosen on the book's own page, and is stored with it.
 
     public CpuBudget Budget
     {

@@ -32,6 +32,8 @@ public static class MauiProgram
 		builder.Services.AddSingleton<BookTextExtractors>();
 		builder.Services.AddSingleton<LibraryService>();
 		builder.Services.AddSingleton<AlignmentQueue>();
+		builder.Services.AddSingleton<MediaReferences>();
+		builder.Services.AddSingleton<LiveSyncRunner>();
 		builder.Services.AddSingleton<BookImporter>();
 		builder.Services.AddSingleton<AlignmentSettingsStore>();
 		builder.Services.AddSingleton<BookFilePicker>();
@@ -46,6 +48,8 @@ public static class MauiProgram
 		builder.Services.AddTransient<BookPage>();
 		builder.Services.AddTransient<ReaderViewModel>();
 		builder.Services.AddTransient<ReaderPage>();
+		builder.Services.AddTransient<BookmarksViewModel>();
+		builder.Services.AddTransient<BookmarksPage>();
 		builder.Services.AddTransient<SettingsViewModel>();
 		builder.Services.AddTransient<SettingsPage>();
 

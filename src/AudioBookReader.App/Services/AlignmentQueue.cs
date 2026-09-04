@@ -9,10 +9,6 @@ public enum AlignmentPhase
 
     DownloadingModel,
     Aligning,
-
-    /// <summary>Measuring the passage being listened to, as it is listened to.</summary>
-    Following,
-
     Finished,
 
     /// <summary>Stopped by the user or by the system; whatever was aligned stays usable.</summary>
@@ -30,11 +26,7 @@ public record AlignmentStatus(
     int ChapterCount = 0)
 {
     public bool IsRunning =>
-        Phase is AlignmentPhase.Starting or AlignmentPhase.DownloadingModel
-            or AlignmentPhase.Aligning or AlignmentPhase.Following;
-
-    /// <summary>Following is bound to the reader being open, so it is stopped differently.</summary>
-    public bool IsFollowing => Phase is AlignmentPhase.Following;
+        Phase is AlignmentPhase.Starting or AlignmentPhase.DownloadingModel or AlignmentPhase.Aligning;
 }
 
 /// <summary>
@@ -73,23 +65,6 @@ public partial class AlignmentQueue
     }
 
     private partial void StartCore(int bookId);
-
-    /// <summary>
-    /// Begins measuring the passage being listened to, for as long as the reader stays open.
-    ///
-    /// Silent about failure on purpose: this starts by itself when a reader opens a book, so a
-    /// device that cannot do it — no model downloaded yet, a whole-book run already going — should
-    /// leave the reader working as it always did rather than putting an error in front of someone
-    /// who asked for nothing.
-    /// </summary>
-    public void StartFollowing(int bookId)
-    {
-        if (Status.IsRunning) return;
-
-        StartFollowingCore(bookId);
-    }
-
-    private partial void StartFollowingCore(int bookId);
 
     /// <summary>Asks the running alignment to stop. Progress so far is kept.</summary>
     public partial void Stop();

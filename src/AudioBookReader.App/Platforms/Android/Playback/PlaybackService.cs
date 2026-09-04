@@ -30,12 +30,29 @@ public class PlaybackService : MediaSessionService
     {
         base.OnCreate();
 
-        _player = new ExoPlayerBuilder(this).Build()!;
+        // The seek increments are what put usable buttons on the lock screen: Media3 builds its
+        // notification from the commands the player advertises, and a player with no seek
+        // increments advertises nothing to skip with.
+        _player = new ExoPlayerBuilder(this)
+            .SetSeekBackIncrementMs(10_000)
+            .SetSeekForwardIncrementMs(10_000)
+            .Build()!;
 
         // Speed changes must not turn the narrator into a chipmunk. The second argument is pitch:
         // holding it at 1 while speed rises is what keeps the voice natural, and an audiobook
         // player is unusable without that.
         _player.PlaybackParameters = new PlaybackParameters(1f, 1f);
+
+        // Holds a partial wake lock while playing, and only while playing.
+        //
+        // Without it the CPU is free to enter deep sleep once the screen goes off, and playback
+        // simply stops a few minutes in — which is precisely how an audiobook is listened to. The
+        // player takes the lock when playback starts and drops it when it ends, so an idle app
+        // costs nothing.
+        _player.SetWakeMode(C.WakeModeLocal);
+
+        // Pause rather than play on into a room when the headphones come out.
+        _player.SetHandleAudioBecomingNoisy(true);
 
         _session = new MediaSession.Builder(this, _player).Build();
         _sleepTimer = new SleepTimer(_player);
@@ -74,7 +91,13 @@ public class PlaybackService : MediaSessionService
 
         if (LoadedPath != audioPath)
         {
-            _player.SetMediaItem(MediaItem.FromUri(global::Android.Net.Uri.FromFile(new Java.IO.File(audioPath))!));
+            // A book is either kept in app storage or referenced where the user has it, so the
+            // location is either a path or a content URI and only the first needs wrapping.
+            var uri = audioPath.StartsWith("content://", StringComparison.OrdinalIgnoreCase)
+                ? global::Android.Net.Uri.Parse(audioPath)!
+                : global::Android.Net.Uri.FromFile(new Java.IO.File(audioPath))!;
+
+            _player.SetMediaItem(MediaItem.FromUri(uri));
             _player.Prepare();
             LoadedPath = audioPath;
         }

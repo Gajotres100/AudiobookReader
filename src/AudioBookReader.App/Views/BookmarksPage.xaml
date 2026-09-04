@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Name="BookmarksRoot"
+    x:Class="AudioBookReader.App.Views.BookmarksPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
+    x:DataType="vm:BookmarksViewModel"
+    Title="Bookmarci">
+
+    <Grid Padding="16,10" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
+
+        <Label
+            Grid.Row="0"
+            FontAttributes="Bold"
+            FontSize="17"
+            LineBreakMode="TailTruncation"
+            Text="{Binding Title}" />
+
+        <Label
+            Grid.Row="1"
+            FontSize="12"
+            Text="{Binding Message}"
+            IsVisible="{Binding HasMessage}"
+            TextColor="#C0392B" />
+
+        <Label
+            Grid.Row="2"
+            HorizontalTextAlignment="Center"
+            IsVisible="{Binding HasNone}"
+            Text="Još nema bookmarka. Dugi pritisak na zastavicu u playeru sprema mjesto na kojem si."
+            TextColor="Gray"
+            VerticalOptions="Center" />
+
+        <CollectionView Grid.Row="2" ItemsSource="{Binding Bookmarks}">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:BookmarkRow">
+                    <Grid Padding="0,12" ColumnDefinitions="*,Auto">
+
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer
+                                Command="{Binding Path=BindingContext.OpenCommand, Source={x:Reference BookmarksRoot}}"
+                                CommandParameter="{Binding .}" />
+                        </Grid.GestureRecognizers>
+
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label
+                                FontAttributes="Bold"
+                                LineBreakMode="TailTruncation"
+                                Text="{Binding Chapter}" />
+                            <Label FontSize="13" Text="{Binding Where}" TextColor="Gray" />
+                            <Label
+                                FontSize="12"
+                                IsVisible="{Binding HasPreview}"
+                                LineBreakMode="TailTruncation"
+                                MaxLines="2"
+                                Text="{Binding Preview}"
+                                TextColor="Gray" />
+                        </VerticalStackLayout>
+
+                        <Button
+                            Grid.Column="1"
+                            BackgroundColor="Transparent"
+                            Command="{Binding Path=BindingContext.DeleteCommand, Source={x:Reference BookmarksRoot}}"
+                            CommandParameter="{Binding .}"
+                            FontSize="16"
+                            Text="✕"
+                            TextColor="Gray"
+                            VerticalOptions="Center" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Grid Grid.Row="3" ColumnDefinitions="*,Auto">
+            <Button
+                Grid.Column="0"
+                Command="{Binding AddCommand}"
+                Text="Dodaj bookmark ovdje" />
+            <Label
+                Grid.Column="1"
+                Margin="12,0,0,0"
+                FontSize="12"
+                Text="{Binding CountText}"
+                TextColor="Gray"
+                VerticalOptions="Center" />
+        </Grid>
+    </Grid>
+</ContentPage>

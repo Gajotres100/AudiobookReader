@@ -17,15 +17,6 @@ public partial class AlignmentQueue
         context.StartForegroundService(intent);
     }
 
-    private partial void StartFollowingCore(int bookId)
-    {
-        var context = global::Android.App.Application.Context;
-        var intent = new Intent(context, typeof(AlignmentService));
-        intent.SetAction(AlignmentService.ActionFollow);
-        intent.PutExtra(AlignmentService.ExtraBookId, bookId);
-
-        context.StartForegroundService(intent);
-    }
 
     public partial void Stop()
     {

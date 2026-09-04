@@ -50,7 +50,15 @@ public sealed class ThermalAwareThrottle : IWorkThrottle
 
         return Status switch
         {
-            ThermalStatus.None or ThermalStatus.Light => 1f,
+            ThermalStatus.None => 1f,
+
+            // Light is not "still fine". It is the point at which the system has begun lowering
+            // clocks, and measurement on a warm phone showed both decoding and recognition taking
+            // twice as long there — a run that pushes through it does the same work at half speed
+            // and keeps the chip hot enough to stay that way. Easing off here is what stops the
+            // slide, and costs less than the slowdown it avoids.
+            ThermalStatus.Light => 0.7f,
+
             ThermalStatus.Moderate => 0.5f,
 
             // From severe upward the system is already throttling the whole device. Pushing on

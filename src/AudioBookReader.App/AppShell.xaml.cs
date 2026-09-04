@@ -12,6 +12,7 @@ public partial class AppShell : Shell
 		// registered by route, or GoToAsync cannot resolve them.
 		Routing.RegisterRoute("book", typeof(BookPage));
 		Routing.RegisterRoute("reader", typeof(ReaderPage));
+		Routing.RegisterRoute("bookmarks", typeof(BookmarksPage));
 	}
 
 	/// <summary>

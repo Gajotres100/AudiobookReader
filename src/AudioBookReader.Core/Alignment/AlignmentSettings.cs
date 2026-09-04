@@ -61,6 +61,16 @@ public record AlignmentSettings
     public int SearchRadiusTokens { get; init; } = 400;
 
     /// <summary>
+    /// How far to search for a phrase that follows one already located in the same probe.
+    ///
+    /// Tight on purpose. The previous phrase ended seconds ago, so the position is known to within
+    /// a line or two — and a phrase is only a handful of words, short enough to appear convincingly
+    /// somewhere else entirely. Searching wide for one does not find it more often, it finds it in
+    /// the wrong place.
+    /// </summary>
+    public int PhraseRadiusTokens { get; init; } = 60;
+
+    /// <summary>
     /// How wide the search may grow after repeated misses. Generous, because a run that has lost
     /// its place is worth spending real effort to recover — the alternative is a chapter, and then
     /// every chapter after it, with no anchors at all.

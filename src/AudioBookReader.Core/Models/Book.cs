@@ -60,6 +60,16 @@ public class Book
     /// </summary>
     public int AlignedThroughChapter { get; set; } = -1;
 
+    /// <summary>
+    /// Measure the passage being read while it is read, instead of aligning the whole book first.
+    ///
+    /// Per book rather than per app, because it is a property of how you intend to use this title.
+    /// A book you will listen to straight through is worth mapping in advance; one you will dip in
+    /// and out of is not, and measuring only what you actually reach is both faster to start and
+    /// more accurate where it counts.
+    /// </summary>
+    public bool MeasureWhileReading { get; set; }
+
     public DateTime AddedUtc { get; set; }
     public DateTime? LastOpenedUtc { get; set; }
 

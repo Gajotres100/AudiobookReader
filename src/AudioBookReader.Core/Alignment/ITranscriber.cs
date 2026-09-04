@@ -7,6 +7,16 @@ public readonly record struct TranscriptSegment(long StartMs, long EndMs, string
 public readonly record struct TimedWord(string Value, long AtMs);
 
 /// <summary>
+/// One timed run of words, as the recognizer broke them up.
+///
+/// Recognition breaks at phrase boundaries every few seconds, and each break is a moment whose time
+/// is known. Locating phrases one at a time rather than the probe as a whole is what lets a long
+/// probe be as accurate as a short one: a probe located only at its two ends is a straight line
+/// drawn across everything between them, and narration does not travel in straight lines.
+/// </summary>
+public sealed record TranscriptPhrase(long StartMs, long EndMs, IReadOnlyList<TimedWord> Words);
+
+/// <summary>
 /// What one probe heard, with times.
 ///
 /// The times are the point of this type. A probe covers ten seconds and the narrator does not
@@ -23,15 +33,18 @@ public sealed class Transcript
     /// <summary>Every word of every segment, in order, each carrying the time it was spoken.</summary>
     public required IReadOnlyList<TimedWord> Words { get; init; }
 
+    /// <summary>The same words, kept in the runs the recognizer timed them in.</summary>
+    public required IReadOnlyList<TranscriptPhrase> Phrases { get; init; }
+
     /// <summary>The raw text, for logging and for anything that only wants the words.</summary>
     public string Text => string.Concat(Segments.Select(s => s.Text));
 
-    public static readonly Transcript Empty = new() { Segments = [], Words = [] };
+    public static readonly Transcript Empty = new() { Segments = [], Words = [], Phrases = [] };
 
     public static Transcript FromSegments(IEnumerable<TranscriptSegment> segments)
     {
         var kept = segments.Where(s => s.EndMs >= s.StartMs).ToList();
-        var words = new List<TimedWord>();
+        var phrases = new List<TranscriptPhrase>();
 
         foreach (var segment in kept)
         {
@@ -44,11 +57,19 @@ public sealed class Transcript
             // assumption costs.
             var span = segment.EndMs - segment.StartMs;
 
+            var words = new List<TimedWord>(spoken.Count);
             for (var i = 0; i < spoken.Count; i++)
                 words.Add(new TimedWord(spoken[i], segment.StartMs + span * i / spoken.Count));
+
+            phrases.Add(new TranscriptPhrase(segment.StartMs, segment.EndMs, words));
         }
 
-        return new Transcript { Segments = kept, Words = words };
+        return new Transcript
+        {
+            Segments = kept,
+            Phrases = phrases,
+            Words = [.. phrases.SelectMany(p => p.Words)],
+        };
     }
 
     /// <summary>

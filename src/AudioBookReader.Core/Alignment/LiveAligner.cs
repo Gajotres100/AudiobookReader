@@ -116,19 +116,14 @@ public class LiveAligner(
 
             if (transcript.Words.Count > 0)
             {
-                var match = TranscriptMatcher.MatchNear(
-                    book,
-                    [.. transcript.Words.Select(w => w.Value)],
-                    book.TokenIndexAtChar(predicted),
-                    radius,
-                    _settings.MinConfidence);
+                // Phrase by phrase, for the same reason the whole-book run does it: a window
+                // located only at its two ends is a straight line drawn across everything between.
+                var located = Record(map, chapter.Index, transcript, predicted, radius);
 
-                if (match is not null)
+                if (located > 0)
                 {
-                    Record(map, chapter.Index, transcript, match.Value);
                     radius = _settings.SearchRadiusTokens;
-
-                    progress?.Report(new LiveAlignmentProgress(chapter.Index, next, match.Value.Confidence));
+                    progress?.Report(new LiveAlignmentProgress(chapter.Index, next, 1f));
                 }
                 else
                 {
@@ -152,22 +147,47 @@ public class LiveAligner(
         }
     }
 
-    /// <summary>Folds a window's two anchors into the chapter, keeping the map consistent.</summary>
-    private void Record(SyncMap map, int chapterIndex, Transcript transcript, TranscriptMatch match)
+    /// <summary>Locates each timed phrase and folds the anchors it yields into the chapter.</summary>
+    /// <returns>How many phrases were placed.</returns>
+    private int Record(SyncMap map, int chapterIndex, Transcript transcript, int predicted, int radius)
     {
-        var opening = new Anchor(
-            transcript.Words[match.TranscriptStart].AtMs, match.CharOffset, match.Confidence);
-
-        var closing = new Anchor(
-            transcript.Words[match.TranscriptEnd].AtMs, match.EndCharOffset, match.Confidence);
-
         var anchors = map.ForChapter(chapterIndex)?.Anchors.ToList() ?? [];
-        anchors.Add(opening);
+        var located = 0;
 
-        if (closing.AudioMs > opening.AudioMs && closing.CharOffset > opening.CharOffset)
-            anchors.Add(closing);
+        var expected = predicted;
+        Anchor? last = null;
 
-        map.SetChapter(ChapterSyncMap.FromAnchors(chapterIndex, anchors));
+        foreach (var phrase in transcript.Phrases)
+        {
+            // Wide only for the first phrase; after that the position is known to within a line.
+            var found = TranscriptMatcher.MatchNear(
+                book,
+                [.. phrase.Words.Select(w => w.Value)],
+                book.TokenIndexAtChar(expected),
+                located > 0 ? _settings.PhraseRadiusTokens : radius,
+                _settings.MinConfidence);
+
+            if (found is null) continue;
+
+            var opening = new Anchor(
+                phrase.Words[found.Value.TranscriptStart].AtMs, found.Value.CharOffset, found.Value.Confidence);
+
+            var closing = new Anchor(
+                phrase.Words[found.Value.TranscriptEnd].AtMs, found.Value.EndCharOffset, found.Value.Confidence);
+
+            anchors.Add(opening);
+
+            if (closing.AudioMs > opening.AudioMs && closing.CharOffset > opening.CharOffset)
+                anchors.Add(closing);
+
+            last = anchors[^1];
+            expected = last.Value.CharOffset;
+            located++;
+        }
+
+        if (located > 0) map.SetChapter(ChapterSyncMap.FromAnchors(chapterIndex, anchors));
+
+        return located;
     }
 
     /// <summary>

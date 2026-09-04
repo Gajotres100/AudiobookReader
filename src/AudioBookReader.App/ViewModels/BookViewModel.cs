@@ -90,6 +90,7 @@ public partial class BookViewModel(
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PositionText))]
     [NotifyPropertyChangedFor(nameof(Progress))]
+    [NotifyPropertyChangedFor(nameof(PlayedWidth))]
     public partial long PositionMs { get; set; }
 
     [ObservableProperty]
@@ -143,6 +144,18 @@ public partial class BookViewModel(
     public double Progress =>
         ChapterDurationMs > 0 ? Math.Clamp(ChapterPositionMs / (double)ChapterDurationMs, 0, 1) : 0;
 
+    /// <summary>
+    /// How wide the bar is on screen, reported by the page as it lays out.
+    ///
+    /// The part already listened to is drawn as a thicker bar over the track rather than tinted,
+    /// and a bar has to be given a width in pixels — a fraction is not something a layout can use.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PlayedWidth))]
+    public partial double TrackWidth { get; set; }
+
+    public double PlayedWidth => Math.Max(0, TrackWidth * Progress);
+
     // ---- Alignment ----
 
     [ObservableProperty]
@@ -162,14 +175,50 @@ public partial class BookViewModel(
     public partial bool IsAligning { get; set; }
 
     /// <summary>
-    /// True while the book measures itself as it is read, in which case there is nothing to run
-    /// here.
+    /// The two ways to get a read-along, offered as a choice because that is what they are.
     ///
-    /// Offering "Pokreni poravnanje" in that mode is not merely redundant, it is misleading: it
-    /// reads as a step the user has to take before the text will follow, when following is the one
-    /// thing that already works without it.
+    /// Turning one on turns the other off. They are not settings that combine: either the whole
+    /// book is sampled in advance and the gaps interpolated, or nothing is done ahead of time and
+    /// the passage being read is measured exactly as it is reached.
     /// </summary>
-    public bool MeasuresWhileReading => settings.LiveRefinement;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanStartAlignment))]
+    [NotifyPropertyChangedFor(nameof(CanRealign))]
+    [NotifyPropertyChangedFor(nameof(AlignmentSummary))]
+    public partial bool MeasuresWhileReading { get; set; }
+
+    [ObservableProperty]
+    public partial bool AlignsInAdvance { get; set; } = true;
+
+    /// <summary>Guards against the two toggles setting each other back and forth forever.</summary>
+    private bool _switchingMode;
+
+    partial void OnMeasuresWhileReadingChanged(bool value) => ApplyMode(value, isLive: true);
+
+    partial void OnAlignsInAdvanceChanged(bool value) => ApplyMode(value, isLive: false);
+
+    private void ApplyMode(bool value, bool isLive)
+    {
+        if (_switchingMode || _book is null) return;
+
+        _switchingMode = true;
+
+        try
+        {
+            // One of the two is always on: switching a mode off means choosing the other.
+            var live = isLive ? value : !value;
+
+            MeasuresWhileReading = live;
+            AlignsInAdvance = !live;
+
+            _book.MeasureWhileReading = live;
+            _ = database.UpdateBookAsync(_book);
+        }
+        finally
+        {
+            _switchingMode = false;
+        }
+    }
 
     public bool CanStartAlignment => IsPaired && !IsAligning && !MeasuresWhileReading;
 
@@ -203,7 +252,7 @@ public partial class BookViewModel(
             if (Chapters.Count == 0) return "";
 
             if (MeasuresWhileReading)
-                return "Tekst se mjeri dok čitaš — otvori „Čitaj” i pusti zvuk. " +
+                return "Sync on the fly: tekst se mjeri dok čitaš — otvori „Čitaj” i pusti zvuk. " +
                        "Poravnanje unaprijed nije potrebno.";
 
             if (HasStaleAlignment)
@@ -269,6 +318,8 @@ public partial class BookViewModel(
 
     public async Task LoadAsync()
     {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
         _book = await database.GetBookAsync(BookId);
         if (_book is null) return;
 
@@ -293,17 +344,29 @@ public partial class BookViewModel(
         HasChapters = Chapters.Count > 0;
         OnPropertyChanged(nameof(ChapterToggleText));
 
-        // The mode can have been switched in Settings since this page was last shown.
-        OnPropertyChanged(nameof(MeasuresWhileReading));
+        // Read back without letting the toggles write it straight out again.
+        _switchingMode = true;
+        MeasuresWhileReading = _book.MeasureWhileReading;
+        AlignsInAdvance = !_book.MeasureWhileReading;
+        _switchingMode = false;
+
         OnPropertyChanged(nameof(CanStartAlignment));
         OnPropertyChanged(nameof(CanRealign));
 
+        var listed = clock.ElapsedMilliseconds;
+
         await RefreshAlignmentProgressAsync();
+
+        var mapped = clock.ElapsedMilliseconds;
 
         alignment.Changed += OnAlignmentChanged;
         ApplyAlignmentStatus(alignment.Status);
 
         if (HasAudio) await StartPlaybackAsync();
+
+        AppLog.Info(
+            $"book page opened in {clock.ElapsedMilliseconds} ms " +
+            $"(chapters {listed} ms, sync map {mapped - listed} ms, player {clock.ElapsedMilliseconds - mapped} ms)");
 
         StartTicking();
     }
@@ -379,8 +442,10 @@ public partial class BookViewModel(
 
         if (playback.DurationMs > 0) DurationMs = playback.DurationMs;
 
+        // Hours are shown when there are any: a ninety-minute timer formatted as mm:ss reads as
+        // thirty minutes, which is exactly the number you must not get wrong at bedtime.
         SleepText = playback.SleepRemaining is { } left && left > TimeSpan.Zero
-            ? $"{left:mm\\:ss}"
+            ? left.TotalHours >= 1 ? $"{left:h\\:mm\\:ss}" : $"{left:mm\\:ss}"
             : "";
 
         UpdateChapterTitle();
@@ -416,6 +481,7 @@ public partial class BookViewModel(
         // The chapter changed, so the scrubber's scale did too.
         OnPropertyChanged(nameof(DurationText));
         OnPropertyChanged(nameof(Progress));
+        OnPropertyChanged(nameof(PlayedWidth));
     }
 
     private Chapter? CurrentChapter() =>
@@ -538,30 +604,73 @@ public partial class BookViewModel(
 
     // ---- Bookmarks ----
 
+    /// <summary>
+    /// Saves the spot being listened to. Reached by holding the flag, not tapping it.
+    ///
+    /// Tapping opens the list, because that is the thing you do often — placing a bookmark is
+    /// deliberate and rare, and a control that silently writes a record on a stray tap gives no
+    /// sign either way.
+    /// </summary>
     [RelayCommand]
-    private async Task AddBookmarkAsync() =>
+    private Task AddBookmarkAsync() => GuardAsync(async () =>
+    {
+        var existing = await database.GetBookmarksAsync(BookId);
+
+        if (existing.Count >= BookmarksViewModel.Limit)
+        {
+            Error = $"Dosegnut je limit od {BookmarksViewModel.Limit} bookmarka za ovu knjigu.";
+            return;
+        }
+
         await database.AddBookmarkAsync(new Bookmark
         {
             BookId = BookId,
             PositionMs = HasAudio ? PositionMs : null,
             ChapterIndex = CurrentChapter()?.Index ?? 0,
+            CreatedUtc = DateTime.UtcNow,
         });
 
+        // A saved bookmark that says nothing looks like a button that does nothing.
+        BookmarkNote = HasAudio ? $"Spremljeno na {PositionText}" : "Spremljeno";
+        await Task.Delay(2500);
+        BookmarkNote = "";
+    });
+
+    /// <summary>Brief confirmation that a bookmark was placed.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBookmarkNote))]
+    public partial string BookmarkNote { get; set; } = "";
+
+    public bool HasBookmarkNote => BookmarkNote.Length > 0;
+
+    [RelayCommand]
+    private Task OpenBookmarksAsync() => Shell.Current.GoToAsync($"bookmarks?id={BookId}");
+
     // ---- Media management ----
+
+    /// <summary>What an import is doing, so a long copy does not look like a hang.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsImporting))]
+    public partial string ImportMessage { get; set; } = "";
+
+    public bool IsImporting => ImportMessage.Length > 0;
+
+    [ObservableProperty]
+    public partial double ImportFraction { get; set; }
 
     [RelayCommand]
     private Task AddAudioAsync() => AttachAsync(
         picker.PickAudioAsync("Dodaj audioknjigu"),
-        (stream, name, ct) => importer.ImportAudioAsync(stream, name, BookId, ct));
+        (picked, progress, ct) => importer.ImportAudioAsync(picked, BookId, progress, ct));
 
     [RelayCommand]
     private Task AddEbookAsync() => AttachAsync(
         picker.PickEbookAsync("Dodaj e-knjigu"),
-        (stream, name, ct) => importer.ImportEbookAsync(stream, name, BookId, ct));
+        (picked, progress, ct) => importer.ImportEbookAsync(picked, BookId, progress, ct));
 
     private async Task AttachAsync(
-        Task<FileResult?> pick,
-        Func<Stream, string, CancellationToken, Task<Book>> attach)
+        Task<PickedMedia?> pick,
+        Func<PickedMedia, IProgress<ImportProgress>, CancellationToken, Task<Book>> attach)
     {
         Error = null;
 
@@ -570,10 +679,22 @@ public partial class BookViewModel(
 
         try
         {
-            AppLog.Info($"attach starting: '{picked.FileName}' from '{picked.FullPath}'");
+            AppLog.Info($"attach starting: '{picked.FileName}' from '{picked.Location}'");
 
-            await using var stream = await picked.OpenReadAsync();
-            await attach(stream, picked.FileName, CancellationToken.None);
+            ImportMessage = "Kopiram…";
+
+            var progress = new Progress<ImportProgress>(p =>
+            {
+                ImportMessage = p.Message;
+                ImportFraction = p.Fraction;
+            });
+
+            await attach(picked, progress, CancellationToken.None);
+
+            // Gaining a second medium turns this into a read-along, and alignment wants the audio
+            // as a local copy rather than as a reference into wherever the user keeps it.
+            var book = await database.GetBookAsync(BookId);
+            if (book?.IsPaired == true) await importer.EnsureLocalAudioAsync(BookId, progress, CancellationToken.None);
 
             await LoadAsync();
         }
@@ -581,6 +702,11 @@ public partial class BookViewModel(
         {
             AppLog.Error($"attach of '{picked.FileName}'", ex);
             Error = $"Dodavanje nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            ImportMessage = "";
+            ImportFraction = 0;
         }
     }
 
