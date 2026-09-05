@@ -60,6 +60,22 @@ public class BookSync(BookText text, SyncMap map, IReadOnlyList<Chapter> chapter
         return chapterMap.TryGetCharOffset(audioMs, out var offset) ? offset : null;
     }
 
+    /// <summary>
+    /// Where the narrator is, but only where that is actually measured.
+    ///
+    /// For callers that will act on the answer rather than draw it: moving playback on the strength
+    /// of an interpolation across a twenty-minute gap moves it somewhere arbitrary, and then the
+    /// next reading is taken from wherever that landed.
+    /// </summary>
+    public int? MeasuredCharOffsetAt(long audioMs, long windowMs)
+    {
+        if (ChapterAt(audioMs) is not { } chapter) return null;
+        if (map.ForChapter(chapter.Index) is not { } chapterMap) return null;
+        if (!chapterMap.IsMeasuredAt(audioMs, windowMs, ChapterSyncMap.BoundaryConfidence)) return null;
+
+        return chapterMap.TryGetCharOffset(audioMs, out var offset) ? offset : null;
+    }
+
     /// <summary>The sentence to highlight for the current playback position.</summary>
     public Sentence? SentenceAt(long audioMs) =>
         CharOffsetAt(audioMs) is { } offset ? text.SentenceAt(offset) : null;

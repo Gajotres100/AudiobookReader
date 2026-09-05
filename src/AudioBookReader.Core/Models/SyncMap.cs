@@ -157,6 +157,34 @@ public class ChapterSyncMap
     }
 
     /// <summary>
+    /// Whether this moment sits inside measured audio, rather than merely between the outermost
+    /// anchors of a chapter.
+    ///
+    /// <see cref="Covers"/> answers a weaker question than it appears to. A chapter measured in two
+    /// places twenty minutes apart "covers" everything between them, and asking where the voice is
+    /// in the middle of that gap gets a straight line drawn across it — an answer that can be tens
+    /// of thousands of characters out and carries no sign of it. That is fine for drawing a
+    /// highlight, and ruinous for anything that acts on the answer.
+    /// </summary>
+    public bool IsMeasuredAt(long audioMs, long windowMs, float boundaryConfidence)
+    {
+        var before = false;
+        var after = false;
+
+        foreach (var anchor in Anchors)
+        {
+            if (anchor.Confidence <= boundaryConfidence) continue;
+
+            if (anchor.AudioMs <= audioMs && audioMs - anchor.AudioMs <= windowMs) before = true;
+            if (anchor.AudioMs >= audioMs && anchor.AudioMs - audioMs <= windowMs) after = true;
+
+            if (before && after) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// True when at least one anchor came from an actual match rather than from a chapter boundary.
     ///
     /// The distinction matters everywhere: a chapter holding only its two boundary guesses looks

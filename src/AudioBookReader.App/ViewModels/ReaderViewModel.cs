@@ -735,10 +735,18 @@ public partial class ReaderViewModel(
                     return;
                 }
 
-                // Not the target, but the voice's own position is now known in the text. The gap
-                // between that and the target is a real distance, and the book's own pace turns it
-                // back into a time to move by.
-                if (_sync?.CharOffsetAt(playback.PositionMs) is not { } voiceAt) continue;
+                // Not the target, but the voice's own position may now be known in the text. The
+                // gap between that and the target is a real distance, and the book's own pace turns
+                // it back into a time to move by.
+                //
+                // Only where it is genuinely measured. Reading it from the map wherever the map
+                // would answer meant taking an interpolation across an unmeasured gap as fact: one
+                // correction landed the voice outside anything that had been listened to, the next
+                // reading came back as the opening of the book, and it moved by forty-seven
+                // minutes to chase it. Measurements only, and it waits for one.
+                var at = playback.PositionMs;
+
+                if (_sync?.MeasuredCharOffsetAt(at, MeasuredWindowMs) is not { } voiceAt) continue;
 
                 var drift = (long)((targetChar - voiceAt) / CharsPerMs);
 
@@ -749,11 +757,16 @@ public partial class ReaderViewModel(
                 }
 
                 corrections++;
-                playback.SeekTo(Math.Max(0, playback.PositionMs + drift));
+                playback.SeekTo(Math.Max(0, at + drift));
 
                 AppLog.Info(
                     $"reader: correction {corrections} — voice at char {voiceAt}, wanted {targetChar}, " +
                     $"moved {drift} ms");
+
+                // A seek needs a moment before the player reports the position it landed on, and
+                // measuring needs longer than that to reach it. Reading again half a second later
+                // produced the nonsense above.
+                await Task.Delay(2_000, ct);
             }
         }
         catch (OperationCanceledException)
@@ -784,6 +797,12 @@ public partial class ReaderViewModel(
             if (resume) playback.Play();
         }
     }
+
+    /// <summary>
+    /// How close an anchor must be for a position to count as measured rather than interpolated.
+    /// One live window either side.
+    /// </summary>
+    private const long MeasuredWindowMs = 20_000;
 
     /// <summary>The book's average pace, used only to turn a distance in the text back into a time.</summary>
     private double CharsPerMs =>

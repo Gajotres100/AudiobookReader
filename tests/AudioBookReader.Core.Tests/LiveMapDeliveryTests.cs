@@ -128,4 +128,31 @@ public class LiveMapDeliveryTests
 
         Assert.False(wrong.TryExtrapolateCharOffset(35_000, withinMs: 20_000, out _));
     }
+
+    [Fact]
+    public void KnowsWhereItIsInsideAMeasuredStretch()
+    {
+        Assert.True(Measured().IsMeasuredAt(12_000, windowMs: 20_000, boundaryConfidence: 0.2f));
+    }
+
+    [Fact]
+    public void DoesNotClaimToKnowTheMiddleOfAGap()
+    {
+        // Two places measured twenty minutes apart. Covers() says yes for everything between them
+        // and hands back a straight line; acting on that moves playback somewhere arbitrary.
+        var twoPlaces = new ChapterSyncMap
+        {
+            ChapterIndex = 0,
+            Anchors =
+            [
+                new Anchor(0, 0, 0.9f),
+                new Anchor(10_000, 150, 0.9f),
+                new Anchor(1_200_000, 18_000, 0.9f),
+                new Anchor(1_210_000, 18_150, 0.9f),
+            ],
+        };
+
+        Assert.True(twoPlaces.Covers(600_000));
+        Assert.False(twoPlaces.IsMeasuredAt(600_000, windowMs: 20_000, boundaryConfidence: 0.2f));
+    }
 }
