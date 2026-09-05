@@ -121,20 +121,6 @@ public partial class ReaderViewModel(
         IsPlaying = playback.IsPlaying;
     }
 
-    /// <summary>Jumps the narration back ten seconds. The highlight follows on the next tick.</summary>
-    [RelayCommand]
-    private void Back() => Nudge(-10_000);
-
-    [RelayCommand]
-    private void Forward() => Nudge(10_000);
-
-    private void Nudge(long deltaMs)
-    {
-        // Only when this book is the one loaded: playback outlives pages, and nudging someone
-        // else's book from here would move audio the reader is not showing.
-        if (playback.BookId == BookId) playback.Nudge(deltaMs);
-    }
-
     // ---- Appearance ----
 
     /// <summary>A page colouring, named the way a reader thinks of it rather than by hex.</summary>
@@ -156,14 +142,15 @@ public partial class ReaderViewModel(
         new("Noć", "#000000", "#A9A39A", "rgba(255, 196, 0, 0.16)"),
     ];
 
-    public sealed record ReaderFont(string Name, string Css);
-
-    public static readonly ReaderFont[] Fonts =
-    [
-        new("Serif", "Georgia, 'Noto Serif', 'Times New Roman', serif"),
-        new("Bez serifa", "'Noto Sans', Roboto, system-ui, sans-serif"),
-        new("Široki", "'Noto Serif', Georgia, serif"),
-    ];
+    /// <summary>
+    /// The face the text is set in.
+    ///
+    /// One, not a choice. It was a picker on the reader's bar, which is a place for the two or
+    /// three things you reach for while reading — and a face is something you settle once and then
+    /// never touch. A serif stack, because that is what a book is set in, with fallbacks for
+    /// whatever the device actually has.
+    /// </summary>
+    public const string FontCss = "Georgia, 'Noto Serif', 'Times New Roman', serif";
 
     /// <summary>Chosen look, kept per reader rather than per book — it belongs to the eyes.</summary>
     public int ThemeIndex
@@ -172,22 +159,9 @@ public partial class ReaderViewModel(
         private set => Preferences.Default.Set("reader.theme", value);
     }
 
-    public int FontIndex
-    {
-        get => Math.Clamp(Preferences.Default.Get("reader.font", 0), 0, Fonts.Length - 1);
-        private set => Preferences.Default.Set("reader.font", value);
-    }
-
-    /// <summary>Extra letter spacing for the widest of the faces, which is what makes it wide.</summary>
-    private string LetterSpacing => FontIndex == 2 ? "0.02em" : "normal";
-
     public ReaderTheme Theme => Themes[ThemeIndex];
 
-    public ReaderFont Font => Fonts[FontIndex];
-
     public string ThemeName => Theme.Name;
-
-    public string FontName => Font.Name;
 
     /// <summary>Raised when the page should restyle itself without being rebuilt and losing its place.</summary>
     public event EventHandler? AppearanceChanged;
@@ -200,16 +174,6 @@ public partial class ReaderViewModel(
         {
             ThemeIndex = index;
             OnPropertyChanged(nameof(ThemeName));
-        });
-
-    [RelayCommand]
-    private Task ChooseFontAsync() => PickAsync(
-        "Font",
-        [.. Fonts.Select(f => f.Name)],
-        index =>
-        {
-            FontIndex = index;
-            OnPropertyChanged(nameof(FontName));
         });
 
     private async Task PickAsync(string title, string[] options, Action<int> chosen)
@@ -225,8 +189,8 @@ public partial class ReaderViewModel(
 
     /// <summary>The one call that restyles a loaded page in place.</summary>
     public string AppearanceScript =>
-        $"applyAppearance('{Theme.Background}', '{Theme.Foreground}', \"{Font.Css}\", " +
-        $"'{Theme.Highlight}', '{LetterSpacing}')";
+        $"applyAppearance('{Theme.Background}', '{Theme.Foreground}', \"{FontCss}\", " +
+        $"'{Theme.Highlight}', 'normal')";
 
     // ---- Chrome ----
 
@@ -385,16 +349,6 @@ public partial class ReaderViewModel(
     public void OnFontSizeChanged(int size) => FontSize = size;
 
     /// <summary>
-    /// Manual correction, in milliseconds, added to the playback position before looking the text
-    /// up.
-    ///
-    /// Anchors sit minutes apart and everything between them is interpolated, so the highlight can
-    /// sit a second or two off the voice — about one sentence, and consistently in one direction
-    /// for a given book and narrator. Rather than make the reader live with it or spend an hour of
-    /// CPU narrowing it, one nudge corrects the whole book. Kept per book, since the offset comes
-    /// from that recording.
-    /// </summary>
-    /// <summary>
     /// How far ahead of the voice the marker aims, in milliseconds.
     ///
     /// The remaining error is roughly symmetric — the marker is as likely to move early as late —
@@ -404,30 +358,6 @@ public partial class ReaderViewModel(
     /// Aiming a little ahead therefore trades a fault nobody notices for one everybody does.
     /// </summary>
     private const int AnticipationMs = 400;
-
-    public int SyncOffsetMs
-    {
-        get => Preferences.Default.Get($"reader.offset.{BookId}", 0);
-        private set => Preferences.Default.Set($"reader.offset.{BookId}", Math.Clamp(value, -20_000, 20_000));
-    }
-
-    public string SyncOffsetText =>
-        SyncOffsetMs == 0 ? "0 s" : $"{(SyncOffsetMs > 0 ? "+" : "")}{SyncOffsetMs / 1000.0:0.0} s";
-
-    [RelayCommand]
-    private void NudgeSyncEarlier() => AdjustOffset(-500);
-
-    [RelayCommand]
-    private void NudgeSyncLater() => AdjustOffset(500);
-
-    private void AdjustOffset(int deltaMs)
-    {
-        SyncOffsetMs += deltaMs;
-        OnPropertyChanged(nameof(SyncOffsetText));
-
-        // Take effect on the next tick rather than waiting for the sentence to change on its own.
-        _lastSentence = -1;
-    }
 
     public bool CanGoPrevious => SpineIndex > 0;
 
@@ -749,7 +679,7 @@ public partial class ReaderViewModel(
             return;
         }
 
-        var at = playback.PositionMs + AnticipationMs + SyncOffsetMs;
+        var at = playback.PositionMs + AnticipationMs;
 
         if (_sync.SentenceAt(at) is not { } sentence)
         {
@@ -1231,8 +1161,8 @@ public partial class ReaderViewModel(
 
         return page.ToString()
             .Replace("{{FONTSIZE}}", FontSize.ToString())
-            .Replace("{{FONTFAMILY}}", Font.Css)
-            .Replace("{{LETTERSPACING}}", LetterSpacing)
+            .Replace("{{FONTFAMILY}}", FontCss)
+            .Replace("{{LETTERSPACING}}", "normal")
             .Replace("{{BACKGROUND}}", Theme.Background)
             .Replace("{{FOREGROUND}}", Theme.Foreground)
             .Replace("{{HIGHLIGHT}}", Theme.Highlight);

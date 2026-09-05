@@ -709,6 +709,8 @@ public partial class BookViewModel(
         var picked = await pick;
         if (picked is null) return;
 
+        var hadText = HasText;
+
         try
         {
             AppLog.Info($"attach starting: '{picked.FileName}' from '{picked.Location}'");
@@ -728,7 +730,21 @@ public partial class BookViewModel(
             var book = await database.GetBookAsync(BookId);
             if (book?.IsPaired == true) await importer.EnsureLocalAudioAsync(BookId, progress, CancellationToken.None);
 
+            var justGainedText = !hadText && book?.HasText == true;
+
             await LoadAsync();
+
+            // A book that has just gained text is a different thing from the one that was open a
+            // moment ago, and it belongs on the reading side. Landing back on the player with a
+            // "Čitaj" button means pressing one more thing to reach what you added.
+            if (justGainedText)
+            {
+                // To the library first, then into the reader: this is reached from the details page
+                // stacked on top of a player, and both of those are now the wrong place to come
+                // back to. Going absolute clears them instead of leaving them under the reader.
+                await Shell.Current.GoToAsync("//library");
+                await Shell.Current.GoToAsync($"reader?id={BookId}");
+            }
         }
         catch (Exception ex)
         {
@@ -755,7 +771,11 @@ public partial class BookViewModel(
         if (!confirmed) return;
 
         await importer.DeleteBookAsync(BookId);
-        await Shell.Current.GoToAsync("..");
+
+        // All the way to the library, not one page back. Deletion is reached from the details page,
+        // which sits on top of a reader or a player still showing the book that no longer exists —
+        // stepping back one page landed on exactly that.
+        await Shell.Current.GoToAsync("//library");
     });
 
     /// <summary>

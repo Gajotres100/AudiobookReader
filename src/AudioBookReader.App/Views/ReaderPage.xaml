@@ -14,19 +14,75 @@
         The page is the text. Controls appear on a tap and go away again when the narration starts,
         because at that point the book is being read rather than operated.
 
-        Two books meet here. One has only text, and then this is a plain reader: no transport, no
-        alignment, nothing about a narrator. One has both, and then the same bar grows a play
-        control — the same filled circle the player screen uses, at a size that suits a bar rather
-        than a screen. The controls that only make sense with a voice are bound to HasAudio and
-        simply are not there otherwise.
+        Everything is one bar, at the top, and it is the same bar for a book with a narration and a
+        book without one — only the play control comes and goes. At the bottom there is nothing to
+        press: just where you are in the book, and a slider that appears if you tap it.
     -->
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
 
-        <!--  Says why the text is not following, instead of leaving a dead control to explain itself.  -->
-        <Label
+        <!--  Controls  -->
+        <Grid
             Grid.Row="0"
-            Padding="16,10"
+            Padding="6,4"
+            BackgroundColor="{AppThemeBinding Light={StaticResource Chrome},
+                                              Dark={StaticResource ChromeDark}}"
+            ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto"
+            IsVisible="{Binding ChromeVisible}">
+
+            <Button
+                Grid.Column="0"
+                Command="{Binding CloseCommand}"
+                Style="{StaticResource Icon}"
+                Text="✕" />
+
+            <!--
+                The one filled control in the app, and the same object the player uses. Only a book
+                with a narration has it; a book with only text has nothing to play.
+            -->
+            <Button
+                Grid.Column="1"
+                Command="{Binding TogglePlayCommand}"
+                IsVisible="{Binding HasAudio}"
+                Style="{StaticResource PlayInline}"
+                Text="{Binding PlayLabel}" />
+
+            <!--  Was a downward swipe; that gesture now belongs to scrolling the text.  -->
+            <Button
+                Grid.Column="2"
+                Command="{Binding JumpToChapterCommand}"
+                IsEnabled="{Binding HasChapters}"
+                Style="{StaticResource IconWide}"
+                Text="Poglavlja" />
+
+            <Button
+                Grid.Column="3"
+                Command="{Binding ChooseThemeCommand}"
+                Style="{StaticResource IconWide}"
+                Text="{Binding ThemeName}" />
+
+            <!--  Only when there is a narration to leave the text for.  -->
+            <Button
+                Grid.Column="4"
+                Command="{Binding OpenPlayerCommand}"
+                IsVisible="{Binding HasAudio}"
+                Style="{StaticResource Icon}"
+                Text="🎧" />
+
+            <Button
+                Grid.Column="5"
+                Command="{Binding OpenDetailsCommand}"
+                Style="{StaticResource Icon}"
+                Text="☰" />
+        </Grid>
+
+        <!--
+            Says why the text is not following, instead of leaving a dead control to explain itself.
+            Under the bar rather than over the text, so it never covers the line being read.
+        -->
+        <Label
+            Grid.Row="1"
+            Padding="16,8"
             BackgroundColor="{AppThemeBinding Light={StaticResource Chrome},
                                               Dark={StaticResource ChromeDark}}"
             IsVisible="{Binding ShowFollowHint}"
@@ -35,8 +91,8 @@
 
         <!--  A map covers only the chapters a run has reached; say so instead of standing still.  -->
         <Label
-            Grid.Row="0"
-            Padding="16,10"
+            Grid.Row="1"
+            Padding="16,8"
             BackgroundColor="{AppThemeBinding Light={StaticResource Chrome},
                                               Dark={StaticResource ChromeDark}}"
             IsVisible="{Binding HasFollowStatus}"
@@ -44,7 +100,7 @@
             Text="{Binding FollowStatus}" />
 
         <ActivityIndicator
-            Grid.Row="1"
+            Grid.Row="2"
             HorizontalOptions="Center"
             IsRunning="{Binding IsBusy}"
             IsVisible="{Binding IsBusy}"
@@ -52,99 +108,17 @@
 
         <WebView
             x:Name="Reader"
-            Grid.Row="1"
+            Grid.Row="2"
             Navigated="OnReaderNavigated"
             Navigating="OnReaderNavigating" />
 
-        <!--  Controls  -->
+        <!--  Where you are. Not a control, so it stays out of the bar and off the top.  -->
         <VerticalStackLayout
-            Grid.Row="2"
+            Grid.Row="3"
             BackgroundColor="{AppThemeBinding Light={StaticResource Chrome},
                                               Dark={StaticResource ChromeDark}}"
             IsVisible="{Binding ChromeVisible}"
-            Padding="10,6"
-            Spacing="2">
-
-            <!--  Where you are, and the way out of the book in both directions.  -->
-            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
-                <Button
-                    Grid.Column="0"
-                    Command="{Binding CloseCommand}"
-                    Style="{StaticResource Icon}"
-                    Text="✕" />
-
-                <!--  Only when there is a narration to leave the text for.  -->
-                <Button
-                    Grid.Column="1"
-                    Command="{Binding OpenPlayerCommand}"
-                    IsVisible="{Binding HasAudio}"
-                    Style="{StaticResource Icon}"
-                    Text="🎧" />
-
-                <!--  Was a downward swipe; that gesture now belongs to scrolling the text.  -->
-                <Button
-                    Grid.Column="2"
-                    Command="{Binding JumpToChapterCommand}"
-                    IsEnabled="{Binding HasChapters}"
-                    Style="{StaticResource IconWide}"
-                    Text="Poglavlja" />
-
-                <Button
-                    Grid.Column="3"
-                    Command="{Binding ChooseThemeCommand}"
-                    Style="{StaticResource IconWide}"
-                    Text="{Binding ThemeName}" />
-
-                <Button
-                    Grid.Column="4"
-                    Command="{Binding OpenDetailsCommand}"
-                    Style="{StaticResource Icon}"
-                    Text="☰" />
-            </Grid>
-
-            <!--
-                Transport, identical in kind to the player's: skip back, the one filled control in
-                the app, skip forward. It used to be a small transparent "⏸" wedged between two
-                words, which is why pause here looked like it belonged to another program.
-            -->
-            <HorizontalStackLayout
-                HorizontalOptions="Center"
-                IsVisible="{Binding HasAudio}"
-                Spacing="20">
-                <Button
-                    Command="{Binding BackCommand}"
-                    Style="{StaticResource Skip}"
-                    Text="↺10" />
-
-                <Button
-                    Command="{Binding TogglePlayCommand}"
-                    Style="{StaticResource PlaySmall}"
-                    Text="{Binding PlayLabel}" />
-
-                <Button
-                    Command="{Binding ForwardCommand}"
-                    Style="{StaticResource Skip}"
-                    Text="↻10" />
-            </HorizontalStackLayout>
-
-            <!--  Nudges the highlight against the voice; only meaningful while following.  -->
-            <HorizontalStackLayout
-                HorizontalOptions="Center"
-                IsVisible="{Binding CanFollow}"
-                Spacing="8">
-                <Button
-                    Command="{Binding NudgeSyncEarlierCommand}"
-                    Style="{StaticResource IconWide}"
-                    Text="◀ ranije" />
-                <Label
-                    Style="{StaticResource Muted}"
-                    Text="{Binding SyncOffsetText}"
-                    VerticalOptions="Center" />
-                <Button
-                    Command="{Binding NudgeSyncLaterCommand}"
-                    Style="{StaticResource IconWide}"
-                    Text="kasnije ▶" />
-            </HorizontalStackLayout>
+            Padding="10,2">
 
             <Slider
                 x:Name="PageSlider"
@@ -154,26 +128,15 @@
                 Minimum="1"
                 Value="{Binding PageNumber, Mode=OneWay}" />
 
-            <!--  Font is here rather than in the bar above: it belongs with the page, not the book.  -->
-            <Grid ColumnDefinitions="Auto,*,Auto">
-                <Button
-                    Grid.Column="0"
-                    Command="{Binding ChooseFontCommand}"
-                    Style="{StaticResource IconWide}"
-                    Text="{Binding FontName}" />
-
-                <Label
-                    Grid.Column="1"
-                    Padding="0,4"
-                    HorizontalTextAlignment="Center"
-                    Style="{StaticResource Muted}"
-                    Text="{Binding DocumentLabel}"
-                    VerticalOptions="Center">
-                    <Label.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding TogglePageSliderCommand}" />
-                    </Label.GestureRecognizers>
-                </Label>
-            </Grid>
+            <Label
+                Padding="0,4"
+                HorizontalTextAlignment="Center"
+                Style="{StaticResource Muted}"
+                Text="{Binding DocumentLabel}">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding TogglePageSliderCommand}" />
+                </Label.GestureRecognizers>
+            </Label>
         </VerticalStackLayout>
     </Grid>
 </ContentPage>
