@@ -100,7 +100,7 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
         _recogniseMs += recogniseMs;
         _audioMs += durationMs;
 
-        if (_probes % 50 != 0) return;
+        if (_probes % 20 != 0) return;
 
         var wall = _decodeMs + _recogniseMs;
 

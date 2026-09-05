@@ -167,6 +167,16 @@ public partial class BookViewModel(
     [ObservableProperty]
     public partial double AlignmentFraction { get; set; }
 
+    /// <summary>
+    /// How far through the chapter being worked on.
+    ///
+    /// Shown beside the book-wide figure because on a forty-chapter book the overall bar advances
+    /// by a fortieth every couple of minutes, which for the first two minutes is indistinguishable
+    /// from nothing happening at all.
+    /// </summary>
+    [ObservableProperty]
+    public partial double ChapterFraction { get; set; }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanStartAlignment))]
     [NotifyPropertyChangedFor(nameof(IsIdleWithMessage))]
@@ -821,6 +831,7 @@ public partial class BookViewModel(
 
         AlignmentMessage = status.Message;
         AlignmentFraction = status.Fraction;
+        ChapterFraction = status.ChapterFraction;
         IsAligning = status.IsRunning;
 
         // A run that just ended moved the high-water mark, so the summary has to be re-read or it

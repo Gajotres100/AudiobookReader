@@ -390,7 +390,14 @@
                             Style="{StaticResource Muted}"
                             Text="{Binding AlignmentMessage}" />
 
+                        <!--  The book, then the chapter: the second is the one that visibly moves.  -->
                         <ProgressBar IsVisible="{Binding IsAligning}" Progress="{Binding AlignmentFraction}" />
+
+                        <ProgressBar
+                            IsVisible="{Binding IsAligning}"
+                            Progress="{Binding ChapterFraction}"
+                            ProgressColor="{AppThemeBinding Light=#7C8AA5,
+                                                            Dark=#5A6B8A}" />
 
                         <Button
                             Command="{Binding StartAlignmentCommand}"

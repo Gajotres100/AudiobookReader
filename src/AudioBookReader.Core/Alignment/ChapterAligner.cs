@@ -74,8 +74,14 @@ public class ChapterAligner(
             var probe = probes[i];
 
             // Once the chapter's opening is pinned there is nothing left for the remaining run-in
-            // probes to find, and transcribing them would be pure waste.
-            if (probe.IsRunIn && lastAccepted is not null) continue;
+            // probes to find, and transcribing them would be pure waste. Still reported, though:
+            // a dozen probes silently skipped made the chapter's progress jump from nothing to a
+            // third in one step, which reads as a stall followed by a glitch.
+            if (probe.IsRunIn && lastAccepted is not null)
+            {
+                progress?.Report(new AlignmentProgress(request.ChapterIndex, i + 1, probes.Count, matches));
+                continue;
+            }
 
             var predictedChar = Predict(request, probe.StartMs, lastAccepted, charsPerMs);
 

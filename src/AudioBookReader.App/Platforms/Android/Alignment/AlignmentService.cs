@@ -177,13 +177,14 @@ public class AlignmentService : Service
 
         // The user needs to know why nothing is moving, or a paused run reads as a broken one.
         var message = gate.BlockedReason
-            ?? $"Poravnavanje u tijeku — poglavlje {progress.ChapterIndex + 1} od {chapterCount}";
+            ?? $"Poglavlje {progress.ChapterIndex + 1} od {chapterCount} — {withinChapter:P0}";
 
         if (gate.BlockedReason is null && thermal.Status >= ThermalStatus.Moderate)
             message += " — usporeno zbog topline";
 
         queue?.Report(new AlignmentStatus(
-            bookId, AlignmentPhase.Aligning, message, fraction, progress.ChapterIndex, chapterCount));
+            bookId, AlignmentPhase.Aligning, message, fraction,
+            progress.ChapterIndex, chapterCount, withinChapter));
 
         Notify(message, (int)(fraction * 100));
     }

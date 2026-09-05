@@ -17,13 +17,20 @@ public enum AlignmentPhase
     Failed,
 }
 
+/// <param name="Fraction">How far through the whole book, 0..1.</param>
+/// <param name="ChapterFraction">
+/// How far through the chapter being worked on. Shown alongside the book-wide figure because on a
+/// forty-chapter book the overall bar moves once every couple of minutes, which is indistinguishable
+/// from nothing happening.
+/// </param>
 public record AlignmentStatus(
     int? BookId = null,
     AlignmentPhase Phase = AlignmentPhase.Idle,
     string Message = "",
     double Fraction = 0,
     int ChapterIndex = 0,
-    int ChapterCount = 0)
+    int ChapterCount = 0,
+    double ChapterFraction = 0)
 {
     public bool IsRunning =>
         Phase is AlignmentPhase.Starting or AlignmentPhase.DownloadingModel or AlignmentPhase.Aligning;
