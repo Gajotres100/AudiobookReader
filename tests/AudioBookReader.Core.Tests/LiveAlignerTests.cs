@@ -259,6 +259,8 @@ public class LiveAlignerTests
                 null,
                 cancellation.Token));
 
-        Assert.InRange(saves, 2, 4);
+        // Every second window, so a run killed by the system loses half a minute of measuring at
+        // most — and not every window, which would rewrite the whole file for two anchors.
+        Assert.InRange(saves, 5, 7);
     }
 }
