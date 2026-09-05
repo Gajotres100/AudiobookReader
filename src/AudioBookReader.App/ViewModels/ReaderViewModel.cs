@@ -107,36 +107,31 @@ public partial class ReaderViewModel(
     public string PlayLabel => IsPlaying ? "⏸" : "▶";
 
     /// <summary>
-    /// True when the map covers the moment playback would resume from.
-    ///
-    /// Recomputed on the tick, including while paused — a passage becomes measured because sync on
-    /// the fly reached it, which has nothing to do with whether anything is playing.
+    /// True while a chapter just jumped to is being measured and playback is deliberately waiting.
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanPlay))]
-    public partial bool MeasuredHere { get; set; }
-
-    /// <summary>Set when measuring has been waited for and did not arrive, so the choice returns to the user.</summary>
-    private bool _playUnmeasured;
+    public partial bool IsWaitingToSpeak { get; set; }
 
     /// <summary>
-    /// Whether starting the narration here would give the reader anything to follow.
+    /// Whether play is offered.
     ///
-    /// Offered as a disabled control rather than one that starts a voice reading text the page
-    /// cannot mark: while measuring is still working towards this passage, playing it means
-    /// listening to one part of the book and looking at another. Only sync on the fly withholds it,
-    /// and only until the passage is measured — a book aligned in advance is either mapped here or
-    /// never will be from this screen, and refusing to play an audiobook for an hour is a worse
-    /// answer than an unmarked page.
+    /// Withheld in exactly one situation: the few seconds after a chapter jump, while measuring
+    /// works towards the new position and the status line says so. Starting there would mean a
+    /// voice reading text the page cannot mark.
+    ///
+    /// It is deliberately not withheld merely because the passage is unmeasured. That looked like
+    /// the same rule but is a very different one — on a book that has never been played there is no
+    /// playhead, nothing measured anywhere, and gating play on measurement leaves a dead button and
+    /// no way to ever start the book. The control that starts a thing cannot depend on the thing
+    /// having started.
     /// </summary>
-    public bool CanPlay => HasAudio && (!MeasuresWhileReading || _playUnmeasured || MeasuredHere);
+    public bool CanPlay => HasAudio && !IsWaitingToSpeak;
 
-    /// <summary>Re-reads whether this moment is measured. Cheap: two binary searches.</summary>
-    private void RefreshMeasured()
-    {
-        MeasuredHere = playback.BookId == BookId
-                       && _sync?.CharOffsetAt(playback.PositionMs + AnticipationMs) is not null;
-    }
+    /// <summary>Whether the map covers the moment playback would resume from.</summary>
+    private bool IsMeasuredHere =>
+        playback.BookId == BookId
+        && _sync?.CharOffsetAt(playback.PositionMs + AnticipationMs) is not null;
 
     [RelayCommand]
     private async Task TogglePlayAsync()
@@ -434,7 +429,11 @@ public partial class ReaderViewModel(
             // through the text moves the playhead — both of which need the player to actually hold
             // this book. Without it, opening the reader first and never pressing play left the
             // measuring run working from zero while the reader sat in chapter five.
-            if (_book.HasAudio && playback.BookId != BookId && _book.AudioPath is { } audio)
+            //
+            // Never while something is playing: opening one book's text to check a name would
+            // otherwise silence the book being listened to.
+            if (_book.HasAudio && playback.BookId != BookId && !playback.IsPlaying
+                && _book.AudioPath is { } audio)
             {
                 var listening = await database.GetReadingStateAsync(BookId);
                 await playback.LoadAsync(BookId, audio, listening?.AudioPositionMs ?? 0, listening?.Speed ?? 1f);
@@ -613,9 +612,6 @@ public partial class ReaderViewModel(
         // Anything still waiting is waiting for the wrong chapter now.
         StopHolding();
 
-        _playUnmeasured = false;
-        OnPropertyChanged(nameof(CanPlay));
-
         var wasPlaying = playback.IsPlaying;
 
         // Where the chapter being left had got to, so coming back resumes there rather than at its
@@ -651,6 +647,7 @@ public partial class ReaderViewModel(
 
     private async Task HoldUntilMeasuredAsync(CancellationToken ct)
     {
+        IsWaitingToSpeak = true;
         FollowStatus = "Mjerim ovo poglavlje — zvuk kreće čim bude spremno.";
 
         try
@@ -664,10 +661,10 @@ public partial class ReaderViewModel(
                 // Live measuring hands the map over as it grows; a whole-book run writes a file.
                 // Asking for both costs nothing and covers a book being worked on either way.
                 MaybeRefreshSyncMap();
-                RefreshMeasured();
 
-                if (!MeasuredHere) continue;
+                if (!IsMeasuredHere) continue;
 
+                IsWaitingToSpeak = false;
                 FollowStatus = "";
                 playback.Play();
                 return;
@@ -678,17 +675,21 @@ public partial class ReaderViewModel(
             // Moved again before this finished. The newer move does its own holding.
             return;
         }
+        finally
+        {
+            IsWaitingToSpeak = false;
+        }
 
-        // Waited and nothing came. Rather than start a voice the page cannot follow, the choice
-        // goes back to the reader — with play offered again and no pretence about what it will do.
-        _playUnmeasured = true;
-        OnPropertyChanged(nameof(CanPlay));
-
+        // Waited and nothing came. Rather than start a voice the page cannot follow behind the
+        // user's back, the choice goes back to them, with what will happen stated rather than
+        // implied.
         FollowStatus = "Ovaj dio još nije izmjeren. Možeš pustiti zvuk, ali tekst ga zasad neće pratiti.";
     }
 
     private void StopHolding()
     {
+        IsWaitingToSpeak = false;
+
         if (_holding is not { } holding) return;
 
         _holding = null;
@@ -857,10 +858,6 @@ public partial class ReaderViewModel(
         // No map yet is exactly the state a finishing alignment gets us out of, so keep looking —
         // and while following, the map grows under us continuously, so keep looking regardless.
         if (_sync is null || MeasuresWhileReading) MaybeRefreshSyncMap();
-
-        // Before the early returns below: whether this passage is measured decides whether play is
-        // offered at all, and that has to stay true while the page sits paused waiting for it.
-        RefreshMeasured();
 
         // Playback outlives pages and can be on a different book entirely. Following it then would
         // walk this book's text to another book's playhead.
@@ -1032,7 +1029,6 @@ public partial class ReaderViewModel(
         var appeared = _sync is null;
 
         _sync = new BookSync(_text, map, _libraryChapters) { ExtrapolateAheadMs = LiveExtrapolationMs };
-        RefreshMeasured();
 
         if (appeared)
         {
