@@ -57,6 +57,10 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 #endif
 
+		// The stored choice has to reach AppLog before anything logs, and the settings page may
+		// never be opened in a session that needs the detail.
+		AppLog.Verbose = new AlignmentSettingsStore().VerboseLog;
+
 		// Nothing is blocked on here: the database creates its schema on first use, so startup
 		// never waits on I/O from the UI thread.
 		return builder.Build();

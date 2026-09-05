@@ -161,8 +161,12 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
     /// </summary>
     private async Task<Transcript> RecognizeAsync(float[] samples, long startMs, CancellationToken ct)
     {
-        using var priority = BorrowAtBackgroundPriority();
-
+        // No priority borrow here, deliberately. It cannot span an await: at the first suspension
+        // the thread returns to the pool still in the background cpuset, and everything the app
+        // schedules on it meanwhile runs on the efficiency cores. And it would not buy what the
+        // comment below claims anyway — whisper runs the native work on threads of its own, not on
+        // the one waiting here, so demoting the waiter confines nothing. Recognition is paced by
+        // the thread count and the duty cycle instead; those are the controls that reach it.
         var segments = new List<TranscriptSegment>();
 
         await foreach (var segment in _processor.ProcessAsync(samples, ct))

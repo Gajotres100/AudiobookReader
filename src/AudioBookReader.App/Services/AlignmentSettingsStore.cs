@@ -14,6 +14,24 @@ public class AlignmentSettingsStore
     private const string ChargingOnlyKey = "alignment.chargingOnly";
     private const string ScreenOffOnlyKey = "alignment.screenOffOnly";
     private const string MinimumBatteryKey = "alignment.minimumBattery";
+    private const string VerboseLogKey = "diagnostics.verbose";
+
+    /// <summary>
+    /// Write the detailed following diagnostics to the log.
+    ///
+    /// Off by default because they fire several times a second for the whole time a book is open.
+    /// Exposed at all because the alternative — gating them behind a build flag — means the one
+    /// person who can reproduce a following problem is the one person who cannot record it.
+    /// </summary>
+    public bool VerboseLog
+    {
+        get => Preferences.Default.Get(VerboseLogKey, false);
+        set
+        {
+            Preferences.Default.Set(VerboseLogKey, value);
+            AppLog.Verbose = value;
+        }
+    }
     // How a book gets its read-along — sampled in advance, or measured as it is read — is not
     // here. It belongs to the book, is chosen on the book's own page, and is stored with it.
 

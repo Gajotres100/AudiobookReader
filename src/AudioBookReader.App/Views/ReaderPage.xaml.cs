@@ -130,6 +130,13 @@ public partial class ReaderPage : ContentPage
 
         DeviceDisplay.Current.KeepScreenOn = false;
 
+        // Detached before anything is awaited. Reading the position asks the web view a question
+        // while it is being torn down, and that call can come back late or never — so doing the
+        // teardown afterwards risks a stale continuation dismantling a page the user has already
+        // come back to, which is the exact fault this pairing exists to prevent.
+        Detach();
+        _viewModel.Dispose();
+
         try
         {
             await _viewModel.SavePositionAsync(await ReadTopSentenceAsync());
@@ -138,9 +145,6 @@ public partial class ReaderPage : ContentPage
         {
             AppLog.Error("saving the reading position", ex);
         }
-
-        Detach();
-        _viewModel.Dispose();
     }
 
     private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

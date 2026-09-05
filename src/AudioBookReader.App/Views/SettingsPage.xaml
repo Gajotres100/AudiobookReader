@@ -73,6 +73,21 @@
                     Value="{Binding MinimumBatteryPercent}" />
             </VerticalStackLayout>
 
+            <BoxView HeightRequest="1" Color="LightGray" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label
+                    Grid.Column="0"
+                    Text="Detaljan zapis u log"
+                    VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding VerboseLog}" />
+            </Grid>
+
+            <Label
+                FontSize="12"
+                Text="Uključi samo ako nešto treba dijagnosticirati — piše nekoliko puta u sekundi dok je knjiga otvorena."
+                TextColor="Gray" />
+
             <Label
                 FontSize="12"
                 Text="Poravnanje se samo pauzira i nastavlja — nikad ne gubi napredak. Uz to se automatski usporava ako se telefon zagrije, bez obzira na odabranu postavku."

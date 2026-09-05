@@ -27,6 +27,17 @@ public partial class LiveSyncRunner(
     private CancellationTokenSource? _cancellation;
     private Task? _running;
 
+    /// <summary>
+    /// Serialises starting and stopping.
+    ///
+    /// Without it the two interleave: stopping cleared the fields before it had waited for
+    /// anything, so a start arriving in that window saw nothing running and began a second run over
+    /// the first — two whisper models, two decoders, and both writing the same map so the later
+    /// save discarded the earlier one's work. Reachable on every return to the app, because this is
+    /// a singleton while the reader that drives it is created afresh each time.
+    /// </summary>
+    private readonly SemaphoreSlim _turn = new(1, 1);
+
     /// <summary>Says what it is doing, for the reader's own status line rather than a notification.</summary>
     public event EventHandler<string>? Progress;
 
@@ -42,24 +53,49 @@ public partial class LiveSyncRunner(
     /// </summary>
     public async Task StartAsync(int bookId)
     {
-        await StopAsync();
+        await _turn.WaitAsync();
 
-        _cancellation = new CancellationTokenSource();
+        try
+        {
+            await StopWhileHoldingTurnAsync();
 
-        // Task.Run for the same reason the whole-book run needs it: this is called from the
-        // reader's OnAppearing, on the UI thread, and every await after it would otherwise come
-        // back there — putting recognition and matching on the thread drawing the page.
-        _running = Task.Run(() => RunAsync(bookId, _cancellation.Token));
+            // The token is read into a local before the lambda captures it. Reading the field from
+            // inside the lambda defers it to whenever the pool gets round to running it, and a stop
+            // arriving first left the lambda dereferencing null — outside RunAsync, so outside its
+            // try, so the failure vanished and following simply never began.
+            var cancellation = new CancellationTokenSource();
+            _cancellation = cancellation;
+
+            // Task.Run for the same reason the whole-book run needs it: this is called from the
+            // reader's OnAppearing, on the UI thread, and every await after it would otherwise come
+            // back there — putting recognition and matching on the thread drawing the page.
+            _running = Task.Run(() => RunAsync(bookId, cancellation.Token));
+        }
+        finally
+        {
+            _turn.Release();
+        }
     }
 
     /// <summary>Cancels the run and waits for it to leave, so nothing overlaps the next one.</summary>
     public async Task StopAsync()
     {
+        await _turn.WaitAsync();
+
+        try
+        {
+            await StopWhileHoldingTurnAsync();
+        }
+        finally
+        {
+            _turn.Release();
+        }
+    }
+
+    private async Task StopWhileHoldingTurnAsync()
+    {
         var cancellation = _cancellation;
         var running = _running;
-
-        _cancellation = null;
-        _running = null;
 
         if (cancellation is null) return;
 
@@ -76,6 +112,11 @@ public partial class LiveSyncRunner(
         finally
         {
             cancellation.Dispose();
+
+            // Cleared only once the run has actually left, so IsRunning never reports idle while a
+            // probe is still in flight.
+            _cancellation = null;
+            _running = null;
         }
     }
 

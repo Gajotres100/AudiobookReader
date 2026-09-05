@@ -37,7 +37,20 @@ public class SyncMapStore(string directory)
         try
         {
             using var stream = File.OpenRead(path);
-            return JsonSerializer.Deserialize(stream, SyncMapJsonContext.Default.SyncMap);
+            var map = JsonSerializer.Deserialize(stream, SyncMapJsonContext.Default.SyncMap);
+
+            // Every lookup and every insertion assumes the anchors are strictly increasing in both
+            // dimensions, and nothing on this path has established that: the anchors arrive
+            // straight out of JSON. A file truncated by a kill, or written by two runs at once, can
+            // break the assumption in ways that are not obvious — two anchors sharing a character
+            // offset make the interpolation divide by zero and hand a seek a nonsense position.
+            // Passing each chapter through the same filter that builds one costs a moment on load
+            // and makes the invariant true rather than hoped for.
+            if (map is not null)
+                foreach (var chapter in map.Chapters.ToList())
+                    map.SetChapter(ChapterSyncMap.FromAnchors(chapter.ChapterIndex, chapter.Anchors));
+
+            return map;
         }
         catch (JsonException)
         {

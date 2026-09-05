@@ -39,6 +39,10 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings) : Observ
     [ObservableProperty]
     public partial string SelectedBudgetName { get; set; } = "";
 
+    /// <summary>Detailed following diagnostics in the log; off unless something needs explaining.</summary>
+    [ObservableProperty]
+    public partial bool VerboseLog { get; set; }
+
     [ObservableProperty]
     public partial bool ChargingOnly { get; set; }
 
@@ -61,6 +65,7 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings) : Observ
             Budgets.Add(new BudgetOption(preset, preset.Name == current.Name));
 
         SelectedBudgetName = current.Name;
+        VerboseLog = settings.VerboseLog;
         ChargingOnly = settings.ChargingOnly;
         ScreenOffOnly = settings.ScreenOffOnly;
         MinimumBatteryPercent = settings.MinimumBatteryPercent;
@@ -71,6 +76,8 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings) : Observ
         settings.Budget = option.Budget;
         Load();
     }
+
+    partial void OnVerboseLogChanged(bool value) => settings.VerboseLog = value;
 
     partial void OnChargingOnlyChanged(bool value) => settings.ChargingOnly = value;
 

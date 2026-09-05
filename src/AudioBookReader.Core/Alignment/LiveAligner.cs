@@ -148,7 +148,7 @@ public class LiveAligner(
     }
 
     /// <summary>Locates each timed phrase and folds the anchors it yields into the chapter.</summary>
-    /// <returns>How many phrases were placed.</returns>
+    /// <returns>How many phrases were located, whether or not their anchors survived.</returns>
     private int Record(SyncMap map, int chapterIndex, Transcript transcript, int predicted, int radius)
     {
         var chapter = map.ForChapter(chapterIndex);
@@ -159,38 +159,72 @@ public class LiveAligner(
             map.SetChapter(chapter);
         }
 
+        // Two counts, because they answer different questions. How many phrases were found decides
+        // whether the search was working; how many anchors were kept decides what the map gained.
+        // Conflating them made a window whose phrases were all found but refused look, in the log
+        // and to the widening radius, exactly like a window that recognised nothing.
+        var found = 0;
         var located = 0;
+
+        // Anchors the chapter refused. Kept because a refusal is ambiguous: either this measurement
+        // is wrong, or the one already in the map is. Insertion alone always believes whoever got
+        // there first, which lets one confident mistake own its stretch of the book forever.
+        var refused = new List<Anchor>();
 
         var expected = predicted;
 
         foreach (var phrase in transcript.Phrases)
         {
             // Wide only for the first phrase; after that the position is known to within a line.
-            var found = TranscriptMatcher.MatchNear(
+            var match = TranscriptMatcher.MatchNear(
                 book,
                 [.. phrase.Words.Select(w => w.Value)],
                 book.TokenIndexAtChar(expected),
                 located > 0 ? _settings.PhraseRadiusTokens : radius,
                 _settings.MinConfidence);
 
-            if (found is null) continue;
+            if (match is null) continue;
 
             var opening = new Anchor(
-                phrase.Words[found.Value.TranscriptStart].AtMs, found.Value.CharOffset, found.Value.Confidence);
+                phrase.Words[match.Value.TranscriptStart].AtMs, match.Value.CharOffset, match.Value.Confidence);
 
             var closing = new Anchor(
-                phrase.Words[found.Value.TranscriptEnd].AtMs, found.Value.EndCharOffset, found.Value.Confidence);
+                phrase.Words[match.Value.TranscriptEnd].AtMs, match.Value.EndCharOffset, match.Value.Confidence);
 
-            if (!chapter.Insert(opening)) continue;
+            // Advanced whether or not the anchor is kept. The phrase was located either way, so it
+            // is the best guide to where the next one lies; leaving the prediction behind sent
+            // every following phrase in this window hunting around a stale position with a narrow
+            // radius, and they missed too.
+            expected = Math.Max(opening.CharOffset, closing.CharOffset);
+            found++;
+
+            if (!chapter.Insert(opening))
+            {
+                refused.Add(opening);
+                continue;
+            }
 
             if (closing.AudioMs > opening.AudioMs && closing.CharOffset > opening.CharOffset)
                 chapter.Insert(closing);
 
-            expected = Math.Max(opening.CharOffset, closing.CharOffset);
             located++;
         }
 
-        return located;
+        // When this window's measurements mostly disagree with what is already stored, the stored
+        // anchors are the likelier suspects — they are older, and everything heard just now says
+        // otherwise. Rebuilding puts every anchor, old and new, through the confidence-weighted
+        // filter and keeps the largest set that agrees with itself, so a wrong one can finally be
+        // outvoted. Rare by construction: it costs a rebuild only on a window that went badly.
+        if (refused.Count > located && refused.Count > 1)
+        {
+            log?.Invoke(
+                $"live ch{chapterIndex}: {refused.Count} of {found} phrases disagreed with the stored " +
+                "anchors — rebuilding the chapter so the majority decides");
+
+            map.SetChapter(ChapterSyncMap.FromAnchors(chapterIndex, [.. chapter.Anchors, .. refused]));
+        }
+
+        return found;
     }
 
     /// <summary>
