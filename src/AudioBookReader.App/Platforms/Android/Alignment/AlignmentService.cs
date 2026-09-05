@@ -105,6 +105,8 @@ public class AlignmentService : Service
 
             var progress = new Progress<AlignmentProgress>(p => Publish(queue, bookId, p, chapterCount, thermal, throttle));
 
+            AppLog.Info($"book {bookId}: alignment loop starting");
+
             await aligner.AlignAsync(bookId, progress, ct);
 
             queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.Finished, "Poravnanje gotovo", 1));
@@ -116,6 +118,10 @@ public class AlignmentService : Service
         }
         catch (Exception ex)
         {
+            // Logged as well as shown. Reporting only to the screen meant a run that died left no
+            // trace anywhere it could be read back off the device, which is exactly the situation
+            // in which someone needs to know what happened.
+            AppLog.Error($"aligning book {bookId}", ex);
             queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.Failed, ex.Message));
         }
         finally
@@ -186,7 +192,10 @@ public class AlignmentService : Service
             bookId, AlignmentPhase.Aligning, message, fraction,
             progress.ChapterIndex, chapterCount, withinChapter));
 
-        Notify(message, (int)(fraction * 100));
+        // The bar tracks the chapter, not the book: on forty chapters the book-wide figure moves
+        // once every couple of minutes, and a bar that does not move reads as a job that has hung.
+        // The overall share is not lost — it goes in the line beneath.
+        Notify(message, (int)(withinChapter * 100), (int)(fraction * 100));
     }
 
     // ---- Notification ----
@@ -206,7 +215,7 @@ public class AlignmentService : Service
         manager.CreateNotificationChannel(channel);
     }
 
-    private Notification BuildNotification(string message, int percent)
+    private Notification BuildNotification(string message, int chapterPercent, int bookPercent = -1)
     {
         var stop = PendingIntent.GetService(
             this,
@@ -214,23 +223,37 @@ public class AlignmentService : Service
             new Intent(this, typeof(AlignmentService)).SetAction(ActionStop),
             PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
 
-        return new Notification.Builder(this, ChannelId)
+        var builder = new Notification.Builder(this, ChannelId)
             .SetContentTitle("Poravnanje teksta")
             .SetContentText(message)
             // Not the download glyph: nothing is being fetched, and a download icon on a job that
             // runs for the better part of an hour invites the user to wonder what is being sent.
             .SetSmallIcon(global::Android.Resource.Drawable.StatNotifySync)
-            .SetProgress(100, percent, indeterminate: percent <= 0)
+            .SetProgress(100, chapterPercent, indeterminate: chapterPercent <= 0)
             .SetOngoing(true)
             .SetOnlyAlertOnce(true)
-            .AddAction(new Notification.Action.Builder(null, "Zaustavi", stop).Build())
-            .Build();
+            .AddAction(new Notification.Action.Builder(null, "Zaustavi", stop).Build());
+
+        // A notification carries one bar and no more, so the book-wide figure is written out
+        // instead. Two drawn bars would need a custom layout, and those are restyled by every
+        // manufacturer's shade until they look like nothing else on the phone.
+        if (bookPercent >= 0) builder.SetSubText($"Cijela knjiga {bookPercent} %");
+
+        return builder.Build();
     }
 
-    private void Notify(string message, int percent)
+    private int _lastNotifiedPercent = -1;
+
+    private void Notify(string message, int chapterPercent, int bookPercent = -1)
     {
+        // Rebuilt only when the number it shows has changed. Every rebuild allocates a PendingIntent
+        // and crosses into the system, and this is called once per probe — the same trap the model
+        // download already sidesteps a few lines above.
+        if (chapterPercent == _lastNotifiedPercent) return;
+        _lastNotifiedPercent = chapterPercent;
+
         var manager = (NotificationManager?)GetSystemService(NotificationService);
-        manager?.Notify(NotificationId, BuildNotification(message, percent));
+        manager?.Notify(NotificationId, BuildNotification(message, chapterPercent, bookPercent));
     }
 
     // ---- Wake lock ----

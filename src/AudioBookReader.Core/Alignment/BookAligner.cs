@@ -68,6 +68,8 @@ public class BookAligner(
 
                 var estimatedEnd = EstimateChapterEnd(cursor, textLength, chapter.DurationMs, remainingMs);
 
+                log?.Invoke($"ch{chapter.Index}: starting, {chapter.StartMs}..{chapter.EndMs} ms");
+
                 var chapterMap = await aligner.AlignAsync(
                     new ChapterAlignmentRequest(
                         book.AudioPath!,

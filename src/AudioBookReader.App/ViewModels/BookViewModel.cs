@@ -193,6 +193,7 @@ public partial class BookViewModel(
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanStartAlignment))]
     [NotifyPropertyChangedFor(nameof(CanRealign))]
+    [NotifyPropertyChangedFor(nameof(RealignText))]
     [NotifyPropertyChangedFor(nameof(AlignmentSummary))]
     public partial bool MeasuresWhileReading { get; set; }
 
@@ -239,7 +240,19 @@ public partial class BookViewModel(
     public partial int AlignedChapterCount { get; set; }
 
     /// <summary>Only worth offering once there is something to discard.</summary>
-    public bool CanRealign => IsPaired && !IsAligning && !MeasuresWhileReading && AlignedChapterCount > 0;
+    /// <summary>
+    /// Whether there is measured alignment to throw away.
+    ///
+    /// Offered in both modes. Sync on the fly deliberately builds on whatever is already stored,
+    /// which is right when the point is to have a working book — but it leaves no way to start
+    /// clean, and starting clean is exactly what you need when you are trying to find out whether
+    /// the live measuring works at all.
+    /// </summary>
+    public bool CanRealign => IsPaired && !IsAligning && AlignedChapterCount > 0;
+
+    /// <summary>What the button does, which is not the same thing in the two modes.</summary>
+    public string RealignText =>
+        MeasuresWhileReading ? "Obriši izmjereno i kreni čisto" : "Poravnaj iznova od početka";
 
     /// <summary>The chapter a resume would begin with, computed the same way the aligner does.</summary>
     [ObservableProperty]
@@ -261,8 +274,16 @@ public partial class BookViewModel(
             if (Chapters.Count == 0) return "";
 
             if (MeasuresWhileReading)
-                return "Sync on the fly: tekst se mjeri dok čitaš — otvori „Čitaj” i pusti zvuk. " +
-                       "Poravnanje unaprijed nije potrebno.";
+            {
+                // The count is here so the mode can be told apart from doing nothing: it starts at
+                // whatever was already stored and climbs as you read, which is the only visible
+                // evidence that measuring is happening at all.
+                var measured = AlignedChapterCount == 0
+                    ? "Još ništa nije izmjereno."
+                    : $"Izmjereno u {AlignedChapterCount} od {Chapters.Count} poglavlja.";
+
+                return $"Sync on the fly: tekst se mjeri dok čitaš — otvori „Čitaj” i pusti zvuk. {measured}";
+            }
 
             if (HasStaleAlignment)
                 return "Ranije poravnanje napravljeno je starijom, manje preciznom metodom i bit će " +
@@ -805,11 +826,15 @@ public partial class BookViewModel(
     [RelayCommand]
     private Task RealignAsync() => GuardAsync(async () =>
     {
+        var live = MeasuresWhileReading;
+
         var confirmed = await Shell.Current.DisplayAlertAsync(
-            "Poravnati iznova?",
-            $"Dosadašnje poravnanje ({AlignedChapterCount} od {Chapters.Count} poglavlja) bit će obrisano i " +
-            "izračunato ispočetka. Sama knjiga i tvoja pozicija ostaju.",
-            "Poravnaj iznova",
+            live ? "Obrisati izmjereno?" : "Poravnati iznova?",
+            $"Dosadašnje poravnanje ({AlignedChapterCount} od {Chapters.Count} poglavlja) bit će obrisano" +
+            (live
+                ? ". Sve dalje mjeri se dok čitaš. Sama knjiga i tvoja pozicija ostaju."
+                : " i izračunato ispočetka. Sama knjiga i tvoja pozicija ostaju."),
+            live ? "Obriši" : "Poravnaj iznova",
             "Odustani");
 
         if (!confirmed) return;
@@ -817,7 +842,9 @@ public partial class BookViewModel(
         await library.ResetAlignmentAsync(BookId);
         await RefreshAlignmentProgressAsync();
 
-        await StartAlignmentAsync();
+        // Only the mode that has a run to start starts one. In the other, an empty map is the
+        // whole point: from here on, everything in it was measured while reading.
+        if (!live) await StartAlignmentAsync();
     });
 
     private void OnAlignmentChanged(object? sender, AlignmentStatus status) =>

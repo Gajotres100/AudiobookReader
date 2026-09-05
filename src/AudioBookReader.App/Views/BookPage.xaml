@@ -411,7 +411,7 @@
                             Command="{Binding RealignCommand}"
                             FontSize="13"
                             IsVisible="{Binding CanRealign}"
-                            Text="Poravnaj iznova od početka" />
+                            Text="{Binding RealignText}" />
                     </VerticalStackLayout>
 
                     <!--  Files  -->

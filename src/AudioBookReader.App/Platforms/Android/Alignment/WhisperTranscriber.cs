@@ -100,7 +100,11 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
         _recogniseMs += recogniseMs;
         _audioMs += durationMs;
 
-        if (_probes % 20 != 0) return;
+        // The first one, then every tenth. Counting only probes that actually reached the
+        // recognizer means a short chapter produces very few — the opening chapter of a book is
+        // often a title card, and waiting for a round number there meant the throughput reading
+        // never appeared at all.
+        if (_probes != 1 && _probes % 10 != 0) return;
 
         var wall = _decodeMs + _recogniseMs;
 
