@@ -1,0 +1,127 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!--
+        The app's own visual language, in one place.
+
+        It lives here because the app is three things — a player, a reader, and the two together —
+        and they have to look like one program. Each page used to carry its own copy: the player had
+        a filled accent play button and flat monochrome glyphs, the reader had small transparent
+        text buttons, and the same pause control therefore looked like it came from a different
+        application depending on which screen you met it on.
+    -->
+
+    <!--  Paper, not white. The reader is the reason, and the player follows it rather than the reverse.  -->
+    <Color x:Key="PaperBackground">#F4F1EC</Color>
+    <Color x:Key="PaperBackgroundDark">#101319</Color>
+
+    <!--  Panels and lists that sit over the page.  -->
+    <Color x:Key="Surface">#FBF9F5</Color>
+    <Color x:Key="SurfaceDark">#171B22</Color>
+
+    <!--  A shade between the two, for a control bar that must read as attached to the page.  -->
+    <Color x:Key="Chrome">#F1EDE5</Color>
+    <Color x:Key="ChromeDark">#15181E</Color>
+
+    <Color x:Key="Ink">#2A2D34</Color>
+    <Color x:Key="InkDark">#E7EAF0</Color>
+
+    <Color x:Key="MutedInk">#6E7480</Color>
+    <Color x:Key="MutedInkDark">#8B93A3</Color>
+
+    <Color x:Key="Hairline">#E1DCD3</Color>
+    <Color x:Key="HairlineDark">#242A34</Color>
+
+    <!--  The one saturated colour in the app, and it belongs to a single control: play.  -->
+    <Color x:Key="Accent">#3E5BD9</Color>
+    <Color x:Key="AccentDark">#7E9CFF</Color>
+
+    <Color x:Key="OnAccent">#FFFFFF</Color>
+    <Color x:Key="OnAccentDark">#0B0E14</Color>
+
+    <!--  Flat glyph button. Everything in a bar is one of these.  -->
+    <Style x:Key="Icon" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="FontSize" Value="19" />
+        <Setter Property="HeightRequest" Value="46" />
+        <Setter Property="WidthRequest" Value="46" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Ink}, Dark={StaticResource InkDark}}" />
+    </Style>
+
+    <!--  The same button where the label is a word rather than a glyph, so it needs room.  -->
+    <Style
+        x:Key="IconWide"
+        BasedOn="{StaticResource Icon}"
+        TargetType="Button">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="WidthRequest" Value="-1" />
+        <Setter Property="Padding" Value="10,0" />
+    </Style>
+
+    <Style x:Key="Muted" TargetType="Label">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource MutedInk}, Dark={StaticResource MutedInkDark}}" />
+    </Style>
+
+    <!--
+        Play. The only filled control anywhere in the app, which is what makes it findable without
+        looking — and why it must be the same object on the player and in the reader rather than a
+        circle in one place and a small piece of text in the other.
+    -->
+    <Style x:Key="Play" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Accent}, Dark={StaticResource AccentDark}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource OnAccent}, Dark={StaticResource OnAccentDark}}" />
+        <Setter Property="CornerRadius" Value="38" />
+        <Setter Property="FontSize" Value="24" />
+        <Setter Property="HeightRequest" Value="76" />
+        <Setter Property="WidthRequest" Value="76" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <!--  The same control in the reader, where the text is the screen and the bar must stay thin.  -->
+    <Style
+        x:Key="PlaySmall"
+        BasedOn="{StaticResource Play}"
+        TargetType="Button">
+        <Setter Property="CornerRadius" Value="26" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="HeightRequest" Value="52" />
+        <Setter Property="WidthRequest" Value="52" />
+    </Style>
+
+    <!--  Skip back and forward: flat, but wide enough for "↺10".  -->
+    <Style
+        x:Key="Skip"
+        BasedOn="{StaticResource Icon}"
+        TargetType="Button">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="WidthRequest" Value="60" />
+    </Style>
+
+    <!--  Ordinary labelled action, used on the housekeeping page where things have names.  -->
+    <Style x:Key="Plain" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Accent}, Dark={StaticResource AccentDark}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource OnAccent}, Dark={StaticResource OnAccentDark}}" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Padding" Value="16,10" />
+    </Style>
+
+    <!--  Destructive, and the only place a red is allowed.  -->
+    <Style
+        x:Key="Destructive"
+        BasedOn="{StaticResource Plain}"
+        TargetType="Button">
+        <Setter Property="BackgroundColor" Value="#C0392B" />
+        <Setter Property="TextColor" Value="#FFFFFF" />
+    </Style>
+
+    <Style x:Key="Divider" TargetType="BoxView">
+        <Setter Property="Color" Value="{AppThemeBinding Light={StaticResource Hairline}, Dark={StaticResource HairlineDark}}" />
+        <Setter Property="HeightRequest" Value="1" />
+    </Style>
+
+</ResourceDictionary>

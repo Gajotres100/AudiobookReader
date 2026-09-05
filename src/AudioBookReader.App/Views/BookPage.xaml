@@ -6,8 +6,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:BookViewModel"
-    BackgroundColor="{AppThemeBinding Light=#F4F1EC,
-                                      Dark=#101319}"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PaperBackground},
+                                      Dark={StaticResource PaperBackgroundDark}}"
     Shell.NavBarIsVisible="False"
     Title="{Binding Title}">
 
@@ -17,432 +17,271 @@
         deletion — is behind the ☰ button, because it was making the daily half look like a form.
     -->
 
-    <ContentPage.Resources>
-        <!--  Flat glyph buttons; the only filled control on the screen is play.  -->
-        <Style x:Key="Icon" TargetType="Button">
-            <Setter Property="BackgroundColor" Value="Transparent" />
-            <Setter Property="FontSize" Value="19" />
-            <Setter Property="HeightRequest" Value="46" />
-            <Setter Property="WidthRequest" Value="46" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="TextColor" Value="{AppThemeBinding Light=#2A2D34, Dark=#E7EAF0}" />
-        </Style>
+    <Grid Padding="14,8" RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" RowSpacing="6">
 
-        <Style x:Key="Muted" TargetType="Label">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="TextColor" Value="{AppThemeBinding Light=#6E7480, Dark=#8B93A3}" />
-        </Style>
-    </ContentPage.Resources>
+        <!--  Top bar  -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto">
+            <Button
+                Grid.Column="0"
+                Command="{Binding CloseCommand}"
+                Style="{StaticResource Icon}"
+                Text="✕" />
 
-    <Grid>
-        <Grid Padding="14,8" RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" RowSpacing="6">
-
-            <!--  Top bar  -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto">
-                <Button
-                    Grid.Column="0"
-                    Command="{Binding CloseCommand}"
-                    Style="{StaticResource Icon}"
-                    Text="✕" />
-
-                <Button
-                    Grid.Column="2"
-                    Command="{Binding ChooseSleepCommand}"
-                    IsVisible="{Binding HasAudio}"
-                    Style="{StaticResource Icon}"
-                    Text="⏱" />
-
-                <!--
-                    Tap opens the list, hold saves the spot. A flag glyph rather than the emoji:
-                    the rest of this bar is flat monochrome text, and a coloured pictogram among
-                    them read as something pasted in from another app.
-                -->
-                <Button
-                    Grid.Column="3"
-                    FontSize="20"
-                    IsVisible="{Binding HasAudio}"
-                    Pressed="OnBookmarkPressed"
-                    Released="OnBookmarkReleased"
-                    Style="{StaticResource Icon}"
-                    Text="⚑" />
-
-                <!--  A number says more about speed than any gauge glyph could.  -->
-                <Button
-                    Grid.Column="4"
-                    Command="{Binding CycleSpeedCommand}"
-                    IsVisible="{Binding HasAudio}"
-                    Style="{StaticResource Icon}"
-                    Text="{Binding SpeedText}" />
-
-                <Button
-                    Grid.Column="5"
-                    Command="{Binding ToggleDetailsCommand}"
-                    Style="{StaticResource Icon}"
-                    Text="☰" />
-            </Grid>
-
-            <!--  Countdown, shown only while a timer is armed.  -->
-            <Label
-                Grid.Row="0"
-                HorizontalOptions="Center"
-                IsVisible="{Binding HasSleepTimer}"
-                Style="{StaticResource Muted}"
-                Text="{Binding SleepButtonText}"
-                VerticalOptions="Center" />
-
-            <!--  Confirms a held flag actually saved something.  -->
-            <Label
-                Grid.Row="1"
-                HorizontalOptions="Center"
-                IsVisible="{Binding HasBookmarkNote}"
-                Style="{StaticResource Muted}"
-                Text="{Binding BookmarkNote}"
-                VerticalOptions="Start" />
-
-            <!--  Cover, with the chapter list opening over it  -->
-            <Grid Grid.Row="1" Margin="0,6">
-                <Image
-                    Aspect="AspectFit"
-                    IsVisible="{Binding HasCover}"
-                    Source="{Binding CoverPath}" />
-
-                <Border
-                    BackgroundColor="{AppThemeBinding Light=#E4DFD6,
-                                                      Dark=#1B2029}"
-                    IsVisible="{Binding HasNoCover}"
-                    Margin="30"
-                    StrokeThickness="0">
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="14" />
-                    </Border.StrokeShape>
-                    <VerticalStackLayout Padding="24" VerticalOptions="Center">
-                        <Label
-                            FontAttributes="Bold"
-                            FontSize="20"
-                            HorizontalTextAlignment="Center"
-                            Text="{Binding Title}" />
-                        <Label
-                            HorizontalTextAlignment="Center"
-                            Margin="0,8,0,0"
-                            Style="{StaticResource Muted}"
-                            Text="{Binding Author}" />
-                    </VerticalStackLayout>
-                </Border>
-
-                <!--  Chapter list  -->
-                <Border
-                    BackgroundColor="{AppThemeBinding Light=#FBF9F5,
-                                                      Dark=#171B22}"
-                    IsVisible="{Binding ChaptersExpanded}"
-                    StrokeThickness="0">
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="14" />
-                    </Border.StrokeShape>
-
-                    <CollectionView ItemsSource="{Binding Chapters}" Margin="6">
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ChapterRow">
-                                <Grid Padding="10,12" ColumnDefinitions="20,*,Auto">
-                                    <Grid.GestureRecognizers>
-                                        <TapGestureRecognizer
-                                            Command="{Binding Path=BindingContext.SelectChapterCommand, Source={x:Reference BookRoot}}"
-                                            CommandParameter="{Binding .}" />
-                                    </Grid.GestureRecognizers>
-
-                                    <Label
-                                        Grid.Column="0"
-                                        FontSize="12"
-                                        Text="{Binding Marker}"
-                                        VerticalOptions="Center" />
-                                    <Label
-                                        Grid.Column="1"
-                                        FontAttributes="{Binding TitleWeight}"
-                                        LineBreakMode="TailTruncation"
-                                        Text="{Binding Title}"
-                                        VerticalOptions="Center" />
-                                    <Label
-                                        Grid.Column="2"
-                                        FontSize="12"
-                                        Text="{Binding StartText}"
-                                        TextColor="Gray"
-                                        VerticalOptions="Center" />
-                                </Grid>
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
-                </Border>
-            </Grid>
-
-            <!--  Chapter bar: tapping the title opens and closes the list  -->
-            <Grid
-                Grid.Row="2"
-                ColumnDefinitions="46,*,46"
-                IsVisible="{Binding HasAudio}">
-                <Button
-                    Grid.Column="0"
-                    Command="{Binding PreviousChapterCommand}"
-                    Style="{StaticResource Icon}"
-                    Text="‹" />
-
-                <Label
-                    Grid.Column="1"
-                    HorizontalTextAlignment="Center"
-                    LineBreakMode="TailTruncation"
-                    Text="{Binding ChapterHeading}"
-                    VerticalOptions="Center">
-                    <Label.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding ToggleChaptersCommand}" />
-                    </Label.GestureRecognizers>
-                </Label>
-
-                <Button
-                    Grid.Column="2"
-                    Command="{Binding NextChapterCommand}"
-                    Style="{StaticResource Icon}"
-                    Text="›" />
-            </Grid>
-
-            <!--  Position within the chapter  -->
-            <Grid
-                Grid.Row="3"
-                ColumnDefinitions="Auto,*,Auto"
-                IsVisible="{Binding HasAudio}">
-                <Label
-                    Grid.Column="0"
-                    Style="{StaticResource Muted}"
-                    Text="{Binding PositionText}"
-                    VerticalOptions="Center" />
-
-                <!--
-                    The part already heard is a solid block sitting on the baseline; what is left
-                    is a hairline. Weight rather than tint, because weight reads at a glance — and
-                    a block that grows along a line is a different shape from the usual filled pill
-                    with a knob riding on it.
-                -->
-                <Grid
-                    x:Name="Track"
-                    Grid.Column="1"
-                    Margin="10,0"
-                    HeightRequest="34"
-                    SizeChanged="OnTrackSizeChanged">
-
-                    <BoxView
-                        BackgroundColor="{AppThemeBinding Light=#C9C3B6,
-                                                          Dark=#333A46}"
-                        HeightRequest="1"
-                        VerticalOptions="Center" />
-
-                    <BoxView
-                        BackgroundColor="{AppThemeBinding Light=#2E3440,
-                                                          Dark=#9FB4E8}"
-                        HeightRequest="12"
-                        HorizontalOptions="Start"
-                        VerticalOptions="Center"
-                        WidthRequest="{Binding PlayedWidth}" />
-
-                    <Slider
-                        x:Name="Scrubber"
-                        DragCompleted="OnScrubberDragCompleted"
-                        Maximum="1"
-                        MaximumTrackColor="Transparent"
-                        Minimum="0"
-                        MinimumTrackColor="Transparent"
-                        ThumbColor="Transparent"
-                        Value="{Binding Progress, Mode=OneWay}" />
-                </Grid>
-
-                <Label
-                    Grid.Column="2"
-                    Style="{StaticResource Muted}"
-                    Text="{Binding DurationText}"
-                    VerticalOptions="Center" />
-            </Grid>
-
-            <!--  Transport  -->
-            <HorizontalStackLayout
-                Grid.Row="4"
-                HorizontalOptions="Center"
+            <Button
+                Grid.Column="2"
+                Command="{Binding ChooseSleepCommand}"
                 IsVisible="{Binding HasAudio}"
-                Spacing="26">
-                <Button
-                    Command="{Binding BackCommand}"
-                    FontSize="16"
-                    Style="{StaticResource Icon}"
-                    Text="↺10"
-                    WidthRequest="60" />
+                Style="{StaticResource Icon}"
+                Text="⏱" />
 
-                <Button
-                    BackgroundColor="{AppThemeBinding Light=#3E5BD9,
-                                                      Dark=#7E9CFF}"
-                    Command="{Binding TogglePlayCommand}"
-                    CornerRadius="38"
-                    FontSize="24"
-                    HeightRequest="76"
-                    Padding="0"
-                    Text="{Binding PlayGlyph}"
-                    TextColor="{AppThemeBinding Light=White,
-                                                Dark=#0B0E14}"
-                    WidthRequest="76" />
+            <!--
+                Tap opens the list, hold saves the spot. A flag glyph rather than the emoji:
+                the rest of this bar is flat monochrome text, and a coloured pictogram among
+                them read as something pasted in from another app.
+            -->
+            <Button
+                Grid.Column="3"
+                FontSize="20"
+                IsVisible="{Binding HasAudio}"
+                Pressed="OnBookmarkPressed"
+                Released="OnBookmarkReleased"
+                Style="{StaticResource Icon}"
+                Text="⚑" />
 
-                <Button
-                    Command="{Binding ForwardCommand}"
-                    FontSize="16"
-                    Style="{StaticResource Icon}"
-                    Text="↻10"
-                    WidthRequest="60" />
-            </HorizontalStackLayout>
+            <!--  A number says more about speed than any gauge glyph could.  -->
+            <Button
+                Grid.Column="4"
+                Command="{Binding CycleSpeedCommand}"
+                IsVisible="{Binding HasAudio}"
+                Style="{StaticResource Icon}"
+                Text="{Binding SpeedText}" />
 
-            <!--  Reading, and a one-line word on alignment when there is one  -->
-            <VerticalStackLayout Grid.Row="5" Spacing="4">
-                <Button
-                    Command="{Binding OpenReaderCommand}"
-                    HorizontalOptions="Center"
-                    IsVisible="{Binding HasText}"
-                    Text="Čitaj" />
-
-                <Label
-                    HorizontalTextAlignment="Center"
-                    IsVisible="{Binding IsAligning}"
-                    Style="{StaticResource Muted}"
-                    Text="{Binding AlignmentMessage}" />
-            </VerticalStackLayout>
+            <Button
+                Grid.Column="5"
+                Command="{Binding OpenDetailsCommand}"
+                Style="{StaticResource Icon}"
+                Text="☰" />
         </Grid>
 
-        <!--  Housekeeping, over the player  -->
-        <Border
-            BackgroundColor="{AppThemeBinding Light=#FBF9F5,
-                                              Dark=#171B22}"
-            IsVisible="{Binding IsDetailsOpen}"
-            StrokeThickness="0">
-            <ScrollView>
-                <VerticalStackLayout Padding="20" Spacing="14">
+        <!--  Countdown, shown only while a timer is armed.  -->
+        <Label
+            Grid.Row="0"
+            HorizontalOptions="Center"
+            IsVisible="{Binding HasSleepTimer}"
+            Style="{StaticResource Muted}"
+            Text="{Binding SleepButtonText}"
+            VerticalOptions="Center" />
 
-                    <Grid ColumnDefinitions="*,Auto">
-                        <Label
-                            FontAttributes="Bold"
-                            FontSize="17"
-                            Text="{Binding Title}"
-                            VerticalOptions="Center" />
-                        <Button
-                            Grid.Column="1"
-                            Command="{Binding ToggleDetailsCommand}"
-                            Style="{StaticResource Icon}"
-                            Text="✕" />
-                    </Grid>
+        <!--  Confirms a held flag actually saved something.  -->
+        <Label
+            Grid.Row="1"
+            HorizontalOptions="Center"
+            IsVisible="{Binding HasBookmarkNote}"
+            Style="{StaticResource Muted}"
+            Text="{Binding BookmarkNote}"
+            VerticalOptions="Start" />
 
-                    <Label Style="{StaticResource Muted}" Text="{Binding Author}" />
+        <!--  Cover, with the chapter list opening over it  -->
+        <Grid Grid.Row="1" Margin="0,6">
+            <Image
+                Aspect="AspectFit"
+                IsVisible="{Binding HasCover}"
+                Source="{Binding CoverPath}" />
 
+            <Border
+                BackgroundColor="{AppThemeBinding Light=#E4DFD6,
+                                                  Dark=#1B2029}"
+                IsVisible="{Binding HasNoCover}"
+                Margin="30"
+                StrokeThickness="0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="14" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Padding="24" VerticalOptions="Center">
                     <Label
-                        IsVisible="{Binding HasError}"
-                        Text="{Binding Error}"
-                        TextColor="#C0392B" />
-
-                    <!--  Copying an audiobook is the slow part of an import; say how far along it is.  -->
-                    <VerticalStackLayout IsVisible="{Binding IsImporting}" Spacing="6">
-                        <Label Style="{StaticResource Muted}" Text="{Binding ImportMessage}" />
-                        <ProgressBar Progress="{Binding ImportFraction}" />
-                    </VerticalStackLayout>
-
-                    <!--  Alignment  -->
-                    <VerticalStackLayout IsVisible="{Binding IsPaired}" Spacing="8">
-                        <BoxView Color="{AppThemeBinding Light=#E1DCD3, Dark=#242A34}" HeightRequest="1" />
-
-                        <Label FontAttributes="Bold" Text="Poravnanje teksta i naracije" />
-
-                        <!--  Two ways to the same thing, so they are a choice, not two settings.  -->
-                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                            <Label
-                                Grid.Row="0"
-                                Grid.Column="0"
-                                Text="Sync on the fly"
-                                VerticalOptions="Center" />
-                            <Switch
-                                Grid.Row="0"
-                                Grid.Column="1"
-                                IsToggled="{Binding MeasuresWhileReading}" />
-
-                            <Label
-                                Grid.Row="1"
-                                Grid.Column="0"
-                                Text="Poravnaj cijelu knjigu unaprijed"
-                                VerticalOptions="Center" />
-                            <Switch
-                                Grid.Row="1"
-                                Grid.Column="1"
-                                IsToggled="{Binding AlignsInAdvance}" />
-                        </Grid>
-
-                        <Label Style="{StaticResource Muted}" Text="{Binding AlignmentSummary}" />
-
-                        <HorizontalStackLayout IsVisible="{Binding IsAligning}" Spacing="10">
-                            <ActivityIndicator
-                                HeightRequest="18"
-                                IsRunning="{Binding IsAligning}"
-                                WidthRequest="18" />
-                            <Label
-                                FontSize="13"
-                                Text="{Binding AlignmentMessage}"
-                                VerticalOptions="Center" />
-                        </HorizontalStackLayout>
-
-                        <Label
-                            IsVisible="{Binding IsIdleWithMessage}"
-                            Style="{StaticResource Muted}"
-                            Text="{Binding AlignmentMessage}" />
-
-                        <!--  The book, then the chapter: the second is the one that visibly moves.  -->
-                        <ProgressBar IsVisible="{Binding IsAligning}" Progress="{Binding AlignmentFraction}" />
-
-                        <ProgressBar
-                            IsVisible="{Binding IsAligning}"
-                            Progress="{Binding ChapterFraction}"
-                            ProgressColor="{AppThemeBinding Light=#7C8AA5,
-                                                            Dark=#5A6B8A}" />
-
-                        <Button
-                            Command="{Binding StartAlignmentCommand}"
-                            IsVisible="{Binding CanStartAlignment}"
-                            Text="{Binding StartAlignmentText}" />
-                        <Button
-                            Command="{Binding StopAlignmentCommand}"
-                            IsVisible="{Binding IsAligning}"
-                            Text="Zaustavi poravnanje" />
-                        <Button
-                            Command="{Binding RealignCommand}"
-                            FontSize="13"
-                            IsVisible="{Binding CanRealign}"
-                            Text="{Binding RealignText}" />
-                    </VerticalStackLayout>
-
-                    <!--  Files  -->
-                    <BoxView Color="{AppThemeBinding Light=#E1DCD3, Dark=#242A34}" HeightRequest="1" />
-
-                    <Label FontAttributes="Bold" Text="Datoteke" />
-
-                    <Button
-                        Command="{Binding AddAudioCommand}"
-                        IsVisible="{Binding HasNoAudio}"
-                        Text="Dodaj audioknjigu" />
-                    <Button
-                        Command="{Binding RemoveAudioCommand}"
-                        IsVisible="{Binding CanRemoveAudio}"
-                        Text="Ukloni audioknjigu" />
-                    <Button
-                        Command="{Binding AddEbookCommand}"
-                        IsVisible="{Binding HasNoText}"
-                        Text="Dodaj e-knjigu" />
-                    <Button
-                        Command="{Binding RemoveEbookCommand}"
-                        IsVisible="{Binding CanRemoveText}"
-                        Text="Ukloni e-knjigu" />
-
-                    <Button
-                        BackgroundColor="#C0392B"
-                        Command="{Binding DeleteBookCommand}"
-                        Margin="0,12,0,0"
-                        Text="Obriši knjigu" />
+                        FontAttributes="Bold"
+                        FontSize="20"
+                        HorizontalTextAlignment="Center"
+                        Text="{Binding Title}" />
+                    <Label
+                        HorizontalTextAlignment="Center"
+                        Margin="0,8,0,0"
+                        Style="{StaticResource Muted}"
+                        Text="{Binding Author}" />
                 </VerticalStackLayout>
-            </ScrollView>
-        </Border>
+            </Border>
+
+            <!--  Chapter list  -->
+            <Border
+                BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                  Dark={StaticResource SurfaceDark}}"
+                IsVisible="{Binding ChaptersExpanded}"
+                StrokeThickness="0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="14" />
+                </Border.StrokeShape>
+
+                <CollectionView ItemsSource="{Binding Chapters}" Margin="6">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ChapterRow">
+                            <Grid Padding="10,12" ColumnDefinitions="20,*,Auto">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Path=BindingContext.SelectChapterCommand, Source={x:Reference BookRoot}}"
+                                        CommandParameter="{Binding .}" />
+                                </Grid.GestureRecognizers>
+
+                                <Label
+                                    Grid.Column="0"
+                                    FontSize="12"
+                                    Text="{Binding Marker}"
+                                    VerticalOptions="Center" />
+                                <Label
+                                    Grid.Column="1"
+                                    FontAttributes="{Binding TitleWeight}"
+                                    LineBreakMode="TailTruncation"
+                                    Text="{Binding Title}"
+                                    VerticalOptions="Center" />
+                                <Label
+                                    Grid.Column="2"
+                                    FontSize="12"
+                                    Text="{Binding StartText}"
+                                    TextColor="Gray"
+                                    VerticalOptions="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Border>
+        </Grid>
+
+        <!--  Chapter bar: tapping the title opens and closes the list  -->
+        <Grid
+            Grid.Row="2"
+            ColumnDefinitions="46,*,46"
+            IsVisible="{Binding HasAudio}">
+            <Button
+                Grid.Column="0"
+                Command="{Binding PreviousChapterCommand}"
+                Style="{StaticResource Icon}"
+                Text="‹" />
+
+            <Label
+                Grid.Column="1"
+                HorizontalTextAlignment="Center"
+                LineBreakMode="TailTruncation"
+                Text="{Binding ChapterHeading}"
+                VerticalOptions="Center">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding ToggleChaptersCommand}" />
+                </Label.GestureRecognizers>
+            </Label>
+
+            <Button
+                Grid.Column="2"
+                Command="{Binding NextChapterCommand}"
+                Style="{StaticResource Icon}"
+                Text="›" />
+        </Grid>
+
+        <!--  Position within the chapter  -->
+        <Grid
+            Grid.Row="3"
+            ColumnDefinitions="Auto,*,Auto"
+            IsVisible="{Binding HasAudio}">
+            <Label
+                Grid.Column="0"
+                Style="{StaticResource Muted}"
+                Text="{Binding PositionText}"
+                VerticalOptions="Center" />
+
+            <!--
+                The part already heard is a solid block sitting on the baseline; what is left
+                is a hairline. Weight rather than tint, because weight reads at a glance — and
+                a block that grows along a line is a different shape from the usual filled pill
+                with a knob riding on it.
+            -->
+            <Grid
+                x:Name="Track"
+                Grid.Column="1"
+                Margin="10,0"
+                HeightRequest="34"
+                SizeChanged="OnTrackSizeChanged">
+
+                <BoxView
+                    BackgroundColor="{AppThemeBinding Light=#C9C3B6,
+                                                      Dark=#333A46}"
+                    HeightRequest="1"
+                    VerticalOptions="Center" />
+
+                <BoxView
+                    BackgroundColor="{AppThemeBinding Light=#2E3440,
+                                                      Dark=#9FB4E8}"
+                    HeightRequest="12"
+                    HorizontalOptions="Start"
+                    VerticalOptions="Center"
+                    WidthRequest="{Binding PlayedWidth}" />
+
+                <Slider
+                    x:Name="Scrubber"
+                    DragCompleted="OnScrubberDragCompleted"
+                    Maximum="1"
+                    MaximumTrackColor="Transparent"
+                    Minimum="0"
+                    MinimumTrackColor="Transparent"
+                    ThumbColor="Transparent"
+                    Value="{Binding Progress, Mode=OneWay}" />
+            </Grid>
+
+            <Label
+                Grid.Column="2"
+                Style="{StaticResource Muted}"
+                Text="{Binding DurationText}"
+                VerticalOptions="Center" />
+        </Grid>
+
+        <!--  Transport  -->
+        <HorizontalStackLayout
+            Grid.Row="4"
+            HorizontalOptions="Center"
+            IsVisible="{Binding HasAudio}"
+            Spacing="26">
+            <Button
+                Command="{Binding BackCommand}"
+                Style="{StaticResource Skip}"
+                Text="↺10" />
+
+            <Button
+                Command="{Binding TogglePlayCommand}"
+                Style="{StaticResource Play}"
+                Text="{Binding PlayGlyph}" />
+
+            <Button
+                Command="{Binding ForwardCommand}"
+                Style="{StaticResource Skip}"
+                Text="↻10" />
+        </HorizontalStackLayout>
+
+        <!--
+            Back to the text, and a one-line word on alignment when there is one.
+
+            Only a paired book ever shows this, and for a paired book the reader is where the
+            book opens — so this is the way back to it rather than the way in. An audiobook with
+            no text has nothing to read and is not offered any.
+        -->
+        <VerticalStackLayout Grid.Row="5" Spacing="4">
+            <Button
+                Command="{Binding OpenReaderCommand}"
+                HorizontalOptions="Center"
+                IsVisible="{Binding HasText}"
+                Style="{StaticResource Plain}"
+                Text="Čitaj" />
+
+            <Label
+                HorizontalTextAlignment="Center"
+                IsVisible="{Binding IsAligning}"
+                Style="{StaticResource Muted}"
+                Text="{Binding AlignmentMessage}" />
+        </VerticalStackLayout>
     </Grid>
 </ContentPage>

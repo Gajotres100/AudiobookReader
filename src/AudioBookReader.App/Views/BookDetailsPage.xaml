@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="AudioBookReader.App.Views.BookDetailsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
+    x:DataType="vm:BookViewModel"
+    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                      Dark={StaticResource SurfaceDark}}"
+    Shell.NavBarIsVisible="False"
+    Title="{Binding Title}">
+
+    <!--
+        Everything you do to a book once: which files it is made of, whether the text is aligned to
+        the narration, and deleting it.
+
+        A page of its own rather than a panel over the player, because a text-only book has no
+        player to put a panel over — and having one place for all three kinds of book is the whole
+        point of splitting them apart.
+    -->
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="14">
+
+            <Grid ColumnDefinitions="*,Auto">
+                <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="17"
+                        Text="{Binding Title}" />
+                    <Label Style="{StaticResource Muted}" Text="{Binding Author}" />
+                </VerticalStackLayout>
+
+                <Button
+                    Grid.Column="1"
+                    Command="{Binding CloseCommand}"
+                    Style="{StaticResource Icon}"
+                    Text="✕" />
+            </Grid>
+
+            <Label
+                IsVisible="{Binding HasError}"
+                Text="{Binding Error}"
+                TextColor="#C0392B" />
+
+            <!--  Copying an audiobook is the slow part of an import; say how far along it is.  -->
+            <VerticalStackLayout IsVisible="{Binding IsImporting}" Spacing="6">
+                <Label Style="{StaticResource Muted}" Text="{Binding ImportMessage}" />
+                <ProgressBar Progress="{Binding ImportFraction}" />
+            </VerticalStackLayout>
+
+            <!--  Alignment  -->
+            <VerticalStackLayout IsVisible="{Binding IsPaired}" Spacing="8">
+                <BoxView Style="{StaticResource Divider}" />
+
+                <Label FontAttributes="Bold" Text="Poravnanje teksta i naracije" />
+
+                <!--  Two ways to the same thing, so they are a choice, not two settings.  -->
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                    <Label
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        Text="Sync on the fly"
+                        VerticalOptions="Center" />
+                    <Switch
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        IsToggled="{Binding MeasuresWhileReading}" />
+
+                    <Label
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        Text="Poravnaj cijelu knjigu unaprijed"
+                        VerticalOptions="Center" />
+                    <Switch
+                        Grid.Row="1"
+                        Grid.Column="1"
+                        IsToggled="{Binding AlignsInAdvance}" />
+                </Grid>
+
+                <Label Style="{StaticResource Muted}" Text="{Binding AlignmentSummary}" />
+
+                <HorizontalStackLayout IsVisible="{Binding IsAligning}" Spacing="10">
+                    <ActivityIndicator
+                        HeightRequest="18"
+                        IsRunning="{Binding IsAligning}"
+                        WidthRequest="18" />
+                    <Label
+                        FontSize="13"
+                        Text="{Binding AlignmentMessage}"
+                        VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
+                <Label
+                    IsVisible="{Binding IsIdleWithMessage}"
+                    Style="{StaticResource Muted}"
+                    Text="{Binding AlignmentMessage}" />
+
+                <!--  The book, then the chapter: the second is the one that visibly moves.  -->
+                <ProgressBar IsVisible="{Binding IsAligning}" Progress="{Binding AlignmentFraction}" />
+
+                <ProgressBar
+                    IsVisible="{Binding IsAligning}"
+                    Progress="{Binding ChapterFraction}"
+                    ProgressColor="{AppThemeBinding Light=#7C8AA5,
+                                                    Dark=#5A6B8A}" />
+
+                <Button
+                    Command="{Binding StartAlignmentCommand}"
+                    IsVisible="{Binding CanStartAlignment}"
+                    Style="{StaticResource Plain}"
+                    Text="{Binding StartAlignmentText}" />
+                <Button
+                    Command="{Binding StopAlignmentCommand}"
+                    IsVisible="{Binding IsAligning}"
+                    Style="{StaticResource Plain}"
+                    Text="Zaustavi poravnanje" />
+                <Button
+                    Command="{Binding RealignCommand}"
+                    FontSize="13"
+                    IsVisible="{Binding CanRealign}"
+                    Style="{StaticResource Plain}"
+                    Text="{Binding RealignText}" />
+            </VerticalStackLayout>
+
+            <!--  Files  -->
+            <BoxView Style="{StaticResource Divider}" />
+
+            <Label FontAttributes="Bold" Text="Datoteke" />
+
+            <Button
+                Command="{Binding AddAudioCommand}"
+                IsVisible="{Binding HasNoAudio}"
+                Style="{StaticResource Plain}"
+                Text="Dodaj audioknjigu" />
+            <Button
+                Command="{Binding RemoveAudioCommand}"
+                IsVisible="{Binding CanRemoveAudio}"
+                Style="{StaticResource Plain}"
+                Text="Ukloni audioknjigu" />
+            <Button
+                Command="{Binding AddEbookCommand}"
+                IsVisible="{Binding HasNoText}"
+                Style="{StaticResource Plain}"
+                Text="Dodaj e-knjigu" />
+            <Button
+                Command="{Binding RemoveEbookCommand}"
+                IsVisible="{Binding CanRemoveText}"
+                Style="{StaticResource Plain}"
+                Text="Ukloni e-knjigu" />
+
+            <Button
+                Command="{Binding DeleteBookCommand}"
+                Margin="0,12,0,0"
+                Style="{StaticResource Destructive}"
+                Text="Obriši knjigu" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

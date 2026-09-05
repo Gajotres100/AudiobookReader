@@ -11,6 +11,9 @@ namespace AudioBookReader.App.ViewModels;
 public class BookCard(Book book, ReadingState? state)
 {
     public int Id { get; } = book.Id;
+
+    /// <summary>Decides which of the app's three shapes this book opens into.</summary>
+    public bool HasText { get; } = book.HasText;
     public string Title { get; } = book.Title;
     public string Author { get; } = book.Author ?? "";
     public string? CoverPath { get; } = book.CoverPath;
@@ -185,7 +188,20 @@ public partial class LibraryViewModel(
         }
     }
 
+    /// <summary>
+    /// Opens the book as whatever it is.
+    ///
+    /// The app is three things and a book is only ever one of them: an audiobook opens the player,
+    /// and anything with text opens the text — plain reading when that is all there is, reading
+    /// with the narration attached when the book is paired. Sending every book to the player first
+    /// meant a novel with no audio was greeted by an empty transport, and a paired book made you
+    /// press "Čitaj" every single time to get to the thing you came for.
+    /// </summary>
     [RelayCommand]
-    private static Task OpenAsync(BookCard? card) =>
-        card is null ? Task.CompletedTask : Shell.Current.GoToAsync($"book?id={card.Id}");
+    private static Task OpenAsync(BookCard? card) => card switch
+    {
+        null => Task.CompletedTask,
+        { HasText: true } => Shell.Current.GoToAsync($"reader?id={card.Id}"),
+        _ => Shell.Current.GoToAsync($"book?id={card.Id}"),
+    };
 }

@@ -11,6 +11,7 @@ public partial class AppShell : Shell
 		// Pages reached by navigation rather than from the shell's own structure have to be
 		// registered by route, or GoToAsync cannot resolve them.
 		Routing.RegisterRoute("book", typeof(BookPage));
+		Routing.RegisterRoute("details", typeof(BookDetailsPage));
 		Routing.RegisterRoute("reader", typeof(ReaderPage));
 		Routing.RegisterRoute("bookmarks", typeof(BookmarksPage));
 	}

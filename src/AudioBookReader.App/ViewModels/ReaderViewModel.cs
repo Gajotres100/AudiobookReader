@@ -51,18 +51,21 @@ public partial class ReaderViewModel(
     /// Says why the text is not following, rather than leaving a disabled control to explain
     /// itself. Silently doing nothing is the worst of the options here — it looks broken.
     /// </summary>
-    public string FollowHint => _book?.IsPaired == true
-        ? "Tekst će pratiti naraciju kad poravnanje završi. Pokreni ga na stranici knjige."
-        : "Dodaj i audioknjigu i e-knjigu za isti naslov pa će tekst moći pratiti naraciju.";
+    public string FollowHint =>
+        "Tekst će pratiti naraciju kad poravnanje završi. Pokreni ga preko ☰.";
 
     /// <summary>
     /// The general hint, shown only when nothing more specific is being said.
     ///
-    /// The two share a place on screen, and live sync sets a status precisely when following is not
-    /// yet possible — so without this they were drawn on top of each other, both on the same dark
-    /// background, in the most common state of a book that has not caught up yet.
+    /// Requires audio, and that is the whole point of the split: a book with only text is not
+    /// failing to follow anything, it is simply being read. Telling a reader on every page that
+    /// they could add an audiobook is an advertisement in the middle of a novel.
+    ///
+    /// The rest is about sharing one line with the live status, which is set precisely when
+    /// following is not yet possible — so without this the two were drawn on top of each other in
+    /// the commonest state of a book that has not caught up yet.
     /// </summary>
-    public bool ShowFollowHint => !CanFollow && !IsBusy && !HasFollowStatus;
+    public bool ShowFollowHint => HasAudio && !CanFollow && !IsBusy && !HasFollowStatus;
 
     /// <summary>
     /// Why the highlight is standing still even though this book has a sync map.
@@ -97,6 +100,7 @@ public partial class ReaderViewModel(
     public partial bool IsPlaying { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowFollowHint))]
     public partial bool HasAudio { get; set; }
 
     public string PlayLabel => IsPlaying ? "⏸" : "▶";
@@ -115,6 +119,20 @@ public partial class ReaderViewModel(
 
         playback.TogglePlayPause();
         IsPlaying = playback.IsPlaying;
+    }
+
+    /// <summary>Jumps the narration back ten seconds. The highlight follows on the next tick.</summary>
+    [RelayCommand]
+    private void Back() => Nudge(-10_000);
+
+    [RelayCommand]
+    private void Forward() => Nudge(10_000);
+
+    private void Nudge(long deltaMs)
+    {
+        // Only when this book is the one loaded: playback outlives pages, and nudging someone
+        // else's book from here would move audio the reader is not showing.
+        if (playback.BookId == BookId) playback.Nudge(deltaMs);
     }
 
     // ---- Appearance ----
@@ -832,6 +850,23 @@ public partial class ReaderViewModel(
 
     [RelayCommand]
     private Task CloseAsync() => Shell.Current.GoToAsync("..");
+
+    /// <summary>
+    /// Opens the full player: cover, chapter list, scrubber, sleep timer, speed, bookmarks.
+    ///
+    /// A paired book opens in the text now, so this is how the listening side is reached. Back
+    /// rather than forward when the player is already the page underneath, so the two do not stack
+    /// up on each other as the user moves between them.
+    /// </summary>
+    [RelayCommand]
+    private Task OpenPlayerAsync() =>
+        Shell.Current.Navigation.NavigationStack is [.., Views.BookPage, _]
+            ? Shell.Current.GoToAsync("..")
+            : Shell.Current.GoToAsync($"book?id={BookId}");
+
+    /// <summary>The book's files, alignment and deletion — the same page the player's ☰ opens.</summary>
+    [RelayCommand]
+    private Task OpenDetailsAsync() => Shell.Current.GoToAsync($"details?id={BookId}");
 
     /// <summary>Only shown while nothing more important has the status line.</summary>
     private void OnLiveSyncProgress(object? sender, string message)

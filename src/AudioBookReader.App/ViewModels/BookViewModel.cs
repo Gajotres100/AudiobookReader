@@ -324,17 +324,23 @@ public partial class BookViewModel(
     private void ToggleChapters() => ChaptersExpanded = !ChaptersExpanded;
 
     /// <summary>
-    /// Whether the housekeeping panel is showing over the player.
+    /// Opens the book's files, alignment and deletion.
     ///
-    /// Importing files, alignment and deletion are things you do to a book once; playing it is what
-    /// you do every day. Keeping them on the same scroll made the second one look like the first,
-    /// so the rare half now lives behind one button.
+    /// Importing files, alignment and deletion are things you do to a book once; reading or playing
+    /// it is what you do every day. They used to be a panel drawn over the player, which worked
+    /// only for as long as every book had a player — a text-only book has none, and the reader
+    /// needs the same panel just as much.
     /// </summary>
-    [ObservableProperty]
-    public partial bool IsDetailsOpen { get; set; }
-
     [RelayCommand]
-    private void ToggleDetails() => IsDetailsOpen = !IsDetailsOpen;
+    private Task OpenDetailsAsync() => Shell.Current.GoToAsync($"details?id={BookId}");
+
+    /// <summary>
+    /// Whether this view model is driving a player, or only describing the book.
+    ///
+    /// The details page shares this view model because it acts on the same book, but shows nothing
+    /// that moves — so it neither loads the player nor runs the once-a-second tick.
+    /// </summary>
+    public bool TracksPlayback { get; set; } = true;
 
     [RelayCommand]
     private Task CloseAsync() => Shell.Current.GoToAsync("..");
@@ -389,6 +395,8 @@ public partial class BookViewModel(
         alignment.Changed -= OnAlignmentChanged;
         alignment.Changed += OnAlignmentChanged;
         ApplyAlignmentStatus(alignment.Status);
+
+        if (!TracksPlayback) return;
 
         if (HasAudio) await StartPlaybackAsync();
 
@@ -892,8 +900,18 @@ public partial class BookViewModel(
 
     // ---- Reader ----
 
+    /// <summary>
+    /// Goes to the text.
+    ///
+    /// Back rather than forward when the reader is the page underneath, which is the usual case now
+    /// that a paired book opens there: pushing a second copy would leave two readers on the stack,
+    /// each with its own web view holding the whole book.
+    /// </summary>
     [RelayCommand]
-    private Task OpenReaderAsync() => Shell.Current.GoToAsync($"reader?id={BookId}");
+    private Task OpenReaderAsync() =>
+        Shell.Current.Navigation.NavigationStack is [.., Views.ReaderPage, _]
+            ? Shell.Current.GoToAsync("..")
+            : Shell.Current.GoToAsync($"reader?id={BookId}");
 
     public void Dispose()
     {

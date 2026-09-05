@@ -49,20 +49,13 @@ public partial class BookPage : ContentPage
     }
 
     /// <summary>
-    /// Back closes whatever is covering the player before it leaves the page.
+    /// Back closes the chapter list before it leaves the page.
     ///
-    /// Both the chapter list and the housekeeping panel sit over the player rather than on pages of
-    /// their own, so without this the system gesture would throw the user out of the book to
-    /// dismiss a panel.
+    /// The list sits over the cover rather than on a page of its own, so without this the system
+    /// gesture would throw the user out of the book to dismiss it.
     /// </summary>
     protected override bool OnBackButtonPressed()
     {
-        if (_viewModel.IsDetailsOpen)
-        {
-            _viewModel.IsDetailsOpen = false;
-            return true;
-        }
-
         if (_viewModel.ChaptersExpanded)
         {
             _viewModel.ChaptersExpanded = false;
