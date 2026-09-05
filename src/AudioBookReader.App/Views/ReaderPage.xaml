@@ -43,6 +43,7 @@
             <Button
                 Grid.Column="1"
                 Command="{Binding TogglePlayCommand}"
+                IsEnabled="{Binding CanPlay}"
                 IsVisible="{Binding HasAudio}"
                 Style="{StaticResource PlayInline}"
                 Text="{Binding PlayLabel}" />

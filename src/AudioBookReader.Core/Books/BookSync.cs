@@ -78,6 +78,13 @@ public class BookSync(BookText text, SyncMap map, IReadOnlyList<Chapter> chapter
         if (ChapterAtChar(charOffset) is not { } chapter) return null;
         if (map.ForChapter(chapter.Index) is not { } chapterMap) return null;
 
+        // The same refusal <see cref="CharOffsetAt"/> makes, and for a worse symptom. Outside the
+        // anchored range the map clamps and still reports success, so asking where chapter two is
+        // read while only chapter one has been measured answered with the last anchor of chapter
+        // one — and the caller dutifully sent playback back there. Jumping forward in the book
+        // therefore left the narrator reading the chapter you had just left.
+        if (!chapterMap.CoversChar(charOffset)) return null;
+
         return chapterMap.TryGetAudioMs(charOffset, out var at) ? at : null;
     }
 
