@@ -100,4 +100,32 @@ public class LiveMapDeliveryTests
 
         Assert.Equal(0, visited.MeasuredMs(windowMs: 15_000, boundaryConfidence: 0.2f));
     }
+
+    [Fact]
+    public void RefusesToReadAPaceFromOnePhrase()
+    {
+        // What a chapter holds after a single phrase has been located: two anchors a few hundred
+        // milliseconds apart. The rate that falls out of those is tens of times too fast, and
+        // carried twenty seconds forward it puts the highlight pages ahead of the voice.
+        var onePhrase = new ChapterSyncMap
+        {
+            ChapterIndex = 0,
+            Anchors = [new Anchor(30_000, 5_000, 0.9f), new Anchor(30_400, 5_200, 0.9f)],
+        };
+
+        Assert.False(onePhrase.TryExtrapolateCharOffset(35_000, withinMs: 20_000, out _));
+    }
+
+    [Fact]
+    public void RefusesAPaceNoNarratorCouldKeep()
+    {
+        // A long stretch can still be measured badly — one anchor in the wrong place is enough.
+        var wrong = new ChapterSyncMap
+        {
+            ChapterIndex = 0,
+            Anchors = [new Anchor(0, 0, 0.9f), new Anchor(30_000, 90_000, 0.9f)],
+        };
+
+        Assert.False(wrong.TryExtrapolateCharOffset(35_000, withinMs: 20_000, out _));
+    }
 }

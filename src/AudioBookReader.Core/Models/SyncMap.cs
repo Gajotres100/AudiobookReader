@@ -63,13 +63,32 @@ public class ChapterSyncMap
         // phrase can be a few hundred milliseconds apart, and a rate read off those swings wildly.
         var first = Anchors[0];
         var span = last.AudioMs - first.AudioMs;
-        if (span <= 0) return false;
+
+        // Too short a stretch to read a pace from at all. A chapter holding one phrase's pair of
+        // anchors spans a few hundred milliseconds, and dividing by that produced a rate tens of
+        // times too fast — which, carried twenty seconds forward, put the highlight several pages
+        // ahead of the voice. Better to say nothing than to say that.
+        if (span < ShortestPaceMs) return false;
 
         var rate = (last.CharOffset - first.CharOffset) / (double)span;
+
+        // And clamped even then, because a stretch can be long and still be measured badly. Prose
+        // is read at something like fifteen characters a second; these bounds are wide enough for
+        // any narrator and any language, and narrow enough that a wrong anchor cannot send the
+        // highlight into the next chapter.
+        if (rate is < SlowestPace or > FastestPace) return false;
 
         charOffset = last.CharOffset + (int)(rate * ahead);
         return true;
     }
+
+    /// <summary>The shortest measured stretch a narration rate may be read from.</summary>
+    private const long ShortestPaceMs = 5_000;
+
+    /// <summary>Plausible narration, in characters per millisecond. Ordinary prose sits near 0.015.</summary>
+    private const double SlowestPace = 0.005;
+
+    private const double FastestPace = 0.05;
 
     public bool CoversChar(int charOffset) =>
         Anchors.Count > 1 && charOffset >= Anchors[0].CharOffset && charOffset <= Anchors[^1].CharOffset;
