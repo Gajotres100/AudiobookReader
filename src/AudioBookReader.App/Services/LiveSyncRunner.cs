@@ -51,6 +51,16 @@ public partial class LiveSyncRunner(
     /// </summary>
     public event EventHandler<string>? Failed;
 
+    /// <summary>
+    /// Hands the reader the map as it grows, window by window.
+    ///
+    /// The reader used to re-read the file instead, and the file is written every few windows and
+    /// polled every ten seconds — so an anchor could be three quarters of a minute old before the
+    /// text could use it, while the narrator was reading through it. Both live in this process, so
+    /// there is no reason to make the disk the messenger.
+    /// </summary>
+    public event EventHandler<SyncMap>? Measured;
+
     public bool IsRunning => _running is { IsCompleted: false };
 
     /// <summary>
@@ -194,12 +204,22 @@ public partial class LiveSyncRunner(
                     Report(ahead > 0 ? $"Sync on the fly — izmjereno {ahead} s unaprijed" : "Sync on the fly…");
                 });
 
+                // Copied synchronously, on the aligner's own thread, while it is between windows
+                // and certainly not inserting. Handing the copy to Progress<T> instead would run it
+                // on some other pool thread alongside the next window's insertions, which is the
+                // torn read this exists to prevent.
+                void Publish()
+                {
+                    var copy = map.Snapshot();
+                    MainThread.BeginInvokeOnMainThread(() => Measured?.Invoke(this, copy));
+                }
+
                 await aligner.RunAsync(
                     book.AudioPath!,
                     map,
                     () => playback.BookId == bookId ? playback.PositionMs : 0,
                     () => syncMaps.SaveAsync(bookId, map),
-                    progress,
+                    new PublishingProgress(progress, Publish),
                     ct);
             }
 
@@ -215,6 +235,17 @@ public partial class LiveSyncRunner(
         {
             AppLog.Error($"sync on the fly (attempt {attempt} of {Attempts})", ex);
             return false;
+        }
+    }
+
+    /// <summary>Reports the status message and hands out the map, because a window is news to both.</summary>
+    private sealed class PublishingProgress(IProgress<LiveAlignmentProgress> status, Action publish)
+        : IProgress<LiveAlignmentProgress>
+    {
+        public void Report(LiveAlignmentProgress value)
+        {
+            publish();
+            status.Report(value);
         }
     }
 

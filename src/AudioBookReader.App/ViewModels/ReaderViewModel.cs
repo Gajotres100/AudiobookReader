@@ -434,6 +434,8 @@ public partial class ReaderViewModel(
             ChapterCount = _readerChapters.Count;
 
             var chapters = await database.GetChaptersAsync(BookId);
+            _libraryChapters = chapters;
+
             var map = await syncMaps.LoadAsync(BookId);
 
             // Following requires both media and a map built from this exact pair of files.
@@ -463,6 +465,8 @@ public partial class ReaderViewModel(
                 liveSync.Progress += OnLiveSyncProgress;
                 liveSync.Failed -= OnLiveSyncFailed;
                 liveSync.Failed += OnLiveSyncFailed;
+                liveSync.Measured -= OnLiveSyncMeasured;
+                liveSync.Measured += OnLiveSyncMeasured;
 
                 await liveSync.StartAsync(BookId);
             }
@@ -843,12 +847,50 @@ public partial class ReaderViewModel(
     /// </summary>
     private void OnLiveSyncFailed(object? sender, string message) => FollowStatus = message;
 
+    /// <summary>
+    /// Takes the map straight from the run that is building it.
+    ///
+    /// Waiting for the file was the reason following stuttered: the run writes it every few windows
+    /// and the reader looked every ten seconds, so an anchor could be most of a minute old before
+    /// the text could use it — and while measuring only runs about twice real time, most of a
+    /// minute is most of the lead. Following would catch the voice, reach the end of what it had,
+    /// and stop until the next read.
+    /// </summary>
+    private void OnLiveSyncMeasured(object? sender, SyncMap map)
+    {
+        if (_text is null || _libraryChapters is null) return;
+
+        var appeared = _sync is null;
+
+        _sync = new BookSync(_text, map, _libraryChapters) { ExtrapolateAheadMs = LiveExtrapolationMs };
+
+        if (appeared)
+        {
+            CanFollow = true;
+            IsFollowing = true;
+            FollowStatus = "";
+        }
+
+        // The map moved underneath, so the sentence chosen from the old one must not veto the next.
+        _lastSentence = -1;
+    }
+
+    /// <summary>
+    /// How far past the last anchor the highlight may be carried while measuring is still catching
+    /// up. One window's worth: enough to bridge the gap between windows, short enough that a run
+    /// which has actually stopped shows as stopped rather than drifting away on its own.
+    /// </summary>
+    private const long LiveExtrapolationMs = 20_000;
+
+    private IReadOnlyList<Chapter>? _libraryChapters;
+
     public void Dispose()
     {
         _ticker?.Stop();
 
         liveSync.Progress -= OnLiveSyncProgress;
         liveSync.Failed -= OnLiveSyncFailed;
+        liveSync.Measured -= OnLiveSyncMeasured;
         _ = liveSync.StopAsync();
     }
 

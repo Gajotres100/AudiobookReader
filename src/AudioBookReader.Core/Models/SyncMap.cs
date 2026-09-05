@@ -38,6 +38,39 @@ public class ChapterSyncMap
     public bool Covers(long audioMs) =>
         Anchors.Count > 1 && audioMs >= Anchors[0].AudioMs && audioMs <= Anchors[^1].AudioMs;
 
+    /// <summary>
+    /// Where the narrator is a little past the last anchor, extrapolated from the pace of the
+    /// anchors themselves.
+    ///
+    /// Only for a map still being measured. Following live, the last anchor is by definition only
+    /// seconds ahead of the listener — the window it came from is being recognised while the
+    /// narrator reads it — so refusing everything past it freezes the highlight between windows and
+    /// then jumps it. Over a few seconds the narration rate is the most stable thing in this whole
+    /// pipeline, so carrying it forward is honest; over a minute it is not, which is what the limit
+    /// is for.
+    /// </summary>
+    public bool TryExtrapolateCharOffset(long audioMs, long withinMs, out int charOffset)
+    {
+        charOffset = 0;
+        if (Anchors.Count < 2) return false;
+
+        var last = Anchors[^1];
+        var ahead = audioMs - last.AudioMs;
+
+        if (ahead <= 0 || ahead > withinMs) return false;
+
+        // Paced by the measured stretch rather than by the final pair: two anchors from the same
+        // phrase can be a few hundred milliseconds apart, and a rate read off those swings wildly.
+        var first = Anchors[0];
+        var span = last.AudioMs - first.AudioMs;
+        if (span <= 0) return false;
+
+        var rate = (last.CharOffset - first.CharOffset) / (double)span;
+
+        charOffset = last.CharOffset + (int)(rate * ahead);
+        return true;
+    }
+
     public bool CoversChar(int charOffset) =>
         Anchors.Count > 1 && charOffset >= Anchors[0].CharOffset && charOffset <= Anchors[^1].CharOffset;
 
@@ -260,6 +293,24 @@ public class SyncMap
 
         return chapterCount;
     }
+
+    /// <summary>
+    /// An independent copy, safe to read while the original keeps being written.
+    ///
+    /// Following hands its map to the reader as it grows, and the two live on different threads:
+    /// the reader walking a list that a recognition run is inserting into is a torn read at best.
+    /// Copying costs a few thousand structs a minute, which is nothing beside recognition.
+    /// </summary>
+    public SyncMap Snapshot() => new()
+    {
+        Version = Version,
+        AudioHash = AudioHash,
+        EbookHash = EbookHash,
+        Chapters =
+        [
+            .. Chapters.Select(c => new ChapterSyncMap { ChapterIndex = c.ChapterIndex, Anchors = [.. c.Anchors] })
+        ],
+    };
 
     public bool MatchesPair(string? audioHash, string? ebookHash) =>
         Version == CurrentVersion && AudioHash == audioHash && EbookHash == ebookHash;

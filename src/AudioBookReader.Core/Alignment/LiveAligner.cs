@@ -38,8 +38,13 @@ public class LiveAligner(
     /// </summary>
     public long MaxLeadMs { get; init; } = 120_000;
 
-    /// <summary>How often the map is handed back to be written, in windows.</summary>
-    private const int SaveEvery = 4;
+    /// <summary>
+    /// How often the map is handed back to be written, in windows.
+    ///
+    /// The reader no longer waits for the file — it is given the map as it grows — so this is now
+    /// only about how much measuring is lost if the app dies. Two windows is half a minute of audio.
+    /// </summary>
+    private const int SaveEvery = 2;
 
     /// <summary>Anything shorter than this is not worth a recognition pass of its own.</summary>
     private const long ShortestWindowMs = 2_000;

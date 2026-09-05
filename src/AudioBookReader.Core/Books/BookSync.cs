@@ -14,6 +14,16 @@ public class BookSync(BookText text, SyncMap map, IReadOnlyList<Chapter> chapter
     public BookText Text => text;
 
     /// <summary>
+    /// How far past the last anchor the narrator's position may be estimated rather than refused.
+    ///
+    /// Zero for a finished map, where beyond the last anchor genuinely means unmeasured. Set while
+    /// sync on the fly is running, where it means the opposite: the last anchor is only seconds
+    /// ahead of the voice by construction, and refusing everything past it makes the highlight
+    /// stop and start with every window instead of moving with the narration.
+    /// </summary>
+    public long ExtrapolateAheadMs { get; init; }
+
+    /// <summary>
     /// True when this chapter holds something actually heard, not merely visited.
     ///
     /// Every chapter map is seeded with two low-confidence guesses at the chapter boundaries, so
@@ -41,7 +51,11 @@ public class BookSync(BookText text, SyncMap map, IReadOnlyList<Chapter> chapter
         // Outside the anchored range the map clamps, and a clamped answer here freezes the
         // highlight on one sentence while reporting that all is well, so the reader never learns
         // that this part of the book has simply not been measured yet.
-        if (!chapterMap.Covers(audioMs)) return null;
+        if (!chapterMap.Covers(audioMs))
+            return ExtrapolateAheadMs > 0
+                   && chapterMap.TryExtrapolateCharOffset(audioMs, ExtrapolateAheadMs, out var ahead)
+                ? ahead
+                : null;
 
         return chapterMap.TryGetCharOffset(audioMs, out var offset) ? offset : null;
     }
