@@ -90,15 +90,34 @@
             Style="{StaticResource Muted}"
             Text="{Binding FollowHint}" />
 
-        <!--  A map covers only the chapters a run has reached; say so instead of standing still.  -->
-        <Label
+        <!--
+            A map covers only the chapters a run has reached; say so instead of standing still.
+
+            With a spinner while playback is deliberately waiting for a chapter to be measured. A
+            line of text alone reads as a notice; the same line with something turning reads as a
+            wait that will end, which is what every player has taught people to expect.
+        -->
+        <HorizontalStackLayout
             Grid.Row="1"
             Padding="16,8"
             BackgroundColor="{AppThemeBinding Light={StaticResource Chrome},
                                               Dark={StaticResource ChromeDark}}"
+            HorizontalOptions="Center"
             IsVisible="{Binding HasFollowStatus}"
-            Style="{StaticResource Muted}"
-            Text="{Binding FollowStatus}" />
+            Spacing="10">
+
+            <ActivityIndicator
+                HeightRequest="14"
+                IsRunning="{Binding IsWaitingToSpeak}"
+                IsVisible="{Binding IsWaitingToSpeak}"
+                VerticalOptions="Center"
+                WidthRequest="14" />
+
+            <Label
+                Style="{StaticResource Muted}"
+                Text="{Binding FollowStatus}"
+                VerticalOptions="Center" />
+        </HorizontalStackLayout>
 
         <ActivityIndicator
             Grid.Row="2"

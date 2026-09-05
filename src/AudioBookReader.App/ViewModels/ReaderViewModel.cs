@@ -104,7 +104,14 @@ public partial class ReaderViewModel(
     [NotifyPropertyChangedFor(nameof(CanPlay))]
     public partial bool HasAudio { get; set; }
 
-    public string PlayLabel => IsPlaying ? "⏸" : "▶";
+    /// <summary>
+    /// The transport glyph.
+    ///
+    /// Both carry the text presentation selector. Without it Android renders U+23F8 as a
+    /// colour emoji and U+25B6 as plain text, so play and pause — the same control one moment
+    /// apart — came out as two different objects in two different styles.
+    /// </summary>
+    public string PlayLabel => IsPlaying ? "⏸︎" : "▶︎";
 
     /// <summary>
     /// True while a chapter just jumped to is being measured and playback is deliberately waiting.
@@ -614,7 +621,12 @@ public partial class ReaderViewModel(
     /// </summary>
     private async Task TakeNarrationToAsync(int textStart)
     {
-        if (_book?.HasAudio != true || !IsFollowing) return;
+        // Deliberately not conditional on IsFollowing. That is only true once a map exists, and a
+        // book measured live has none until the first window lands — so on exactly the book this
+        // was written for, moving through the text moved nothing and the voice carried on in the
+        // chapter left behind. Telling the narration where the reader went is also how measuring
+        // learns which passage to work on, so it has to happen before there is anything to follow.
+        if (_book?.HasAudio != true) return;
         if (playback.BookId != BookId) return;
 
         // Anything still waiting is waiting for the wrong chapter now.
@@ -659,7 +671,7 @@ public partial class ReaderViewModel(
     private async Task HoldUntilMeasuredAsync(CancellationToken ct)
     {
         IsWaitingToSpeak = true;
-        FollowStatus = "Mjerim ovo poglavlje — zvuk kreće čim bude spremno.";
+        FollowStatus = "Pripremam poglavlje…";
 
         try
         {
@@ -752,21 +764,41 @@ public partial class ReaderViewModel(
 
         var chapters = await database.GetChaptersAsync(BookId);
 
-        // Failing that, the book's own chapter marks. Matched by position rather than by index,
-        // because an ebook's front matter routinely gives it chapters the audio has not.
-        var target = chapters.Count == _readerChapters.Count
-            ? chapters.FirstOrDefault(c => c.Index == chapterIndex)
-            : null;
+        // The audiobook's own marks, when the two sides divide the book the same way.
+        if (chapters.Count == _readerChapters.Count
+            && chapters.FirstOrDefault(c => c.Index == chapterIndex)?.StartMs is { } exact)
+            return exact;
 
-        if (target?.StartMs is { } at) return at;
+        if (_text is not { PlainText.Length: > 0 } text || _book!.DurationMs <= 0) return 0;
 
-        // Nothing lines up, so place it by proportion — sync on the fly corrects it within a window
-        // or two, and being a minute out beats being a chapter out.
-        if (_text is { PlainText.Length: > 0 } text && _book!.DurationMs > 0)
-            return (long)(_book.DurationMs * (textStart / (double)text.PlainText.Length));
+        // Otherwise place it by proportion — and then put it on the nearest chapter mark, if one is
+        // near enough to be the same chapter.
+        //
+        // Proportion alone is what sent a jump to chapter six into the end of chapter five: an
+        // ebook's front matter gives it documents the audio has none of, so the counts differ, the
+        // exact match above is skipped, and a raw proportion lands wherever the arithmetic falls —
+        // minutes from any boundary. Snapping recovers the thing actually asked for, which is the
+        // start of a chapter, without needing the two sides to agree on how many there are.
+        var proportional = (long)(_book.DurationMs * (textStart / (double)text.PlainText.Length));
 
-        return 0;
+        var nearest = chapters
+            .Where(c => c.StartMs is not null)
+            .OrderBy(c => Math.Abs(c.StartMs!.Value - proportional))
+            .FirstOrDefault();
+
+        if (nearest?.StartMs is { } mark && Math.Abs(mark - proportional) <= SnapToChapterMs)
+            return mark;
+
+        return proportional;
     }
+
+    /// <summary>
+    /// How far a proportional guess may be from a chapter mark and still be treated as that chapter.
+    ///
+    /// Five minutes: long enough to absorb the drift a proportion accumulates over ten hours,
+    /// short enough that it cannot reach past a neighbouring chapter of any ordinary length.
+    /// </summary>
+    private const long SnapToChapterMs = 5 * 60 * 1000;
 
     private DateTime _lastMapCheck = DateTime.MinValue;
     private bool _checkingMap;

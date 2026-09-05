@@ -93,6 +93,7 @@
         BasedOn="{StaticResource Icon}"
         TargetType="Button">
         <Setter Property="FontSize" Value="22" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Accent}, Dark={StaticResource AccentDark}}" />
     </Style>
 
     <!--  Skip back and forward: flat, but wide enough for "↺10".  -->
