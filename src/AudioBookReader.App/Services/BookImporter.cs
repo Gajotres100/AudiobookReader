@@ -28,7 +28,6 @@ public class BookImporter(
 
     public bool IsEbook(string fileName) => extractors.CanHandle(fileName);
 
-    /// <summary>Imports an audiobook as a new book, or attaches it to <paramref name="attachTo"/>.</summary>
     /// <summary>
     /// Imports an audiobook, leaving the file where the user keeps it when the system allows.
     ///
@@ -143,7 +142,6 @@ public class BookImporter(
         return book;
     }
 
-    /// <summary>Imports an ebook as a new book, or attaches it to <paramref name="attachTo"/>.</summary>
     /// <summary>
     /// Imports an ebook, always copying it in.
     ///
@@ -179,7 +177,8 @@ public class BookImporter(
                 extracted.Text.PlainText.Length,
                 extracted.Chapters,
                 extracted.Text.Title,
-                extracted.Text.Author);
+                extracted.Text.Author,
+                TextLanguage.Detect(extracted.Text.PlainText));
 
             return attachTo is { } bookId
                 ? await library.AttachTextAsync(bookId, attachment)
@@ -210,10 +209,39 @@ public class BookImporter(
     public async Task<Book> RemoveAudioAsync(int bookId, CancellationToken ct = default)
     {
         var before = await database.GetBookAsync(bookId);
-        var book = await library.DetachAudioAsync(bookId);
+
+        // The ebook's own chapters, read back before the audio's are discarded.
+        //
+        // Without them the book loses every chapter it had. Chapters belong to the audio while it
+        // is present, so they carry no text range until alignment has filled one in — and stripping
+        // the audio ranges from chapters that have no text ranges leaves nothing at all. Removing an
+        // audiobook from a pairing that was never aligned would empty a forty-chapter ebook, and
+        // there is no way back: the ebook cannot be removed and re-added, because by then it is the
+        // only medium left.
+        var fromText = await ChaptersFromTextAsync(before, ct);
+
+        var book = await library.DetachAudioAsync(bookId, fromText);
 
         if (before?.AudioPath is { } path) await DeleteIfUnusedAsync(path);
         return book;
+    }
+
+    /// <summary>The ebook's chapters, or null when there is no readable ebook to ask.</summary>
+    private async Task<IReadOnlyList<Chapter>?> ChaptersFromTextAsync(Book? book, CancellationToken ct)
+    {
+        if (book?.EbookPath is not { } path) return null;
+
+        try
+        {
+            var extracted = await extractors.ExtractAsync(path, ct);
+            return extracted.Chapters.Count > 0 ? extracted.Chapters : null;
+        }
+        catch (Exception ex)
+        {
+            // Better to fall back to the old behaviour than to refuse the removal outright.
+            AppLog.Error("reading the ebook's chapters while removing the audio", ex);
+            return null;
+        }
     }
 
     public async Task<Book> RemoveEbookAsync(int bookId, CancellationToken ct = default)

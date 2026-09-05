@@ -70,6 +70,15 @@ public class Book
     /// </summary>
     public bool MeasureWhileReading { get; set; }
 
+    /// <summary>
+    /// The language of the text, as a code recognition understands, or null when it is not clear.
+    ///
+    /// Detected once at import, where the text is already in memory, and kept because every probe
+    /// would otherwise pay for the recognizer to work it out again — six hundred times for a
+    /// ten-hour book, to answer a question the book itself settles.
+    /// </summary>
+    public string? Language { get; set; }
+
     public DateTime AddedUtc { get; set; }
     public DateTime? LastOpenedUtc { get; set; }
 

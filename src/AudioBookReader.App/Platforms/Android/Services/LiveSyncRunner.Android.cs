@@ -13,7 +13,10 @@ public partial class LiveSyncRunner
     /// their behalf — the whole-book alignment asks for the model in a place where the user has
     /// clearly chosen to wait for it.
     /// </summary>
-    private partial async Task<ITranscriber?> CreateTranscriberAsync(CpuBudget budget, CancellationToken ct)
+    private partial async Task<ITranscriber?> CreateTranscriberAsync(
+        CpuBudget budget,
+        string? language,
+        CancellationToken ct)
     {
         var services = IPlatformApplication.Current?.Services;
         var models = services?.GetService<WhisperModelStore>();
@@ -21,7 +24,8 @@ public partial class LiveSyncRunner
         var model = WhisperModelStore.Tiny;
         if (models is null || !models.IsDownloaded(model)) return null;
 
-        return await Task.Run(() => WhisperTranscriber.Create(models.PathFor(model), budget), ct);
+        return await Task.Run(
+            () => WhisperTranscriber.Create(models.PathFor(model), budget, language ?? "auto"), ct);
     }
 
     /// <summary>

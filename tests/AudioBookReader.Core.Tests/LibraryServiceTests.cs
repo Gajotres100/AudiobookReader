@@ -21,6 +21,84 @@ public class LibraryServiceTests : IAsyncLifetime, IDisposable
 
     public Task DisposeAsync() => _database.CloseAsync();
 
+    /// <summary>
+    /// The case the production caller actually hits: a pairing that was never aligned.
+    ///
+    /// Chapters belong to the audio while it is present, so they carry no text range until
+    /// alignment has filled one in. Stripping the audio ranges from chapters that have no text
+    /// ranges leaves nothing at all, and there is no way back — the ebook cannot be removed and
+    /// re-added, because by then it is the only medium left. The existing tests all passed because
+    /// they exercised the overload that is handed replacements; nothing covered the one-argument
+    /// call every screen makes.
+    /// </summary>
+    [Fact]
+    public async Task RemovingUnalignedAudioKeepsTheChaptersWhenGivenTheEbooksOwn()
+    {
+        var book = await _service.CreateFromAudioAsync(
+            new AudioAttachment("book.m4b", "audio-hash", 600_000, AudioChapters(42)));
+
+        await _service.AttachTextAsync(book.Id,
+            new TextAttachment("book.epub", "text-hash", 50_000, TextChapters(42)));
+
+        // Nothing has been aligned, so not one chapter has a text range.
+        var paired = await _database.GetChaptersAsync(book.Id);
+        Assert.Equal(42, paired.Count);
+        Assert.All(paired, c => Assert.False(c.HasTextRange));
+
+        await _service.DetachAudioAsync(book.Id, TextChapters(42));
+
+        var after = await _database.GetChaptersAsync(book.Id);
+        Assert.Equal(42, after.Count);
+        Assert.All(after, c => Assert.True(c.HasTextRange));
+    }
+
+    /// <summary>Without replacements there is nothing to keep, which is why the caller must supply them.</summary>
+    [Fact]
+    public async Task RemovingUnalignedAudioWithNothingToPutInItsPlaceEmptiesTheChapters()
+    {
+        var book = await _service.CreateFromAudioAsync(
+            new AudioAttachment("book.m4b", "audio-hash", 600_000, AudioChapters(42)));
+
+        await _service.AttachTextAsync(book.Id,
+            new TextAttachment("book.epub", "text-hash", 50_000, TextChapters(42)));
+
+        await _service.DetachAudioAsync(book.Id);
+
+        Assert.Empty(await _database.GetChaptersAsync(book.Id));
+    }
+
+    /// <summary>
+    /// The two writers must not lose each other's coordinate.
+    ///
+    /// The player saves the listening position every few seconds while the reader saves the reading
+    /// position on every sentence. Read-then-write left two awaits between reading a row and writing
+    /// it back, so each routinely overwrote the other with the value it had read a moment earlier —
+    /// a reading position that jumps backwards, which reads as the app forgetting where you were.
+    /// </summary>
+    [Fact]
+    public async Task ConcurrentPositionSavesKeepBothCoordinates()
+    {
+        var book = await _service.CreateFromAudioAsync(
+            new AudioAttachment("book.m4b", "audio-hash", 600_000, AudioChapters(2)));
+
+        await _service.AttachTextAsync(book.Id,
+            new TextAttachment("book.epub", "text-hash", 50_000, TextChapters(2)));
+
+        await _database.SaveReadingStateAsync(book.Id, audioPositionMs: 100_000, textOffset: 5_000);
+
+        // Interleaved the way the ticker and the follow loop actually interleave.
+        await Task.WhenAll(
+            Enumerable.Range(1, 40).Select(i => _database.SaveReadingStateAsync(book.Id, audioPositionMs: 100_000 + i * 1_000))
+                .Concat(Enumerable.Range(1, 40).Select(i => _database.SaveReadingStateAsync(book.Id, textOffset: 5_000 + i * 100))));
+
+        var state = await _database.GetReadingStateAsync(book.Id);
+        Assert.NotNull(state);
+
+        // Neither writer may have pushed the other back to where it started.
+        Assert.True(state.AudioPositionMs > 100_000, $"listening position fell back to {state.AudioPositionMs}");
+        Assert.True(state.TextOffset > 5_000, $"reading position fell back to {state.TextOffset}");
+    }
+
     public void Dispose()
     {
         // Cleanup only; a lingering file handle should not fail a test that otherwise passed.

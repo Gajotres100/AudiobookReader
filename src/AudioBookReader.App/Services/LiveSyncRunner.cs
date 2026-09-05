@@ -127,7 +127,7 @@ public partial class LiveSyncRunner(
             var book = await database.GetBookAsync(bookId);
             if (book?.IsPaired != true) return;
 
-            var transcriber = await CreateTranscriberAsync(settings.Budget, ct);
+            var transcriber = await CreateTranscriberAsync(settings.Budget, book.Language, ct);
             if (transcriber is null)
             {
                 Report("Model za prepoznavanje još nije preuzet.");
@@ -183,7 +183,10 @@ public partial class LiveSyncRunner(
         MainThread.BeginInvokeOnMainThread(() => Progress?.Invoke(this, message));
 
     /// <summary>Builds the recognizer, or null when the model is not on the device yet.</summary>
-    private partial Task<ITranscriber?> CreateTranscriberAsync(CpuBudget budget, CancellationToken ct);
+    private partial Task<ITranscriber?> CreateTranscriberAsync(
+        CpuBudget budget,
+        string? language,
+        CancellationToken ct);
 
     private partial IWorkThrottle CreateThrottle(CpuBudget budget);
 

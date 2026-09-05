@@ -88,7 +88,12 @@ public class AlignmentService : Service
 
             var chapterCount = (await database.GetChaptersAsync(bookId)).Count;
 
-            await using var transcriber = WhisperTranscriber.Create(modelPath, budget);
+            // Named rather than detected: the book already told us at import, and leaving it to
+            // the recognizer costs an extra pass over every single probe.
+            var book = await database.GetBookAsync(bookId);
+
+            await using var transcriber = WhisperTranscriber.Create(
+                modelPath, budget, book?.Language ?? "auto");
 
             // Layered deliberately: the duty cycle paces the work, thermal readings can lower it,
             // and the gate holds everything back while the user's conditions are unmet.

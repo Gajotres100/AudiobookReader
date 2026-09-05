@@ -47,7 +47,11 @@ public class LibraryDatabase
     // ---- Books ----
 
     public async Task<List<Book>> GetBooksAsync() =>
-        await (await ReadyAsync()).Table<Book>().OrderByDescending(b => b.LastOpenedUtc).ToListAsync();
+        // By when the book was last opened, falling back to when it arrived. LastOpenedUtc alone
+        // sorted by a column nothing ever wrote, so every row was null and the list came back oldest
+        // first — a freshly imported book appeared at the bottom, below titles from a year ago.
+        await (await ReadyAsync()).QueryAsync<Book>(
+            "select * from books order by coalesce(LastOpenedUtc, AddedUtc) desc");
 
     public async Task<Book?> GetBookAsync(int id) =>
         await (await ReadyAsync()).Table<Book>().Where(b => b.Id == id).FirstOrDefaultAsync();
@@ -139,13 +143,35 @@ public class LibraryDatabase
     /// </summary>
     public async Task SaveReadingStateAsync(int bookId, long? audioPositionMs = null, int? textOffset = null, float? speed = null)
     {
-        var state = await GetReadingStateAsync(bookId) ?? new ReadingState { BookId = bookId };
+        var db = await ReadyAsync();
 
-        if (audioPositionMs is not null) state.AudioPositionMs = audioPositionMs;
-        if (textOffset is not null) state.TextOffset = textOffset;
-        if (speed is not null) state.Speed = speed.Value;
-        state.UpdatedUtc = DateTime.UtcNow;
+        // One statement, so the two writers cannot lose each other's work.
+        //
+        // Reading the row and writing it back looks equivalent and is not: the player saves the
+        // listening position every few seconds while the reader saves the reading position on every
+        // sentence, and with two awaits between the read and the write each routinely overwrites
+        // the other's coordinate with the stale value it read a moment earlier. The symptom is a
+        // reading position that occasionally jumps backwards — indistinguishable, to the user, from
+        // the app forgetting where they were. coalesce keeps whichever coordinate is not being
+        // written, inside the statement, where nothing can interleave.
+        var updated = await db.ExecuteAsync(
+            @"update reading_state
+                 set AudioPositionMs = coalesce(?, AudioPositionMs),
+                     TextOffset      = coalesce(?, TextOffset),
+                     Speed           = coalesce(?, Speed),
+                     UpdatedUtc      = ?
+               where BookId = ?",
+            audioPositionMs, textOffset, speed, DateTime.UtcNow, bookId);
 
-        await (await ReadyAsync()).InsertOrReplaceAsync(state);
+        if (updated > 0) return;
+
+        await db.InsertOrReplaceAsync(new ReadingState
+        {
+            BookId = bookId,
+            AudioPositionMs = audioPositionMs,
+            TextOffset = textOffset,
+            Speed = speed ?? 1f,
+            UpdatedUtc = DateTime.UtcNow,
+        });
     }
 }

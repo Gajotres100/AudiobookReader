@@ -14,13 +14,18 @@ public record AudioAttachment(
     string? CoverPath = null);
 
 /// <summary>An ebook ready to be attached to a library entry.</summary>
+/// <param name="Language">
+/// Code recognition understands, or null when the text does not say clearly. Detected at import,
+/// where the text is already in hand, so that no probe ever pays to have it worked out again.
+/// </param>
 public record TextAttachment(
     string Path,
     string Hash,
     int TextLength,
     IReadOnlyList<Chapter> Chapters,
     string? Title = null,
-    string? Author = null);
+    string? Author = null,
+    string? Language = null);
 
 /// <summary>
 /// Owns how a book's two media go together.
@@ -88,6 +93,7 @@ public class LibraryService(LibraryDatabase database, SyncMapStore syncMaps)
         book.EbookPath = text.Path;
         book.EbookHash = text.Hash;
         book.TextLength = text.TextLength;
+        book.Language = text.Language;
         if (string.IsNullOrWhiteSpace(book.Title)) book.Title = text.Title ?? book.Title;
         book.Author ??= text.Author;
 

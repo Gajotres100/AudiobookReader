@@ -12,9 +12,66 @@ public class PlainTextExtractor : IBookTextExtractor
     public bool CanHandle(string path) =>
         Path.GetExtension(path).Equals(".txt", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Reads the file as text, refusing to guess quietly.
+    ///
+    /// The default is UTF-8 with a replacement fallback, which never fails and is exactly the
+    /// problem: a Croatian text file saved in Windows-1250 has every c, c, z, s and d turned into a
+    /// replacement character, the import reports success because the text is not empty, and
+    /// alignment then cannot match a single word carrying one. Decoding strictly and falling back
+    /// to the legacy code page turns a book that looked imported into a book that reads.
+    /// </summary>
+    private static async Task<string> ReadTextAsync(string path, CancellationToken ct)
+    {
+        var bytes = await File.ReadAllBytesAsync(path, ct);
+
+        // A byte-order mark settles it outright, whatever the encoding is.
+        if (HasByteOrderMark(bytes)) return DecodeWithDetectedMark(bytes);
+
+        try
+        {
+            return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
+                .GetString(bytes);
+        }
+        catch (DecoderFallbackException)
+        {
+            // Not UTF-8. Central European is the likeliest alternative for the languages this app
+            // is used in, and it decodes every byte, so this cannot fail in turn.
+            return LegacyEncoding().GetString(bytes);
+        }
+    }
+
+    private static bool HasByteOrderMark(byte[] bytes) =>
+        bytes.Length >= 2 &&
+        ((bytes[0] == 0xFF && bytes[1] == 0xFE) ||
+         (bytes[0] == 0xFE && bytes[1] == 0xFF) ||
+         (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF));
+
+    private static string DecodeWithDetectedMark(byte[] bytes)
+    {
+        if (bytes[0] == 0xFF && bytes[1] == 0xFE) return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
+        if (bytes[0] == 0xFE && bytes[1] == 0xFF) return Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2);
+
+        return Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
+    }
+
+    /// <summary>Windows-1250 where the platform has it, Latin-1 where it does not.</summary>
+    private static Encoding LegacyEncoding()
+    {
+        try
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            return Encoding.GetEncoding(1250);
+        }
+        catch (Exception)
+        {
+            return Encoding.Latin1;
+        }
+    }
+
     public async Task<ExtractedBook> ExtractAsync(string path, CancellationToken ct = default)
     {
-        var raw = await File.ReadAllTextAsync(path, ct);
+        var raw = await ReadTextAsync(path, ct);
         var (plainText, paragraphs) = Normalize(raw);
 
         var sentences = SentenceSplitter.Split(plainText)
