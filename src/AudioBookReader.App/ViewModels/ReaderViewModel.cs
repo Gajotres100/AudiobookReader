@@ -461,6 +461,8 @@ public partial class ReaderViewModel(
                 // otherwise collect a handler per visit, each one keeping a dead page alive.
                 liveSync.Progress -= OnLiveSyncProgress;
                 liveSync.Progress += OnLiveSyncProgress;
+                liveSync.Failed -= OnLiveSyncFailed;
+                liveSync.Failed += OnLiveSyncFailed;
 
                 await liveSync.StartAsync(BookId);
             }
@@ -833,11 +835,20 @@ public partial class ReaderViewModel(
         if (_sync is null || !CanFollow) FollowStatus = message;
     }
 
+    /// <summary>
+    /// Shown whatever else is on the status line.
+    ///
+    /// Progress is hidden once the text is moving, and that is right — but a failure hidden the same
+    /// way is how following came to stop after half a page with nothing on screen saying so.
+    /// </summary>
+    private void OnLiveSyncFailed(object? sender, string message) => FollowStatus = message;
+
     public void Dispose()
     {
         _ticker?.Stop();
 
         liveSync.Progress -= OnLiveSyncProgress;
+        liveSync.Failed -= OnLiveSyncFailed;
         _ = liveSync.StopAsync();
     }
 

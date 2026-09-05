@@ -41,6 +41,16 @@ public partial class LiveSyncRunner(
     /// <summary>Says what it is doing, for the reader's own status line rather than a notification.</summary>
     public event EventHandler<string>? Progress;
 
+    /// <summary>
+    /// Raised when following has given up.
+    ///
+    /// Separate from <see cref="Progress"/> because the reader deliberately hides progress once the
+    /// text is moving — it would sit on top of the page the user is reading. A failure is the one
+    /// message that must get through anyway: the symptom of losing this silently is text that
+    /// follows for half a page and then stops, with nothing on screen to say why.
+    /// </summary>
+    public event EventHandler<string>? Failed;
+
     public bool IsRunning => _running is { IsCompleted: false };
 
     /// <summary>
@@ -120,18 +130,43 @@ public partial class LiveSyncRunner(
         }
     }
 
+    /// <summary>
+    /// How many times a failed run is begun again before following gives up for this reading.
+    ///
+    /// Recognition reaches a hardware decoder and a native model, and either can fail once for
+    /// reasons that have gone by the next attempt. Dying on the first of those left the reader with
+    /// a map frozen wherever it had reached, which reads as the feature quietly not working.
+    /// </summary>
+    private const int Attempts = 3;
+
     private async Task RunAsync(int bookId, CancellationToken ct)
+    {
+        for (var attempt = 1; attempt <= Attempts; attempt++)
+        {
+            if (await RunOnceAsync(bookId, attempt, ct)) return;
+
+            ct.ThrowIfCancellationRequested();
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        }
+
+        Report("Sync on the fly je stao — zatvori i otvori čitač da pokušam ponovo.");
+        Fail("Sync on the fly je stao — zatvori i otvori čitač da pokušam ponovo.");
+    }
+
+    /// <returns>True when the run finished on its own terms rather than failing.</returns>
+    private async Task<bool> RunOnceAsync(int bookId, int attempt, CancellationToken ct)
     {
         try
         {
             var book = await database.GetBookAsync(bookId);
-            if (book?.IsPaired != true) return;
+            if (book?.IsPaired != true) return true;
 
             var transcriber = await CreateTranscriberAsync(settings.Budget, book.Language, ct);
             if (transcriber is null)
             {
                 Report("Model za prepoznavanje još nije preuzet.");
-                return;
+                Fail("Model za prepoznavanje još nije preuzet — pokreni poravnanje sa stranice knjige.");
+                return true;
             }
 
             await using (transcriber as IAsyncDisposable ?? new NoDisposal())
@@ -167,17 +202,24 @@ public partial class LiveSyncRunner(
                     progress,
                     ct);
             }
+
+            // RunAsync only leaves by cancellation, so reaching here at all is unexpected.
+            return true;
         }
         catch (OperationCanceledException)
         {
             // Closing the reader is how this ends.
+            return true;
         }
         catch (Exception ex)
         {
-            AppLog.Error("sync on the fly", ex);
-            Report("Sync on the fly je stao.");
+            AppLog.Error($"sync on the fly (attempt {attempt} of {Attempts})", ex);
+            return false;
         }
     }
+
+    private void Fail(string message) =>
+        MainThread.BeginInvokeOnMainThread(() => Failed?.Invoke(this, message));
 
     private void Report(string message) =>
         MainThread.BeginInvokeOnMainThread(() => Progress?.Invoke(this, message));

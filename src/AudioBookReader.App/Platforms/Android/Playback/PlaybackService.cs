@@ -59,6 +59,8 @@ public class PlaybackService : MediaSessionService
         _sleepTimer = new SleepTimer(_player);
 
         Current = this;
+
+        PublishState();
     }
 
     public override MediaSession? OnGetSession(MediaSession.ControllerInfo? controllerInfo) => _session;
@@ -73,21 +75,75 @@ public class PlaybackService : MediaSessionService
         base.OnTaskRemoved(rootIntent);
     }
 
+    // ---- State, readable from any thread ----
+
+    /// <summary>
+    /// ExoPlayer may only be touched from the thread that built it — every getter included, and it
+    /// throws rather than tolerating it. So the state is copied onto plain fields on that thread and
+    /// everyone else reads the copy.
+    ///
+    /// This is not a nicety. Sync on the fly asks where playback is from a pool thread on every
+    /// window; reading the player directly threw <c>IllegalStateException</c> on the first such
+    /// question after a book was loaded, which killed the whole run. The reader kept following the
+    /// handful of anchors already written and then simply stopped — no error the user could see,
+    /// just text that stops moving after half a page.
+    /// </summary>
+    private readonly Handler _playerThread = new(Looper.MainLooper!);
+
+    private long _statePositionMs;
+    private long _stateDurationMs;
+    private volatile bool _stateIsPlaying;
+    private volatile float _stateSpeed = 1f;
+
+    private static bool OnPlayerThread => Looper.MyLooper() == Looper.MainLooper;
+
+    /// <summary>Copies the player's state out, and schedules the next copy. Player thread only.</summary>
+    private void PublishState()
+    {
+        if (_player is null) return;
+
+        Interlocked.Exchange(ref _statePositionMs, _player.CurrentPosition);
+        Interlocked.Exchange(ref _stateDurationMs, _player.Duration is var d && d > 0 ? d : 0);
+        _stateIsPlaying = _player.IsPlaying;
+        _stateSpeed = _player.PlaybackParameters?.Speed ?? 1f;
+
+        // Five times a second: fast enough that a scrubber does not visibly lag and that alignment
+        // never works from a stale playhead, cheap enough to leave running while a book plays.
+        _playerThread.PostDelayed(PublishState, 200);
+    }
+
+    /// <summary>Runs a player call on the player's own thread, immediately when already there.</summary>
+    private void OnPlayer(Action work)
+    {
+        if (OnPlayerThread) work();
+        else _playerThread.Post(work);
+    }
+
     // ---- Transport ----
 
-    public bool IsPlaying => _player?.IsPlaying ?? false;
+    public bool IsPlaying => OnPlayerThread ? _player?.IsPlaying ?? false : _stateIsPlaying;
 
-    public long PositionMs => _player?.CurrentPosition ?? 0;
+    public long PositionMs =>
+        OnPlayerThread ? _player?.CurrentPosition ?? 0 : Interlocked.Read(ref _statePositionMs);
 
     /// <summary>Track length, or 0 before anything is loaded. Media3 reports an unset duration as a sentinel.</summary>
-    public long DurationMs => _player?.Duration is { } duration && duration > 0 ? duration : 0;
+    public long DurationMs =>
+        OnPlayerThread
+            ? _player?.Duration is { } duration && duration > 0 ? duration : 0
+            : Interlocked.Read(ref _stateDurationMs);
 
-    public float Speed => _player?.PlaybackParameters?.Speed ?? 1f;
+    public float Speed => OnPlayerThread ? _player?.PlaybackParameters?.Speed ?? 1f : _stateSpeed;
 
     public string? LoadedPath { get; private set; }
 
     public void Load(string audioPath, long startMs, float speed)
     {
+        if (!OnPlayerThread)
+        {
+            _playerThread.Post(() => Load(audioPath, startMs, speed));
+            return;
+        }
+
         if (_player is null) return;
 
         if (LoadedPath != audioPath)
@@ -107,23 +163,23 @@ public class PlaybackService : MediaSessionService
         _player.SeekTo(startMs);
     }
 
-    public void Play() => _player?.Play();
+    public void Play() => OnPlayer(() => _player?.Play());
 
-    public void Pause() => _player?.Pause();
+    public void Pause() => OnPlayer(() => _player?.Pause());
 
-    public void SeekTo(long positionMs) =>
-        _player?.SeekTo(Math.Clamp(positionMs, 0, DurationMs > 0 ? DurationMs : long.MaxValue));
+    public void SeekTo(long positionMs) => OnPlayer(() =>
+        _player?.SeekTo(Math.Clamp(positionMs, 0, DurationMs > 0 ? DurationMs : long.MaxValue)));
 
     /// <summary>Jumps forward or back, clamped to the track. Used by the ±10 second controls.</summary>
-    public void Nudge(long deltaMs) => SeekTo(PositionMs + deltaMs);
+    public void Nudge(long deltaMs) => OnPlayer(() => SeekTo(PositionMs + deltaMs));
 
-    public void SetSpeed(float speed)
+    public void SetSpeed(float speed) => OnPlayer(() =>
     {
         if (_player is null) return;
 
         // Pitch held at 1 regardless of speed, so the narrator still sounds like themselves.
         _player.PlaybackParameters = new PlaybackParameters(Math.Clamp(speed, 0.5f, 2f), 1f);
-    }
+    });
 
     // ---- Sleep timer ----
 
@@ -140,6 +196,10 @@ public class PlaybackService : MediaSessionService
     public override void OnDestroy()
     {
         _sleepTimer?.Cancel();
+
+        // Stops the state pump, and any transport call still queued behind it — both would reach a
+        // released player otherwise.
+        _playerThread.RemoveCallbacksAndMessages(null);
 
         _session?.Release();
         _session = null;
