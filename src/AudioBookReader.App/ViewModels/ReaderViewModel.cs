@@ -55,7 +55,14 @@ public partial class ReaderViewModel(
         ? "Tekst će pratiti naraciju kad poravnanje završi. Pokreni ga na stranici knjige."
         : "Dodaj i audioknjigu i e-knjigu za isti naslov pa će tekst moći pratiti naraciju.";
 
-    public bool ShowFollowHint => !CanFollow && !IsBusy;
+    /// <summary>
+    /// The general hint, shown only when nothing more specific is being said.
+    ///
+    /// The two share a place on screen, and live sync sets a status precisely when following is not
+    /// yet possible — so without this they were drawn on top of each other, both on the same dark
+    /// background, in the most common state of a book that has not caught up yet.
+    /// </summary>
+    public bool ShowFollowHint => !CanFollow && !IsBusy && !HasFollowStatus;
 
     /// <summary>
     /// Why the highlight is standing still even though this book has a sync map.
@@ -66,6 +73,7 @@ public partial class ReaderViewModel(
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasFollowStatus))]
+    [NotifyPropertyChangedFor(nameof(ShowFollowHint))]
     public partial string FollowStatus { get; set; } = "";
 
     public bool HasFollowStatus => FollowStatus.Length > 0;
@@ -449,8 +457,12 @@ public partial class ReaderViewModel(
             // reader's lifetime: started here, stopped when the page goes away.
             if (_book.IsPaired && MeasuresWhileReading)
             {
+                // Removed first: LoadAsync runs again on every reappearance, and a singleton would
+                // otherwise collect a handler per visit, each one keeping a dead page alive.
+                liveSync.Progress -= OnLiveSyncProgress;
                 liveSync.Progress += OnLiveSyncProgress;
-                liveSync.Start(BookId);
+
+                await liveSync.StartAsync(BookId);
             }
 
             await ShowStartingDocumentAsync();
@@ -657,6 +669,15 @@ public partial class ReaderViewModel(
 
     private void StartTicking()
     {
+        // The page reloads on every appearance, so without this each visit would leave another
+        // timer running against the same view model — each holding the book's whole text alive and
+        // calling Follow five times a second on behalf of a page that is gone.
+        if (_ticker is not null)
+        {
+            _ticker.Start();
+            return;
+        }
+
         _ticker = Application.Current?.Dispatcher.CreateTimer();
         if (_ticker is null) return;
 
@@ -687,12 +708,16 @@ public partial class ReaderViewModel(
         // and while following, the map grows under us continuously, so keep looking regardless.
         if (_sync is null || MeasuresWhileReading) MaybeRefreshSyncMap();
 
-        if (!IsFollowing || _sync is null || !playback.IsPlaying)
+        // Playback outlives pages and can be on a different book entirely. Following it then would
+        // walk this book's text to another book's playhead.
+        var playingThisBook = playback.BookId == BookId;
+
+        if (!IsFollowing || _sync is null || !playback.IsPlaying || !playingThisBook)
         {
             if (DateTime.UtcNow - _lastMiss > TimeSpan.FromSeconds(10))
             {
                 _lastMiss = DateTime.UtcNow;
-                AppLog.Info(
+                AppLog.Detail(() =>
                     $"follow idle: following={IsFollowing}, sync={_sync is not null}, playing={playback.IsPlaying}, " +
                     $"playbackBook={playback.BookId}, thisBook={BookId}");
             }
@@ -720,7 +745,7 @@ public partial class ReaderViewModel(
             {
                 _lastMiss = DateTime.UtcNow;
 
-                AppLog.Info(
+                AppLog.Detail(() =>
                     $"follow: no sentence at {at} ms — chapter {chapter?.Index}, " +
                     $"aligned={(chapter is null ? "?" : _sync.IsAligned(chapter.Index).ToString())}");
             }
@@ -735,9 +760,8 @@ public partial class ReaderViewModel(
         if (DateTime.UtcNow - _lastTrace > TimeSpan.FromSeconds(10))
         {
             _lastTrace = DateTime.UtcNow;
-            AppLog.Info(
-                $"follow: {at} ms -> char {_sync.CharOffsetAt(at)} -> sentence {sentence.Index} " +
-                $"(doc {sentence.SpineIndex}, showing {SpineIndex})");
+            AppLog.Detail(() =>
+                $"follow: {at} ms -> sentence {sentence.Index} (doc {sentence.SpineIndex}, showing {SpineIndex})");
         }
 
         var previousDocument = SpineIndex;
@@ -814,7 +838,7 @@ public partial class ReaderViewModel(
         _ticker?.Stop();
 
         liveSync.Progress -= OnLiveSyncProgress;
-        liveSync.Stop();
+        _ = liveSync.StopAsync();
     }
 
     /// <summary>
@@ -838,9 +862,9 @@ public partial class ReaderViewModel(
             <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
             <style>
               html, body { height: 100%; margin: 0; overflow: hidden; }
-              body { font-family: FONTFAMILY; font-size: FONTSIZEpx; line-height: 1.65;
-                     letter-spacing: LETTERSPACING;
-                     color: FOREGROUND; background: BACKGROUND;
+              body { font-family: {{FONTFAMILY}}; font-size: {{FONTSIZE}}px; line-height: 1.65;
+                     letter-spacing: {{LETTERSPACING}};
+                     color: {{FOREGROUND}}; background: {{BACKGROUND}};
                      -webkit-user-select: none; user-select: none; }
               #size {
                 position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -866,9 +890,9 @@ public partial class ReaderViewModel(
               p { margin: 0 0 0.85em; }
               h1, h2, h3 { margin: 0 0 0.6em; }
               span[data-idx] { transition: background-color 120ms linear; }
-              span.hl { background: HIGHLIGHT; border-radius: 3px; }
+              span.hl { background: {{HIGHLIGHT}}; border-radius: 3px; }
             </style>
-            <style id="hlrule">span.hl { background: HIGHLIGHT; border-radius: 3px; }</style>
+            <style id="hlrule">span.hl { background: {{HIGHLIGHT}}; border-radius: 3px; }</style>
             </head><body>
             <div id="size"></div>
             <div id="content">
@@ -1118,11 +1142,11 @@ public partial class ReaderViewModel(
             """);
 
         return page.ToString()
-            .Replace("FONTSIZE", FontSize.ToString())
-            .Replace("FONTFAMILY", Font.Css)
-            .Replace("LETTERSPACING", LetterSpacing)
-            .Replace("BACKGROUND", Theme.Background)
-            .Replace("FOREGROUND", Theme.Foreground)
-            .Replace("HIGHLIGHT", Theme.Highlight);
+            .Replace("{{FONTSIZE}}", FontSize.ToString())
+            .Replace("{{FONTFAMILY}}", Font.Css)
+            .Replace("{{LETTERSPACING}}", LetterSpacing)
+            .Replace("{{BACKGROUND}}", Theme.Background)
+            .Replace("{{FOREGROUND}}", Theme.Foreground)
+            .Replace("{{HIGHLIGHT}}", Theme.Highlight);
     }
 }

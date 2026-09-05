@@ -32,19 +32,51 @@ public partial class LiveSyncRunner(
 
     public bool IsRunning => _running is { IsCompleted: false };
 
-    public void Start(int bookId)
+    /// <summary>
+    /// Begins following, after making sure the previous run has actually finished.
+    ///
+    /// Waiting matters: a run can be sitting inside a fifteen-second recognition when it is
+    /// cancelled, and a reader reopened in that window would otherwise start a second one. Two runs
+    /// means two whisper models loaded at once, two hardware decoders, and both writing the same
+    /// sync map — the later save silently discarding the earlier one's work.
+    /// </summary>
+    public async Task StartAsync(int bookId)
     {
-        if (IsRunning) return;
+        await StopAsync();
 
         _cancellation = new CancellationTokenSource();
-        _running = RunAsync(bookId, _cancellation.Token);
+
+        // Task.Run for the same reason the whole-book run needs it: this is called from the
+        // reader's OnAppearing, on the UI thread, and every await after it would otherwise come
+        // back there — putting recognition and matching on the thread drawing the page.
+        _running = Task.Run(() => RunAsync(bookId, _cancellation.Token));
     }
 
-    public void Stop()
+    /// <summary>Cancels the run and waits for it to leave, so nothing overlaps the next one.</summary>
+    public async Task StopAsync()
     {
-        _cancellation?.Cancel();
+        var cancellation = _cancellation;
+        var running = _running;
+
         _cancellation = null;
         _running = null;
+
+        if (cancellation is null) return;
+
+        await cancellation.CancelAsync();
+
+        try
+        {
+            if (running is not null) await running;
+        }
+        catch (Exception)
+        {
+            // RunAsync reports its own failures; this await only exists to know it has stopped.
+        }
+        finally
+        {
+            cancellation.Dispose();
+        }
     }
 
     private async Task RunAsync(int bookId, CancellationToken ct)

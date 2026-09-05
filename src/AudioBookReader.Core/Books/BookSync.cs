@@ -13,8 +13,16 @@ public class BookSync(BookText text, SyncMap map, IReadOnlyList<Chapter> chapter
 {
     public BookText Text => text;
 
-    /// <summary>True when this chapter has been aligned and the reader can follow along in it.</summary>
-    public bool IsAligned(int chapterIndex) => map.ForChapter(chapterIndex) is { IsEmpty: false };
+    /// <summary>
+    /// True when this chapter holds something actually heard, not merely visited.
+    ///
+    /// Every chapter map is seeded with two low-confidence guesses at the chapter boundaries, so
+    /// "not empty" is true even when no probe matched a single word. Treating that as aligned told
+    /// the reader to follow a straight line drawn between two guesses, and told the library the
+    /// book was finished.
+    /// </summary>
+    public bool IsAligned(int chapterIndex) =>
+        map.ForChapter(chapterIndex)?.HasMeasurement(ChapterSyncMap.BoundaryConfidence) == true;
 
     public Chapter? ChapterAt(long audioMs) =>
         chapters.FirstOrDefault(c => c.HasAudioRange && audioMs >= c.StartMs && audioMs < c.EndMs)
@@ -29,6 +37,11 @@ public class BookSync(BookText text, SyncMap map, IReadOnlyList<Chapter> chapter
     {
         if (ChapterAt(audioMs) is not { } chapter) return null;
         if (map.ForChapter(chapter.Index) is not { } chapterMap) return null;
+
+        // Outside the anchored range the map clamps, and a clamped answer here freezes the
+        // highlight on one sentence while reporting that all is well, so the reader never learns
+        // that this part of the book has simply not been measured yet.
+        if (!chapterMap.Covers(audioMs)) return null;
 
         return chapterMap.TryGetCharOffset(audioMs, out var offset) ? offset : null;
     }

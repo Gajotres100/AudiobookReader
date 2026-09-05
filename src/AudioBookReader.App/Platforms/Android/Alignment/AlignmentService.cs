@@ -53,7 +53,11 @@ public class AlignmentService : Service
         // Only the whole-book run lives here. Sync on the fly runs in the app itself, because it
         // only ever works while the reader is on screen and so needs neither a service nor the
         // notification a service is obliged to post.
-        _ = RunAsync(bookId, _cancellation.Token);
+        //
+        // Started through Task.Run because Android calls OnStartCommand on the main looper, and
+        // nothing downstream configures its awaits. Without this, every continuation in the whole
+        // alignment pipeline resumes on the UI thread — recognition included.
+        _ = Task.Run(() => RunAsync(bookId, _cancellation.Token));
 
         // Not sticky: a book half-aligned when the process died should resume because the user
         // asked again, not because Android silently restarted the service with a stale intent.

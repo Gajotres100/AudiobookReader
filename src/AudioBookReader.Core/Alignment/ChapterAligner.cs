@@ -32,6 +32,10 @@ public class ChapterAligner(
     private readonly AlignmentSettings _settings = settings ?? new AlignmentSettings();
     private readonly IWorkThrottle _throttle = throttle ?? NoThrottle.Instance;
 
+    /// <summary>Bounds on a believable narration rate, set from the chapter's own proportions.</summary>
+    private double _floor;
+    private double _ceiling;
+
     public async Task<ChapterSyncMap> AlignAsync(
         ChapterAlignmentRequest request,
         IProgress<AlignmentProgress>? progress = null,
@@ -49,6 +53,8 @@ public class ChapterAligner(
         anchors.Add(new Anchor(request.AudioEndMs, request.TextEnd, _settings.BoundaryConfidence));
 
         var charsPerMs = EstimateInitialRate(request);
+        _floor = charsPerMs / 5;
+        _ceiling = charsPerMs * 5;
         Anchor? lastAccepted = null;
         var matches = 0;
 
@@ -201,6 +207,13 @@ public class ChapterAligner(
         var observed = (accepted.CharOffset - from.CharOffset) / (double)elapsed;
         if (observed <= 0) return current;
 
-        return current * (1 - _settings.RateSmoothing) + observed * _settings.RateSmoothing;
+        // Bounded, not merely smoothed. After a miss the search widens to twelve thousand tokens,
+        // and a confident-but-wrong match inside that span implies a reading rate hundreds of times
+        // too fast. Smoothing only halves it, so the next prediction lands past the end of the book,
+        // every probe after it misses, and the chapter finishes with nothing to show. No narrator
+        // reads at five times or a fifth of the pace the chapter itself implies.
+        var plausible = Math.Clamp(observed, _floor, _ceiling);
+
+        return current * (1 - _settings.RateSmoothing) + plausible * _settings.RateSmoothing;
     }
 }

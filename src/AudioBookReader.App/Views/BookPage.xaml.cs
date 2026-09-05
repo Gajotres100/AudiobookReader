@@ -1,3 +1,4 @@
+using AudioBookReader.App.Services;
 using AudioBookReader.App.ViewModels;
 
 namespace AudioBookReader.App.Views;
@@ -15,7 +16,15 @@ public partial class BookPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        await _viewModel.LoadAsync();
+
+        try
+        {
+            await _viewModel.LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("opening the book page", ex);
+        }
     }
 
     /// <summary>
@@ -26,7 +35,16 @@ public partial class BookPage : ContentPage
     protected override async void OnDisappearing()
     {
         base.OnDisappearing();
-        await _viewModel.SavePositionAsync();
+
+        try
+        {
+            await _viewModel.SavePositionAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("saving the listening position", ex);
+        }
+
         _viewModel.Dispose();
     }
 

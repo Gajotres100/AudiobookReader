@@ -33,10 +33,11 @@ public class PlaybackService : MediaSessionService
         // The seek increments are what put usable buttons on the lock screen: Media3 builds its
         // notification from the commands the player advertises, and a player with no seek
         // increments advertises nothing to skip with.
-        _player = new ExoPlayerBuilder(this)
-            .SetSeekBackIncrementMs(10_000)
-            .SetSeekForwardIncrementMs(10_000)
-            .Build()!;
+        var builder = new ExoPlayerBuilder(this);
+        builder.SetSeekBackIncrementMs(10_000);
+        builder.SetSeekForwardIncrementMs(10_000);
+
+        _player = builder.Build()!;
 
         // Speed changes must not turn the narrator into a chipmunk. The second argument is pitch:
         // holding it at 1 while speed rises is what keeps the voice natural, and an audiobook

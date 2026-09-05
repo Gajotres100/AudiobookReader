@@ -151,11 +151,17 @@ public class LiveAligner(
     /// <returns>How many phrases were placed.</returns>
     private int Record(SyncMap map, int chapterIndex, Transcript transcript, int predicted, int radius)
     {
-        var anchors = map.ForChapter(chapterIndex)?.Anchors.ToList() ?? [];
+        var chapter = map.ForChapter(chapterIndex);
+
+        if (chapter is null)
+        {
+            chapter = new ChapterSyncMap { ChapterIndex = chapterIndex };
+            map.SetChapter(chapter);
+        }
+
         var located = 0;
 
         var expected = predicted;
-        Anchor? last = null;
 
         foreach (var phrase in transcript.Phrases)
         {
@@ -175,17 +181,14 @@ public class LiveAligner(
             var closing = new Anchor(
                 phrase.Words[found.Value.TranscriptEnd].AtMs, found.Value.EndCharOffset, found.Value.Confidence);
 
-            anchors.Add(opening);
+            if (!chapter.Insert(opening)) continue;
 
             if (closing.AudioMs > opening.AudioMs && closing.CharOffset > opening.CharOffset)
-                anchors.Add(closing);
+                chapter.Insert(closing);
 
-            last = anchors[^1];
-            expected = last.Value.CharOffset;
+            expected = Math.Max(opening.CharOffset, closing.CharOffset);
             located++;
         }
-
-        if (located > 0) map.SetChapter(ChapterSyncMap.FromAnchors(chapterIndex, anchors));
 
         return located;
     }

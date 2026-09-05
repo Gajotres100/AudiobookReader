@@ -17,8 +17,7 @@ public partial class BookViewModel(
     BookImporter importer,
     BookFilePicker picker,
     PlaybackController playback,
-    AlignmentQueue alignment,
-    AlignmentSettingsStore settings) : ObservableObject, IDisposable
+    AlignmentQueue alignment) : ObservableObject, IDisposable
 {
     /// <summary>The speeds the button cycles through. Nothing below 0.75 or above 2 is useful for narration.</summary>
     private static readonly float[] Speeds = [1f, 1.25f, 1.5f, 1.75f, 2f, 0.75f];
@@ -318,8 +317,6 @@ public partial class BookViewModel(
 
     public async Task LoadAsync()
     {
-        var clock = System.Diagnostics.Stopwatch.StartNew();
-
         _book = await database.GetBookAsync(BookId);
         if (_book is null) return;
 
@@ -353,20 +350,16 @@ public partial class BookViewModel(
         OnPropertyChanged(nameof(CanStartAlignment));
         OnPropertyChanged(nameof(CanRealign));
 
-        var listed = clock.ElapsedMilliseconds;
-
         await RefreshAlignmentProgressAsync();
 
-        var mapped = clock.ElapsedMilliseconds;
-
+        // LoadAsync is reached from the page appearing and from every attach or removal, so the
+        // handler is dropped before it is added; otherwise each one orphans a subscription on a
+        // singleton that then does database work for a page that no longer exists.
+        alignment.Changed -= OnAlignmentChanged;
         alignment.Changed += OnAlignmentChanged;
         ApplyAlignmentStatus(alignment.Status);
 
         if (HasAudio) await StartPlaybackAsync();
-
-        AppLog.Info(
-            $"book page opened in {clock.ElapsedMilliseconds} ms " +
-            $"(chapters {listed} ms, sync map {mapped - listed} ms, player {clock.ElapsedMilliseconds - mapped} ms)");
 
         StartTicking();
     }

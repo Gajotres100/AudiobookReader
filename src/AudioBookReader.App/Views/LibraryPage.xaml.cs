@@ -1,3 +1,4 @@
+using AudioBookReader.App.Services;
 using AudioBookReader.App.ViewModels;
 
 namespace AudioBookReader.App.Views;
@@ -20,6 +21,16 @@ public partial class LibraryPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        await _viewModel.LoadAsync();
+
+        // An exception out of an async void override kills the process, and this one is reached
+        // before the user can do anything about whatever went wrong.
+        try
+        {
+            await _viewModel.LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("opening the library", ex);
+        }
     }
 }

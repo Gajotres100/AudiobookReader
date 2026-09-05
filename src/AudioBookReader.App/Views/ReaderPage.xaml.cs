@@ -33,11 +33,32 @@ public partial class ReaderPage : ContentPage
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
+    }
+
+    /// <summary>
+    /// Attaches the page to its view model.
+    ///
+    /// Paired with the detach in OnDisappearing, and deliberately not done in the constructor:
+    /// those two fire on every window deactivate and reactivate, not once per instance. Subscribing
+    /// in the constructor meant that the first time the user left the app and came back, the reader
+    /// silently stopped — no highlight, no page turns, no restyling, and nothing in the log.
+    /// </summary>
+    private void Attach()
+    {
+        Detach();
 
         _viewModel.PropertyChanged += OnViewModelChanged;
         _viewModel.HighlightRequested += OnHighlightRequested;
         _viewModel.PageJumpRequested += OnPageJumpRequested;
         _viewModel.AppearanceChanged += OnAppearanceChanged;
+    }
+
+    private void Detach()
+    {
+        _viewModel.PropertyChanged -= OnViewModelChanged;
+        _viewModel.HighlightRequested -= OnHighlightRequested;
+        _viewModel.PageJumpRequested -= OnPageJumpRequested;
+        _viewModel.AppearanceChanged -= OnAppearanceChanged;
     }
 
     /// <summary>
@@ -87,7 +108,20 @@ public partial class ReaderPage : ContentPage
         // fights the feature: the display goes dark mid-sentence.
         DeviceDisplay.Current.KeepScreenOn = true;
 
-        await _viewModel.LoadAsync();
+        Attach();
+
+        // An unreadable ebook throws out of here, and an exception from an async void override
+        // reaches the Android runtime and kills the app — leaving no way back to the button that
+        // would have deleted the broken book.
+        try
+        {
+            await _viewModel.LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("opening the reader", ex);
+            _viewModel.FollowStatus = "Knjigu nije bilo moguće otvoriti.";
+        }
     }
 
     protected override async void OnDisappearing()
@@ -96,12 +130,16 @@ public partial class ReaderPage : ContentPage
 
         DeviceDisplay.Current.KeepScreenOn = false;
 
-        await _viewModel.SavePositionAsync(await ReadTopSentenceAsync());
+        try
+        {
+            await _viewModel.SavePositionAsync(await ReadTopSentenceAsync());
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("saving the reading position", ex);
+        }
 
-        _viewModel.PropertyChanged -= OnViewModelChanged;
-        _viewModel.HighlightRequested -= OnHighlightRequested;
-        _viewModel.PageJumpRequested -= OnPageJumpRequested;
-        _viewModel.AppearanceChanged -= OnAppearanceChanged;
+        Detach();
         _viewModel.Dispose();
     }
 

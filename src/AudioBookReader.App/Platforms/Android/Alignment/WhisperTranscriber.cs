@@ -100,7 +100,7 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
         _recogniseMs += recogniseMs;
         _audioMs += durationMs;
 
-        if (_probes % 10 != 0) return;
+        if (_probes % 50 != 0) return;
 
         var wall = _decodeMs + _recogniseMs;
 
@@ -138,7 +138,7 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
     /// </summary>
     private float[] DecodeOnAWorkerThread(string audioPath, long startMs, long durationMs, CancellationToken ct)
     {
-        ApplyThreadPriority();
+        using var priority = BorrowAtBackgroundPriority();
 
         if (_decoder is not null && _decoder.Path != audioPath)
         {
@@ -161,7 +161,7 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
     /// </summary>
     private async Task<Transcript> RecognizeAsync(float[] samples, long startMs, CancellationToken ct)
     {
-        ApplyThreadPriority();
+        using var priority = BorrowAtBackgroundPriority();
 
         var segments = new List<TranscriptSegment>();
 
@@ -175,7 +175,7 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
     }
 
     /// <summary>
-    /// Drops the calling thread to background priority.
+    /// Drops the calling thread to background priority for the duration of one piece of work.
     ///
     /// On Android this does more than reorder the scheduler: a background-priority thread is moved
     /// into the background cpuset, which confines it to the efficiency cores. That single call is
@@ -184,18 +184,52 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
     ///
     /// whisper.cpp spawns its own worker threads from here, and threads inherit their creator's
     /// cgroup, so the whole recognition run stays on the little cores rather than only this thread.
+    ///
+    /// Two guards, both learned the hard way. It refuses to touch the main thread: an await that
+    /// resumed there would otherwise leave the app's own UI thread in the background cpuset for the
+    /// life of the process, which is a phone that feels broken. And it restores what it found, so a
+    /// pooled thread borrowed for one probe is not handed back to unrelated work still demoted.
     /// </summary>
-    private void ApplyThreadPriority()
+    private IDisposable? BorrowAtBackgroundPriority()
     {
-        if (!_backgroundPriority) return;
+        if (!_backgroundPriority) return null;
+
+        // A continuation that came back to the UI thread must never be demoted.
+        if (global::Android.OS.Looper.MyLooper() == global::Android.OS.Looper.MainLooper) return null;
 
         try
         {
-            AndroidProcess.SetThreadPriority(global::Android.OS.ThreadPriority.Background);
+            return new BackgroundPriority();
         }
-        catch (Java.Lang.IllegalArgumentException)
+        catch (Java.Lang.RuntimeException)
         {
             // Some devices refuse the change; running at normal priority is worse but not broken.
+            return null;
+        }
+    }
+
+    /// <summary>Holds one thread at background priority, and puts back what it found.</summary>
+    private sealed class BackgroundPriority : IDisposable
+    {
+        private readonly int _thread = AndroidProcess.MyTid();
+        private readonly int _previous;
+
+        public BackgroundPriority()
+        {
+            _previous = (int)AndroidProcess.GetThreadPriority(_thread);
+            AndroidProcess.SetThreadPriority(_thread, global::Android.OS.ThreadPriority.Background);
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                AndroidProcess.SetThreadPriority(_thread, (global::Android.OS.ThreadPriority)_previous);
+            }
+            catch (Java.Lang.RuntimeException)
+            {
+                // The thread is going away anyway; nothing left to restore it for.
+            }
         }
     }
 

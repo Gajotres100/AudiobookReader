@@ -23,6 +23,54 @@ public class ChapterSyncMap
     public bool IsEmpty => Anchors.Count == 0;
 
     /// <summary>
+    /// The confidence at or below which an anchor is a chapter-boundary guess rather than something
+    /// heard. Lives here because every consumer has to agree on it to agree about what is aligned.
+    /// </summary>
+    public const float BoundaryConfidence = 0.2f;
+
+    /// <summary>
+    /// Whether this moment lies between two anchors, rather than beyond the outermost one.
+    ///
+    /// The lookups clamp outside the anchored range and still report success, which is a fine
+    /// answer for interpolation and a misleading one for anybody asking whether the position is
+    /// actually known. Callers that would act on a wrong answer must ask this first.
+    /// </summary>
+    public bool Covers(long audioMs) =>
+        Anchors.Count > 1 && audioMs >= Anchors[0].AudioMs && audioMs <= Anchors[^1].AudioMs;
+
+    public bool CoversChar(int charOffset) =>
+        Anchors.Count > 1 && charOffset >= Anchors[0].CharOffset && charOffset <= Anchors[^1].CharOffset;
+
+    /// <summary>
+    /// Adds one anchor in its place, keeping the sequence strictly increasing in both dimensions.
+    ///
+    /// The alternative, rebuilding the whole chapter through <see cref="FromAnchors"/>, is
+    /// quadratic in the anchors already collected. That is ruinous for a run adding a few every
+    /// fifteen seconds for hours, and it degrades as the map improves. An anchor that disagrees
+    /// with its neighbours is refused rather than allowed to displace them.
+    /// </summary>
+    /// <returns>True when the anchor was consistent enough to keep.</returns>
+    public bool Insert(Anchor anchor)
+    {
+        int lo = 0, hi = Anchors.Count;
+        while (lo < hi)
+        {
+            var mid = lo + (hi - lo) / 2;
+            if (Anchors[mid].AudioMs >= anchor.AudioMs) hi = mid;
+            else lo = mid + 1;
+        }
+
+        if (lo > 0 && (Anchors[lo - 1].AudioMs >= anchor.AudioMs || Anchors[lo - 1].CharOffset >= anchor.CharOffset))
+            return false;
+
+        if (lo < Anchors.Count && (Anchors[lo].AudioMs <= anchor.AudioMs || Anchors[lo].CharOffset <= anchor.CharOffset))
+            return false;
+
+        Anchors.Insert(lo, anchor);
+        return true;
+    }
+
+    /// <summary>
     /// True when at least one anchor came from an actual match rather than from a chapter boundary.
     ///
     /// The distinction matters everywhere: a chapter holding only its two boundary guesses looks
