@@ -292,7 +292,7 @@ public partial class BookViewModel(
                     ? "Još ništa nije izmjereno."
                     : $"Izmjereno {Format(MeasuredMs)} od {Format(_book?.DurationMs ?? 0)} knjige.";
 
-                return $"Sync on the fly: tekst se mjeri dok čitaš — otvori „Čitaj” i pusti zvuk. {measured}";
+                return $"Poravnavanje u hodu: mjeri se dok čitaš — otvori „Čitaj” i pusti zvuk. {measured}";
             }
 
             if (HasStaleAlignment)

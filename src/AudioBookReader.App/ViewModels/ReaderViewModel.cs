@@ -494,6 +494,7 @@ public partial class ReaderViewModel(
             : state?.TextOffset ?? 0;
 
         ShowDocumentAt(offset);
+        _narrationDocument = SpineIndex;
 
         // The voice starts where the eye is, not where listening last stopped. In a read-along
         // those are usually the same place, and when they are not it is the page in front of the
@@ -632,8 +633,16 @@ public partial class ReaderViewModel(
 
         var wasPlaying = playback.IsPlaying;
 
+        // Where the document being left had got to. Read before the seek, which is the last moment
+        // it is still true.
+        RememberPosition();
+
+        var arriving = SpineIndex;
+
         playback.Pause();
-        playback.SeekTo(await PositionForTextAsync(textStart));
+        playback.SeekTo(await PositionForTextAsync(textStart, arriving));
+
+        _narrationDocument = arriving;
 
         // The map is about to grow around a new position, so whatever sentence was showing must not
         // veto the next move.
@@ -797,6 +806,34 @@ public partial class ReaderViewModel(
         FollowStatus = "";
     }
 
+    /// <summary>The document the narration is in, which is what a remembered position is filed under.</summary>
+    private int _narrationDocument = -1;
+
+    private string PositionKey(int documentIndex) => $"reader.at3.{BookId}.{documentIndex}";
+
+    /// <summary>
+    /// Notes where the narration had reached in the document now being left, so coming back to it
+    /// resumes rather than restarts.
+    ///
+    /// Only what the map vouches for, and only for a book aligned in advance — see
+    /// <see cref="PositionForTextAsync"/> for why the two modes differ.
+    /// </summary>
+    private void RememberPosition()
+    {
+        if (MeasuresWhileReading || _text is null || playback.BookId != BookId) return;
+        if (_narrationDocument < 0) return;
+
+        var at = playback.PositionMs;
+        if (at <= 0) return;
+
+        // A position is worth keeping because the voice was reading this document, and the only
+        // thing that knows whether it was is the map.
+        if (_sync?.CharOffsetAt(at) is not { } readingAt) return;
+        if (_text.SpineAt(readingAt)?.Index != _narrationDocument) return;
+
+        Preferences.Default.Set(PositionKey(_narrationDocument), at);
+    }
+
     /// <summary>Which of the ebook's own chapters a character offset falls in.</summary>
     private int ChapterIndexAtChar(int charOffset)
     {
@@ -809,15 +846,20 @@ public partial class ReaderViewModel(
     /// <summary>
     /// Where the audio should go for a place in the text, best evidence first.
     ///
-    /// Deliberately no memory of where this chapter was last left. It was asked for and it was
-    /// built, and in use it fought the thing it was meant to help: going to a chapter means going
-    /// to a chapter, and being dropped a third of the way in — from a session whose positions were
-    /// themselves often wrong — reads as the app ignoring you. Resuming a book where you stopped
-    /// still happens, once, when the book is opened; that is what the reading state is for.
+    /// Whether a document remembers where it was left depends on the mode, and the two really are
+    /// different. A book aligned in advance has a complete map: the position it recorded is exact,
+    /// and coming back to a chapter you were half way through and being returned there is a
+    /// kindness. A book measured in the reader has a map full of holes, and the positions it
+    /// recorded were often taken while playback was somewhere the map only guessed at — so being
+    /// dropped a third of the way into a chapter you asked for reads as the app ignoring you.
     /// </summary>
-    private async Task<long> PositionForTextAsync(int textStart)
+    private async Task<long> PositionForTextAsync(int textStart, int documentIndex)
     {
         var chapterIndex = ChapterIndexAtChar(textStart);
+
+        if (!MeasuresWhileReading && documentIndex >= 0
+            && Preferences.Default.Get(PositionKey(documentIndex), 0L) is > 0 and var remembered)
+            return remembered;
 
         // A map that already covers this passage knows exactly when it is read.
         if (_sync?.AudioPositionAtChar(textStart) is { } known) return known;
@@ -1022,6 +1064,7 @@ public partial class ReaderViewModel(
 
         var previousDocument = SpineIndex;
         _lastSentence = sentence.Index;
+        _narrationDocument = sentence.SpineIndex;
 
         // Crossing into another document means loading a different page before highlighting in it.
         ShowDocumentAt(sentence.Start);

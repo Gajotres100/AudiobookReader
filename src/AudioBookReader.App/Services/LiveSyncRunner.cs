@@ -159,8 +159,8 @@ public partial class LiveSyncRunner(
             await Task.Delay(TimeSpan.FromSeconds(5), ct);
         }
 
-        Report("Sync on the fly je stao — zatvori i otvori čitač da pokušam ponovo.");
-        Fail("Sync on the fly je stao — zatvori i otvori čitač da pokušam ponovo.");
+        Report("Poravnavanje u hodu je stalo — zatvori i otvori čitač da pokušam ponovo.");
+        Fail("Poravnavanje u hodu je stalo — zatvori i otvori čitač da pokušam ponovo.");
     }
 
     /// <returns>True when the run finished on its own terms rather than failing.</returns>
@@ -201,7 +201,7 @@ public partial class LiveSyncRunner(
                 var progress = new Progress<LiveAlignmentProgress>(p =>
                 {
                     var ahead = Math.Max(0, p.AtMs - playback.PositionMs) / 1000;
-                    Report(ahead > 0 ? $"Sync on the fly — izmjereno {ahead} s unaprijed" : "Sync on the fly…");
+                    Report(ahead > 0 ? $"Poravnavam u hodu — izmjereno {ahead} s unaprijed" : "Poravnavam u hodu…");
                 });
 
                 // Copied synchronously, on the aligner's own thread, while it is between windows

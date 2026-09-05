@@ -60,7 +60,7 @@
                     <Label
                         Grid.Row="0"
                         Grid.Column="0"
-                        Text="Sync on the fly"
+                        Text="Poravnavanje u hodu"
                         VerticalOptions="Center" />
                     <Switch
                         Grid.Row="0"
