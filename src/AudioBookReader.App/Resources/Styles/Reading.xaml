@@ -82,19 +82,17 @@
     </Style>
 
     <!--
-        The same control sitting in a bar rather than on a screen of its own.
+        Play where it sits in a bar of other actions.
 
-        Sized to the bar's own height so the row stays one line: in the reader the text is the page
-        and every pixel the controls take is a line of the book not being read.
+        Flat, like everything beside it. The filled circle above is right on the player, where it is
+        the one thing that screen is for — but dropped into a row of monochrome glyphs it stops
+        reading as the important control and starts reading as a piece of another application.
     -->
     <Style
         x:Key="PlayInline"
-        BasedOn="{StaticResource Play}"
+        BasedOn="{StaticResource Icon}"
         TargetType="Button">
-        <Setter Property="CornerRadius" Value="21" />
-        <Setter Property="FontSize" Value="16" />
-        <Setter Property="HeightRequest" Value="42" />
-        <Setter Property="WidthRequest" Value="42" />
+        <Setter Property="FontSize" Value="22" />
     </Style>
 
     <!--  Skip back and forward: flat, but wide enough for "↺10".  -->

@@ -483,7 +483,7 @@ public partial class ReaderViewModel(
             : state?.TextOffset ?? 0;
 
         ShowDocumentAt(offset);
-        _narrationAt = offset;
+        _narrationDocument = SpineIndex;
 
         if (_text!.SentenceAt(offset) is { } sentence)
         {
@@ -587,8 +587,16 @@ public partial class ReaderViewModel(
     /// <summary>Cancels a hold when the reader moves again before the previous one has resumed.</summary>
     private CancellationTokenSource? _holding;
 
-    /// <summary>Where in the text the narration was before the current move.</summary>
-    private int _narrationAt;
+    /// <summary>
+    /// The document the narration is in, which is what a remembered position is filed under.
+    ///
+    /// The document, not a chapter derived from a character offset. Deriving it looked equivalent
+    /// and was not: an ebook whose table of contents does not divide it the way its spine does
+    /// mapped both the chapter being left and the one being opened to the same index, so the
+    /// position written on the way out was read straight back in on the way in — and jumping to
+    /// chapter two resumed exactly where chapter one had stopped.
+    /// </summary>
+    private int _narrationDocument = -1;
 
     /// <summary>
     /// Takes the narration to where the reader has just gone, and holds it there until there is
@@ -620,10 +628,13 @@ public partial class ReaderViewModel(
 
         playback.Pause();
 
-        var chapterIndex = ChapterIndexAtChar(textStart);
-        playback.SeekTo(await PositionForTextAsync(textStart, chapterIndex));
+        // The document to file a remembered position under is the one now on screen, and it is read
+        // before anything is written for the one being left — never the same key twice in one move.
+        var arriving = SpineIndex;
 
-        _narrationAt = textStart;
+        playback.SeekTo(await PositionForTextAsync(textStart, arriving));
+
+        _narrationDocument = arriving;
 
         // The map is about to grow around a new position, so whatever sentence was showing must not
         // veto the next move.
@@ -708,7 +719,7 @@ public partial class ReaderViewModel(
         return 0;
     }
 
-    private string PositionKey(int chapterIndex) => $"reader.chapter.{BookId}.{chapterIndex}";
+    private string PositionKey(int documentIndex) => $"reader.doc.{BookId}.{documentIndex}";
 
     /// <summary>
     /// Notes where the narration had reached in the chapter now being left.
@@ -718,20 +729,22 @@ public partial class ReaderViewModel(
     /// </summary>
     private void RememberPosition()
     {
-        if (_text is null || playback.BookId != BookId) return;
+        if (_text is null || playback.BookId != BookId || _narrationDocument < 0) return;
 
         var at = playback.PositionMs;
         if (at <= 0) return;
 
-        Preferences.Default.Set(PositionKey(ChapterIndexAtChar(_narrationAt)), at);
+        Preferences.Default.Set(PositionKey(_narrationDocument), at);
     }
 
     /// <summary>Where the audio should go for a place in the text, best evidence first.</summary>
-    private async Task<long> PositionForTextAsync(int textStart, int chapterIndex)
+    private async Task<long> PositionForTextAsync(int textStart, int documentIndex)
     {
-        // Somewhere this chapter was already listened to. Preferred over the map, which says where
-        // the chapter begins where this says where the listener actually stopped.
-        var remembered = Preferences.Default.Get(PositionKey(chapterIndex), 0L);
+        var chapterIndex = ChapterIndexAtChar(textStart);
+
+        // Somewhere this very document was already listened to. Preferred over the map, which says
+        // where the chapter begins where this says where the listener actually stopped.
+        var remembered = Preferences.Default.Get(PositionKey(documentIndex), 0L);
         if (remembered > 0) return remembered;
 
         // A map that already covers this passage knows exactly when it is read.
@@ -918,9 +931,9 @@ public partial class ReaderViewModel(
         var previousDocument = SpineIndex;
         _lastSentence = sentence.Index;
 
-        // Kept current as the voice moves, so that leaving a chapter records the position under the
-        // chapter actually being left rather than the last one jumped to by hand.
-        _narrationAt = sentence.Start;
+        // Kept current as the voice moves, so leaving records the position under the document
+        // actually being left rather than the last one jumped to by hand.
+        _narrationDocument = sentence.SpineIndex;
 
         // Crossing into another document means loading a different page before highlighting in it.
         ShowDocumentAt(sentence.Start);
