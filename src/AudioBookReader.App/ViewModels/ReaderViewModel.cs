@@ -494,7 +494,6 @@ public partial class ReaderViewModel(
             : state?.TextOffset ?? 0;
 
         ShowDocumentAt(offset);
-        _narrationDocument = SpineIndex;
 
         // The voice starts where the eye is, not where listening last stopped. In a read-along
         // those are usually the same place, and when they are not it is the page in front of the
@@ -595,10 +594,7 @@ public partial class ReaderViewModel(
             HighlightRequested?.Invoke(this, sentence.Index);
         }
 
-        // Chosen from the list, so the destination is the chapter itself. Somebody picking chapter
-        // seven wants it to begin, not to resume a third of the way in because they passed through
-        // once before — that is what paging back into a chapter is for.
-        await TakeNarrationToAsync(start, useRemembered: false);
+        await TakeNarrationToAsync(start);
     }
 
     /// <summary>How long to hold playback while measuring catches up with a chapter just opened.</summary>
@@ -606,17 +602,6 @@ public partial class ReaderViewModel(
 
     /// <summary>Cancels a hold when the reader moves again before the previous one has resumed.</summary>
     private CancellationTokenSource? _holding;
-
-    /// <summary>
-    /// The document the narration is in, which is what a remembered position is filed under.
-    ///
-    /// The document, not a chapter derived from a character offset. Deriving it looked equivalent
-    /// and was not: an ebook whose table of contents does not divide it the way its spine does
-    /// mapped both the chapter being left and the one being opened to the same index, so the
-    /// position written on the way out was read straight back in on the way in — and jumping to
-    /// chapter two resumed exactly where chapter one had stopped.
-    /// </summary>
-    private int _narrationDocument = -1;
 
     /// <summary>
     /// Takes the narration to where the reader has just gone, and holds it there until there is
@@ -632,7 +617,7 @@ public partial class ReaderViewModel(
     /// few seconds and then starting cleanly is the kinder trade, and it is only taken when it buys
     /// something: a book aligned in advance has nothing to wait for.
     /// </summary>
-    private async Task TakeNarrationToAsync(int textStart, bool useRemembered = true)
+    private async Task TakeNarrationToAsync(int textStart)
     {
         // Deliberately not conditional on IsFollowing. That is only true once a map exists, and a
         // book measured live has none until the first window lands — so on exactly the book this
@@ -647,19 +632,8 @@ public partial class ReaderViewModel(
 
         var wasPlaying = playback.IsPlaying;
 
-        // Where the chapter being left had got to, so coming back resumes there rather than at its
-        // first word. Read before the seek, which is the last moment it is still true.
-        RememberPosition();
-
         playback.Pause();
-
-        // The document to file a remembered position under is the one now on screen, and it is read
-        // before anything is written for the one being left — never the same key twice in one move.
-        var arriving = SpineIndex;
-
-        playback.SeekTo(await PositionForTextAsync(textStart, useRemembered ? arriving : -1));
-
-        _narrationDocument = arriving;
+        playback.SeekTo(await PositionForTextAsync(textStart));
 
         // The map is about to grow around a new position, so whatever sentence was showing must not
         // veto the next move.
@@ -833,49 +807,17 @@ public partial class ReaderViewModel(
     }
 
     /// <summary>
-    /// Where a document's listening position is kept.
+    /// Where the audio should go for a place in the text, best evidence first.
     ///
-    /// The name carries a generation. Earlier builds recorded whatever the playhead happened to
-    /// read, including the many times it was in the wrong chapter entirely, and those values then
-    /// outlived the bugs that produced them — pressing play on chapter one resumed halfway through
-    /// it for no reason the user could see. Moving the name abandons them.
+    /// Deliberately no memory of where this chapter was last left. It was asked for and it was
+    /// built, and in use it fought the thing it was meant to help: going to a chapter means going
+    /// to a chapter, and being dropped a third of the way in — from a session whose positions were
+    /// themselves often wrong — reads as the app ignoring you. Resuming a book where you stopped
+    /// still happens, once, when the book is opened; that is what the reading state is for.
     /// </summary>
-    private string PositionKey(int documentIndex) => $"reader.at2.{BookId}.{documentIndex}";
-
-    /// <summary>
-    /// Notes where the narration had reached in the chapter now being left.
-    ///
-    /// Leaving a chapter half-listened and coming back to its first word is the one thing that
-    /// makes moving around feel punishing — the detour gets paid for twice.
-    /// </summary>
-    private void RememberPosition()
-    {
-        if (_text is null || playback.BookId != BookId || _narrationDocument < 0) return;
-
-        var at = playback.PositionMs;
-        if (at <= 0) return;
-
-        // Only what the map vouches for. A position is worth keeping because the voice was reading
-        // this document, and the only thing that knows whether it was is the map — recording it
-        // regardless is how a guess that landed in the wrong chapter became a stored fact.
-        if (_sync?.CharOffsetAt(at) is not { } readingAt) return;
-
-        var document = _text.SpineAt(readingAt);
-        if (document?.Index != _narrationDocument) return;
-
-        Preferences.Default.Set(PositionKey(_narrationDocument), at);
-    }
-
-    /// <summary>Where the audio should go for a place in the text, best evidence first.</summary>
-    private async Task<long> PositionForTextAsync(int textStart, int documentIndex)
+    private async Task<long> PositionForTextAsync(int textStart)
     {
         var chapterIndex = ChapterIndexAtChar(textStart);
-
-        // Somewhere this very document was already listened to. Preferred over the map, which says
-        // where the chapter begins where this says where the listener actually stopped. Skipped
-        // when the destination was named rather than arrived at.
-        var remembered = documentIndex >= 0 ? Preferences.Default.Get(PositionKey(documentIndex), 0L) : 0L;
-        if (remembered > 0) return remembered;
 
         // A map that already covers this passage knows exactly when it is read.
         if (_sync?.AudioPositionAtChar(textStart) is { } known) return known;
@@ -1081,10 +1023,6 @@ public partial class ReaderViewModel(
         var previousDocument = SpineIndex;
         _lastSentence = sentence.Index;
 
-        // Kept current as the voice moves, so leaving records the position under the document
-        // actually being left rather than the last one jumped to by hand.
-        _narrationDocument = sentence.SpineIndex;
-
         // Crossing into another document means loading a different page before highlighting in it.
         ShowDocumentAt(sentence.Start);
 
@@ -1103,29 +1041,45 @@ public partial class ReaderViewModel(
     /// <summary>
     /// Called when the reader presses and holds a sentence: play from here.
     ///
-    /// It falls out of the same map that drives the highlight, and it is also the fix for a
-    /// highlight that has drifted — pressing the right sentence puts the audio back where it
-    /// belongs instead of leaving the reader to hunt with the scrubber.
+    /// This is the gesture for "start at this exact place", so it has to work at any place — and
+    /// it used to work only where the map already knew the answer, which is the case that needed no
+    /// help. Anywhere else it refused and left the voice where it was, so pressing the first line
+    /// of a chapter did nothing and playback carried on from page seven.
+    ///
+    /// Where the map knows, it is exact and instant. Where it does not, this takes the same route a
+    /// chapter jump takes: place the voice as well as can be guessed, then correct the guess from
+    /// what measuring finds.
     /// </summary>
     public void OnSentenceTapped(int sentenceIndex)
     {
         _lastSentence = sentenceIndex;
+        HighlightRequested?.Invoke(this, sentenceIndex);
 
         if (_sync?.AudioPositionAtSentence(sentenceIndex) is { } at)
         {
             playback.SeekTo(at);
             FollowStatus = "";
-        }
-        else
-        {
-            // Nothing has measured this passage yet, so there is no audio position to jump to.
-            // Saying so beats a press that silently does nothing.
-            FollowStatus = MeasuresWhileReading
-                ? "Ovaj dio još nije izmjeren — pusti zvuk pa će ga izmjeriti."
-                : "Ovaj dio još nije poravnan.";
+            return;
         }
 
-        HighlightRequested?.Invoke(this, sentenceIndex);
+        if (_text is null || sentenceIndex < 0 || sentenceIndex >= _text.Sentences.Count) return;
+
+        var start = _text.Sentences[sentenceIndex].Start;
+
+        _ = SafelyAsync("placing the narration by hand", () => TakeNarrationToAsync(start));
+    }
+
+    /// <summary>Runs work started by a gesture, so a failure lands in the log instead of the process.</summary>
+    private static async Task SafelyAsync(string what, Func<Task> work)
+    {
+        try
+        {
+            await work();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error(what, ex);
+        }
     }
 
     /// <summary>Records where the reader stopped, so opening the book again lands in the right place.</summary>
