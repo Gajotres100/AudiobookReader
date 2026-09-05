@@ -62,4 +62,42 @@ public class LiveMapDeliveryTests
         Assert.Equal("a", copy.AudioHash);
         Assert.Equal("b", copy.EbookHash);
     }
+
+    [Fact]
+    public void CountsTheAudioActuallyHeard()
+    {
+        // Three anchors ten seconds apart, measured by touching windows: twenty seconds of audio.
+        Assert.Equal(20_000, Measured().MeasuredMs(windowMs: 15_000, boundaryConfidence: 0.2f));
+    }
+
+    [Fact]
+    public void DoesNotCountTheGapsBetweenSparseAnchors()
+    {
+        // What a whole-book run leaves: anchors a minute apart, everything between interpolated.
+        var sampled = new ChapterSyncMap
+        {
+            ChapterIndex = 0,
+            Anchors =
+            [
+                new Anchor(0, 0, 0.9f),
+                new Anchor(60_000, 900, 0.9f),
+                new Anchor(120_000, 1800, 0.9f),
+            ],
+        };
+
+        Assert.Equal(0, sampled.MeasuredMs(windowMs: 15_000, boundaryConfidence: 0.2f));
+    }
+
+    [Fact]
+    public void IgnoresChapterBoundaryGuesses()
+    {
+        // Two boundary anchors span a whole chapter and mean nothing was heard in it.
+        var visited = new ChapterSyncMap
+        {
+            ChapterIndex = 0,
+            Anchors = [new Anchor(0, 0, 0.2f), new Anchor(1_800_000, 40_000, 0.2f)],
+        };
+
+        Assert.Equal(0, visited.MeasuredMs(windowMs: 15_000, boundaryConfidence: 0.2f));
+    }
 }

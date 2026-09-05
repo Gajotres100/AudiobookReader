@@ -17,7 +17,8 @@ public partial class BookViewModel(
     BookImporter importer,
     BookFilePicker picker,
     PlaybackController playback,
-    AlignmentQueue alignment) : ObservableObject, IDisposable
+    AlignmentQueue alignment,
+    LiveSyncRunner liveSync) : ObservableObject, IDisposable
 {
     /// <summary>The speeds the button cycles through. Nothing below 0.75 or above 2 is useful for narration.</summary>
     private static readonly float[] Speeds = [1f, 1.25f, 1.5f, 1.75f, 2f, 0.75f];
@@ -239,6 +240,12 @@ public partial class BookViewModel(
     [NotifyPropertyChangedFor(nameof(CanRealign))]
     public partial int AlignedChapterCount { get; set; }
 
+    /// <summary>How much audio has genuinely been measured, which is what live measuring produces.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AlignmentSummary))]
+    [NotifyPropertyChangedFor(nameof(CanRealign))]
+    public partial long MeasuredMs { get; set; }
+
     /// <summary>Only worth offering once there is something to discard.</summary>
     /// <summary>
     /// Whether there is measured alignment to throw away.
@@ -248,7 +255,7 @@ public partial class BookViewModel(
     /// clean, and starting clean is exactly what you need when you are trying to find out whether
     /// the live measuring works at all.
     /// </summary>
-    public bool CanRealign => IsPaired && !IsAligning && AlignedChapterCount > 0;
+    public bool CanRealign => IsPaired && !IsAligning && (AlignedChapterCount > 0 || MeasuredMs > 0);
 
     /// <summary>What the button does, which is not the same thing in the two modes.</summary>
     public string RealignText =>
@@ -278,9 +285,12 @@ public partial class BookViewModel(
                 // The count is here so the mode can be told apart from doing nothing: it starts at
                 // whatever was already stored and climbs as you read, which is the only visible
                 // evidence that measuring is happening at all.
-                var measured = AlignedChapterCount == 0
+                // Time, not chapters. A chapter counts as holding a measurement after one
+                // fifteen-second window, so passing through three of them claimed three chapters
+                // aligned while under a minute of the book had actually been heard.
+                var measured = MeasuredMs <= 0
                     ? "Još ništa nije izmjereno."
-                    : $"Izmjereno u {AlignedChapterCount} od {Chapters.Count} poglavlja.";
+                    : $"Izmjereno {Format(MeasuredMs)} od {Format(_book?.DurationMs ?? 0)} knjige.";
 
                 return $"Sync on the fly: tekst se mjeri dok čitaš — otvori „Čitaj” i pusti zvuk. {measured}";
             }
@@ -867,6 +877,15 @@ public partial class BookViewModel(
 
         if (!confirmed) return;
 
+        // Stopped before the file is touched, and waited for.
+        //
+        // Sync on the fly holds the map in memory and writes it out every couple of windows. This
+        // is reached from the book's own page, which is reached from the reader — so the run is
+        // very likely alive right now, and deleting the file under it only meant the next save put
+        // everything back thirty seconds later. Which is exactly what "I deleted it and a third of
+        // chapter one was still there" looks like.
+        await liveSync.StopAsync();
+
         await library.ResetAlignmentAsync(BookId);
         await RefreshAlignmentProgressAsync();
 
@@ -912,6 +931,12 @@ public partial class BookViewModel(
         HasStaleAlignment = map is { IsStale: true };
 
         AlignedChapterCount = HasStaleAlignment ? 0 : map?.MeasuredChapterCount(boundary) ?? 0;
+
+        // The window the live run uses, which is what decides whether two anchors bracket audio
+        // that was heard or a gap that was interpolated across.
+        MeasuredMs = HasStaleAlignment
+            ? 0
+            : map?.MeasuredMs(AlignmentSettings.Refinement.ProbeDurationMs, boundary) ?? 0;
         ResumeFromChapter = HasStaleAlignment ? 0 : map?.FirstChapterNeedingWork(Chapters.Count, boundary) ?? 0;
 
         OnPropertyChanged(nameof(AlignmentSummary));

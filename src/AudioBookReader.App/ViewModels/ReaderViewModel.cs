@@ -135,10 +135,6 @@ public partial class ReaderViewModel(
     /// </summary>
     public bool CanPlay => HasAudio && !IsWaitingToSpeak;
 
-    /// <summary>Whether the map covers the moment playback would resume from.</summary>
-    private bool IsMeasuredHere =>
-        playback.BookId == BookId
-        && _sync?.CharOffsetAt(playback.PositionMs + AnticipationMs) is not null;
 
     [RelayCommand]
     private async Task TogglePlayAsync()
@@ -451,6 +447,14 @@ public partial class ReaderViewModel(
                 _sync = new BookSync(_text, map!, chapters);
                 IsFollowing = true;
             }
+            else
+            {
+                // Cleared rather than left standing. The page object outlives a visit, so a map
+                // deleted while the reader was away would otherwise go on answering questions from
+                // whatever this field was still holding.
+                _sync = null;
+                IsFollowing = false;
+            }
 
             // Following measures the passage being read while it is read, so it belongs to the
             // reader's lifetime: started here, stopped when the page goes away.
@@ -491,6 +495,12 @@ public partial class ReaderViewModel(
 
         ShowDocumentAt(offset);
         _narrationDocument = SpineIndex;
+
+        // The voice starts where the eye is, not where listening last stopped. In a read-along
+        // those are usually the same place, and when they are not it is the page in front of the
+        // reader that is right — opening chapter one and pressing play should read chapter one, not
+        // resume halfway through it because that is where a previous session ended.
+        if (!playback.IsPlaying) await TakeNarrationToAsync(offset);
 
         if (_text!.SentenceAt(offset) is { } sentence)
         {
@@ -585,7 +595,10 @@ public partial class ReaderViewModel(
             HighlightRequested?.Invoke(this, sentence.Index);
         }
 
-        await TakeNarrationToAsync(start);
+        // Chosen from the list, so the destination is the chapter itself. Somebody picking chapter
+        // seven wants it to begin, not to resume a third of the way in because they passed through
+        // once before — that is what paging back into a chapter is for.
+        await TakeNarrationToAsync(start, useRemembered: false);
     }
 
     /// <summary>How long to hold playback while measuring catches up with a chapter just opened.</summary>
@@ -619,7 +632,7 @@ public partial class ReaderViewModel(
     /// few seconds and then starting cleanly is the kinder trade, and it is only taken when it buys
     /// something: a book aligned in advance has nothing to wait for.
     /// </summary>
-    private async Task TakeNarrationToAsync(int textStart)
+    private async Task TakeNarrationToAsync(int textStart, bool useRemembered = true)
     {
         // Deliberately not conditional on IsFollowing. That is only true once a map exists, and a
         // book measured live has none until the first window lands — so on exactly the book this
@@ -644,7 +657,7 @@ public partial class ReaderViewModel(
         // before anything is written for the one being left — never the same key twice in one move.
         var arriving = SpineIndex;
 
-        playback.SeekTo(await PositionForTextAsync(textStart, arriving));
+        playback.SeekTo(await PositionForTextAsync(textStart, useRemembered ? arriving : -1));
 
         _narrationDocument = arriving;
 
@@ -665,13 +678,36 @@ public partial class ReaderViewModel(
         var holding = new CancellationTokenSource();
         _holding = holding;
 
-        await HoldUntilMeasuredAsync(holding.Token);
+        await HoldUntilMeasuredAsync(textStart, holding.Token);
     }
 
-    private async Task HoldUntilMeasuredAsync(CancellationToken ct)
+    /// <summary>How far off the target the voice may start, in milliseconds. About one sentence.</summary>
+    private const long CloseEnoughMs = 4_000;
+
+    /// <summary>How many times a guess may be corrected before the result is accepted as it is.</summary>
+    private const int MaxCorrections = 4;
+
+    /// <summary>
+    /// Waits for the passage to be measured, and uses each measurement to correct where the voice
+    /// was put.
+    ///
+    /// The seek that precedes this is a guess, and on a book whose ebook and audiobook do not
+    /// divide into the same chapters it can be minutes out — which is how asking for chapter seven
+    /// started the voice in the middle of chapter six. Nothing afterwards ever revisited that guess:
+    /// the wait only asked whether the place it had landed was measured, and it was, so it played
+    /// there.
+    ///
+    /// So the wait now aims at the piece of text the reader actually asked for. Each window that
+    /// lands tells us where the voice really is in the text, and the distance from there to the
+    /// target converts back into time — a correction anchored on a measurement rather than on a
+    /// proportion across ten hours, which is what makes it converge instead of merely differing.
+    /// </summary>
+    private async Task HoldUntilMeasuredAsync(int targetChar, CancellationToken ct)
     {
         IsWaitingToSpeak = true;
         FollowStatus = "Pripremam poglavlje…";
+
+        var corrections = 0;
 
         try
         {
@@ -685,12 +721,33 @@ public partial class ReaderViewModel(
                 // Asking for both costs nothing and covers a book being worked on either way.
                 MaybeRefreshSyncMap();
 
-                if (!IsMeasuredHere) continue;
+                // The map now knows when this very text is read, so stop guessing and use it.
+                if (_sync?.AudioPositionAtChar(targetChar) is { } exact)
+                {
+                    if (Math.Abs(exact - playback.PositionMs) > CloseEnoughMs) playback.SeekTo(exact);
+                    Speak();
+                    return;
+                }
 
-                IsWaitingToSpeak = false;
-                FollowStatus = "";
-                playback.Play();
-                return;
+                // Not the target, but the voice's own position is now known in the text. The gap
+                // between that and the target is a real distance, and the book's own pace turns it
+                // back into a time to move by.
+                if (_sync?.CharOffsetAt(playback.PositionMs) is not { } voiceAt) continue;
+
+                var drift = (long)((targetChar - voiceAt) / CharsPerMs);
+
+                if (Math.Abs(drift) <= CloseEnoughMs || corrections >= MaxCorrections)
+                {
+                    Speak();
+                    return;
+                }
+
+                corrections++;
+                playback.SeekTo(Math.Max(0, playback.PositionMs + drift));
+
+                AppLog.Info(
+                    $"reader: correction {corrections} — voice at char {voiceAt}, wanted {targetChar}, " +
+                    $"moved {drift} ms");
             }
         }
         catch (OperationCanceledException)
@@ -707,7 +764,21 @@ public partial class ReaderViewModel(
         // user's back, the choice goes back to them, with what will happen stated rather than
         // implied.
         FollowStatus = "Ovaj dio još nije izmjeren. Možeš pustiti zvuk, ali tekst ga zasad neće pratiti.";
+        return;
+
+        void Speak()
+        {
+            IsWaitingToSpeak = false;
+            FollowStatus = "";
+            playback.Play();
+        }
     }
+
+    /// <summary>The book's average pace, used only to turn a distance in the text back into a time.</summary>
+    private double CharsPerMs =>
+        _text is { PlainText.Length: > 0 } text && _book is { DurationMs: > 0 }
+            ? text.PlainText.Length / (double)_book.DurationMs
+            : 0.015;
 
     private void StopHolding()
     {
@@ -731,7 +802,15 @@ public partial class ReaderViewModel(
         return 0;
     }
 
-    private string PositionKey(int documentIndex) => $"reader.doc.{BookId}.{documentIndex}";
+    /// <summary>
+    /// Where a document's listening position is kept.
+    ///
+    /// The name carries a generation. Earlier builds recorded whatever the playhead happened to
+    /// read, including the many times it was in the wrong chapter entirely, and those values then
+    /// outlived the bugs that produced them — pressing play on chapter one resumed halfway through
+    /// it for no reason the user could see. Moving the name abandons them.
+    /// </summary>
+    private string PositionKey(int documentIndex) => $"reader.at2.{BookId}.{documentIndex}";
 
     /// <summary>
     /// Notes where the narration had reached in the chapter now being left.
@@ -746,6 +825,14 @@ public partial class ReaderViewModel(
         var at = playback.PositionMs;
         if (at <= 0) return;
 
+        // Only what the map vouches for. A position is worth keeping because the voice was reading
+        // this document, and the only thing that knows whether it was is the map — recording it
+        // regardless is how a guess that landed in the wrong chapter became a stored fact.
+        if (_sync?.CharOffsetAt(at) is not { } readingAt) return;
+
+        var document = _text.SpineAt(readingAt);
+        if (document?.Index != _narrationDocument) return;
+
         Preferences.Default.Set(PositionKey(_narrationDocument), at);
     }
 
@@ -755,8 +842,9 @@ public partial class ReaderViewModel(
         var chapterIndex = ChapterIndexAtChar(textStart);
 
         // Somewhere this very document was already listened to. Preferred over the map, which says
-        // where the chapter begins where this says where the listener actually stopped.
-        var remembered = Preferences.Default.Get(PositionKey(documentIndex), 0L);
+        // where the chapter begins where this says where the listener actually stopped. Skipped
+        // when the destination was named rather than arrived at.
+        var remembered = documentIndex >= 0 ? Preferences.Default.Get(PositionKey(documentIndex), 0L) : 0L;
         if (remembered > 0) return remembered;
 
         // A map that already covers this passage knows exactly when it is read.

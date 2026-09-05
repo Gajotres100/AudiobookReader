@@ -104,6 +104,40 @@ public class ChapterSyncMap
     }
 
     /// <summary>
+    /// How much audio this chapter has been measured across, in milliseconds.
+    ///
+    /// Counting chapters that hold a measurement answers a different question than the one a reader
+    /// is asking. Sync on the fly leaves a real anchor in a chapter after a single fifteen-second
+    /// window, so passing through three chapters reported three chapters aligned — while perhaps
+    /// forty seconds of a twenty-hour book had been heard. This counts the stretches instead:
+    /// anchors within a window of each other were produced by touching windows, so the audio
+    /// between them was listened to rather than interpolated across.
+    /// </summary>
+    public long MeasuredMs(long windowMs, float boundaryConfidence)
+    {
+        var heard = Anchors.Where(a => a.Confidence > boundaryConfidence).Select(a => a.AudioMs).ToList();
+        if (heard.Count < 2) return 0;
+
+        long total = 0;
+        var spanStart = heard[0];
+        var spanEnd = heard[0];
+
+        foreach (var at in heard.Skip(1))
+        {
+            if (at - spanEnd <= windowMs)
+            {
+                spanEnd = at;
+                continue;
+            }
+
+            total += spanEnd - spanStart;
+            spanStart = spanEnd = at;
+        }
+
+        return total + (spanEnd - spanStart);
+    }
+
+    /// <summary>
     /// True when at least one anchor came from an actual match rather than from a chapter boundary.
     ///
     /// The distinction matters everywhere: a chapter holding only its two boundary guesses looks
@@ -280,6 +314,10 @@ public class SyncMap
     /// <summary>How many chapters are genuinely aligned — the number worth showing a user.</summary>
     public int MeasuredChapterCount(float boundaryConfidence) =>
         Chapters.Count(c => c.HasMeasurement(boundaryConfidence));
+
+    /// <summary>How much of the book has actually been measured, in milliseconds.</summary>
+    public long MeasuredMs(long windowMs, float boundaryConfidence) =>
+        Chapters.Sum(c => c.MeasuredMs(windowMs, boundaryConfidence));
 
     /// <summary>
     /// The first chapter a run should work on: the first without a real measurement, whether it
