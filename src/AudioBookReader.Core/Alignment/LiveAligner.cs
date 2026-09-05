@@ -71,7 +71,15 @@ public class LiveAligner(
         var runStart = long.MinValue;
         var next = long.MinValue;
 
-        var radius = _settings.SearchRadiusTokens;
+        // Wide to begin with, and wide again after every jump. The narrow radius is what a run
+        // earns by knowing where it is: the previous window ended a line ago, so the next one is
+        // within a hundred words of it. A jump throws that away — the prediction falls back to the
+        // book's own proportions, which front matter and an audiobook's credits put thousands of
+        // words out — and starting narrow there guaranteed a miss, then another, before the
+        // tripling caught up. Measured on the device: every jump logged "no match within 120",
+        // then "no match within 360", and only found itself on the third window some half a minute
+        // later, by which time the voice had been reading the wrong chapter the whole time.
+        var radius = _settings.MaximumSearchRadiusTokens;
         var sinceSave = 0;
 
         while (true)
@@ -84,7 +92,7 @@ public class LiveAligner(
             {
                 // Seeked somewhere this run is not working towards, so begin again from there.
                 runStart = next = head;
-                radius = _settings.SearchRadiusTokens;
+                radius = _settings.MaximumSearchRadiusTokens;
             }
             else if (next > head + MaxLeadMs)
             {
@@ -127,6 +135,10 @@ public class LiveAligner(
 
                 if (located > 0)
                 {
+                    // Narrowed only now that the run knows where it is.
+                    if (radius != _settings.SearchRadiusTokens)
+                        log?.Invoke($"live ch{chapter.Index} @{next}ms: found within {radius}, narrowing");
+
                     radius = _settings.SearchRadiusTokens;
                     progress?.Report(new LiveAlignmentProgress(chapter.Index, next, 1f));
                 }

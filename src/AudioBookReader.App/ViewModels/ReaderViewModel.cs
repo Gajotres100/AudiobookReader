@@ -665,20 +665,24 @@ public partial class ReaderViewModel(
         // veto the next move.
         _lastSentence = -1;
 
-        if (!wasPlaying) return;
-
         // Nothing to wait for when the whole book is aligned in advance: either this chapter is
         // already mapped or it never will be from here, and standing still would just look broken.
         if (!MeasuresWhileReading)
         {
-            playback.Play();
+            if (wasPlaying) playback.Play();
             return;
         }
 
+        // Corrected whether or not the voice was running, which is the case that was missed. Most
+        // jumps are made while paused — you find the chapter, then press play — and the correction
+        // only ran for a jump made mid-sentence. So the guess stayed uncorrected, play started from
+        // it, and half a minute later a window finally matched and dragged the text back to
+        // wherever the guess had actually landed. Doing the work while paused means the position is
+        // already right by the time anyone presses anything.
         var holding = new CancellationTokenSource();
         _holding = holding;
 
-        await HoldUntilMeasuredAsync(textStart, holding.Token);
+        await HoldUntilMeasuredAsync(textStart, resume: wasPlaying, holding.Token);
     }
 
     /// <summary>How far off the target the voice may start, in milliseconds. About one sentence.</summary>
@@ -702,7 +706,7 @@ public partial class ReaderViewModel(
     /// target converts back into time — a correction anchored on a measurement rather than on a
     /// proportion across ten hours, which is what makes it converge instead of merely differing.
     /// </summary>
-    private async Task HoldUntilMeasuredAsync(int targetChar, CancellationToken ct)
+    private async Task HoldUntilMeasuredAsync(int targetChar, bool resume, CancellationToken ct)
     {
         IsWaitingToSpeak = true;
         FollowStatus = "Pripremam poglavlje…";
@@ -725,7 +729,9 @@ public partial class ReaderViewModel(
                 if (_sync?.AudioPositionAtChar(targetChar) is { } exact)
                 {
                     if (Math.Abs(exact - playback.PositionMs) > CloseEnoughMs) playback.SeekTo(exact);
-                    Speak();
+
+                    AppLog.Info($"reader: settled on char {targetChar} at {exact} ms after {corrections} corrections");
+                    Settle();
                     return;
                 }
 
@@ -738,7 +744,7 @@ public partial class ReaderViewModel(
 
                 if (Math.Abs(drift) <= CloseEnoughMs || corrections >= MaxCorrections)
                 {
-                    Speak();
+                    Settle();
                     return;
                 }
 
@@ -763,14 +769,19 @@ public partial class ReaderViewModel(
         // Waited and nothing came. Rather than start a voice the page cannot follow behind the
         // user's back, the choice goes back to them, with what will happen stated rather than
         // implied.
+        AppLog.Info($"reader: gave up placing char {targetChar} after {corrections} corrections");
+
         FollowStatus = "Ovaj dio još nije izmjeren. Možeš pustiti zvuk, ali tekst ga zasad neće pratiti.";
         return;
 
-        void Speak()
+        void Settle()
         {
             IsWaitingToSpeak = false;
             FollowStatus = "";
-            playback.Play();
+
+            // Only resumes what was already running. A jump made while paused leaves it paused —
+            // with the position now correct, which was the whole point of waiting.
+            if (resume) playback.Play();
         }
     }
 

@@ -263,4 +263,22 @@ public class LiveAlignerTests
         // most — and not every window, which would rewrite the whole file for two anchors.
         Assert.InRange(saves, 5, 7);
     }
+
+    [Fact]
+    public async Task FindsItsPlaceOnTheFirstWindowAfterAJump()
+    {
+        // Nothing known about where the chapter's text begins, which is the state a book is in
+        // before anything has been measured — so the prediction is the book's own proportions and
+        // can be thousands of words out. Starting the search narrow made every jump miss twice
+        // before the tripling caught up, and the voice read the wrong chapter meanwhile.
+        var fixture = Fixture.Create(knownTextRange: false);
+
+        const long jumpedTo = 20 * 60 * 1_000;
+
+        await RunAsync(fixture, () => jumpedTo, windows: 1);
+
+        var chapter = fixture.Map.ForChapter(0);
+        Assert.NotNull(chapter);
+        Assert.NotEmpty(chapter.Anchors);
+    }
 }
