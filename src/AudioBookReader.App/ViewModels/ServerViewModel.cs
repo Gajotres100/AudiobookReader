@@ -141,14 +141,18 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         Libraries.Clear();
         foreach (var library in await server.GetLibrariesAsync()) Libraries.Add(library);
 
+        AppLog.Info($"server: {Libraries.Count} book libraries at {server.Url}");
+
         if (Libraries.Count == 0)
         {
             Status = "Na serveru nema biblioteke s knjigama.";
             return;
         }
 
-        SelectedLibrary ??= Libraries[0];
-        await LoadBooksAsync();
+        // Assigning it is what triggers the load, so an already-chosen library needs the explicit
+        // call — otherwise nothing changes and nothing happens.
+        if (SelectedLibrary is null || !Libraries.Contains(SelectedLibrary)) SelectedLibrary = Libraries[0];
+        else await LoadBooksAsync();
     });
 
     partial void OnSelectedLibraryChanged(ServerLibraryInfo? value)
@@ -168,7 +172,11 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
 
         foreach (var book in books) Books.Add(new ServerBookRow(book));
 
-        Status = $"{Books.Count} knjiga na serveru.";
+        AppLog.Info($"server: {Books.Count} books in '{library.Name}'");
+
+        Status = Books.Count == 0
+            ? $"Biblioteka „{library.Name}” je prazna."
+            : $"{Books.Count} knjiga u „{library.Name}”.";
     });
 
     [RelayCommand]
@@ -195,13 +203,25 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
     });
 
     /// <summary>
+    /// How deep the guarded calls are nested.
+    ///
+    /// Counted rather than flagged, because these call each other: connecting reads the libraries,
+    /// which loads the books. A plain "already busy, do nothing" turned that into a screen that
+    /// connected, said it was reading the libraries, and then stopped — the inner call saw the flag
+    /// its own caller had set and returned without doing anything at all.
+    ///
+    /// Nothing is lost by allowing it: a second tap on the same command is already refused by the
+    /// command itself, which is where that belongs.
+    /// </summary>
+    private int _depth;
+
+    /// <summary>
     /// Runs a command, turning a failure into a line on screen rather than a crash — and naming the
     /// one failure the user can do something about.
     /// </summary>
     private async Task GuardAsync(Func<Task> action)
     {
-        if (IsBusy) return;
-
+        _depth++;
         IsBusy = true;
 
         try
@@ -222,8 +242,11 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         }
         finally
         {
-            IsBusy = false;
-            Progress = 0;
+            if (--_depth == 0)
+            {
+                IsBusy = false;
+                Progress = 0;
+            }
         }
     }
 }
