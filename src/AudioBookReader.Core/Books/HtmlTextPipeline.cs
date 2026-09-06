@@ -168,9 +168,18 @@ internal static class HtmlTextPipeline
     /// Rewrites the parsed document, wrapping each sentence in a span. A sentence crossing inline
     /// markup produces several spans sharing one index, so the reader highlights by attribute
     /// rather than assuming one element per sentence.
+    ///
+    /// The first span of each sentence also carries an id. The reader does not use it — it selects
+    /// on the attribute — but EPUB 3 Media Overlays can only point at an element, and a sentence
+    /// split across three spans by an italic needs one agreed place to point at. Sentence indices
+    /// are unique across the whole book, so the id is too.
     /// </summary>
     public static string Render(ParsedHtmlDocument parsed, string plainText, IReadOnlyList<Sentence> sentences)
     {
+        // Nodes come in document order and pieces left to right within each, so a sentence's first
+        // span is simply the first one seen for that index. One counter is enough; no second pass.
+        var stamped = -1;
+
         foreach (var (node, start, end) in parsed.TextNodes)
         {
             var parent = node.ParentNode;
@@ -179,9 +188,18 @@ internal static class HtmlTextPipeline
             foreach (var (sentenceIndex, pieceStart, pieceEnd) in SplitBySentences(start, end, sentences))
             {
                 var content = plainText[pieceStart..pieceEnd];
-                var piece = sentenceIndex is null
-                    ? (HtmlNode)TextNode(parsed.Document, content)
-                    : SpanNode(parsed.Document, sentenceIndex.Value, content);
+
+                HtmlNode piece;
+
+                if (sentenceIndex is not { } index)
+                {
+                    piece = TextNode(parsed.Document, content);
+                }
+                else
+                {
+                    piece = SpanNode(parsed.Document, index, content, first: index > stamped);
+                    stamped = Math.Max(stamped, index);
+                }
 
                 parent.InsertBefore(piece, node);
             }
@@ -191,6 +209,10 @@ internal static class HtmlTextPipeline
 
         return parsed.Root.InnerHtml;
     }
+
+    /// <summary>The id given to the first span of a sentence, and the one a Media Overlay points at.</summary>
+    public static string SentenceId(int sentenceIndex) =>
+        "s" + sentenceIndex.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Cuts the range <paramref name="start"/>..<paramref name="end"/> into pieces that each lie
@@ -243,10 +265,13 @@ internal static class HtmlTextPipeline
     private static HtmlTextNode TextNode(HtmlDocument document, string content) =>
         document.CreateTextNode(Escape(content));
 
-    private static HtmlNode SpanNode(HtmlDocument document, int sentenceIndex, string content)
+    private static HtmlNode SpanNode(HtmlDocument document, int sentenceIndex, string content, bool first)
     {
         var span = document.CreateElement("span");
         span.SetAttributeValue("data-idx", sentenceIndex.ToString(CultureInfo.InvariantCulture));
+
+        if (first) span.SetAttributeValue("id", SentenceId(sentenceIndex));
+
         span.AppendChild(TextNode(document, content));
         return span;
     }

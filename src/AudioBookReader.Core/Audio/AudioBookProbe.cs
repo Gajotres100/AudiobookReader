@@ -52,11 +52,47 @@ public static class AudioBookProbe
 
     private static AudioBookInfo ProbeStream(Stream stream, string fileName)
     {
-        var track = new Track(stream, Path.GetExtension(fileName));
+        // What the bytes say, not what the name says. See AudioFormat for why the difference is
+        // not academic.
+        var track = Read(() => new Track(stream, AudioFormat.ExtensionOf(stream, fileName)), fileName);
         return Describe(track, fileName, fileName);
     }
 
-    private static AudioBookInfo ProbeFile(string path) => Describe(new Track(path), path, path);
+    private static AudioBookInfo ProbeFile(string path)
+    {
+        var sniffed = AudioFormat.ExtensionOf(path);
+
+        // The tag reader takes an extension from a path, so a file whose name disagrees with its
+        // contents is read through a stream with the right one supplied instead.
+        if (string.Equals(sniffed, Path.GetExtension(path), StringComparison.OrdinalIgnoreCase))
+            return Describe(Read(() => new Track(path), path), path, path);
+
+        using var stream = File.OpenRead(path);
+        return Describe(Read(() => new Track(stream, sniffed), path), path, path);
+    }
+
+    /// <summary>
+    /// Reads the tags, turning a reader that gives up into something the user can act on.
+    ///
+    /// ATL answers a container it cannot make sense of with a NullReferenceException from its own
+    /// constructor. Left alone that surfaces as "Object reference not set to an instance of an
+    /// object" at the end of a minute of waiting, which tells the person holding the phone nothing
+    /// whatsoever about the file they just picked.
+    /// </summary>
+    private static Track Read(Func<Track> read, string nameSource)
+    {
+        try
+        {
+            return read();
+        }
+        catch (Exception ex) when (ex is NullReferenceException or IndexOutOfRangeException
+                                       or ArgumentException or InvalidDataException)
+        {
+            throw new InvalidOperationException(
+                $"'{Path.GetFileName(nameSource)}' nije zvučna datoteka koju znam pročitati, " +
+                "ili je oštećena.", ex);
+        }
+    }
 
     private static AudioBookInfo Describe(Track track, string reference, string nameSource)
     {

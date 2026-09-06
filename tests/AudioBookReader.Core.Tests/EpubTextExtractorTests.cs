@@ -69,6 +69,36 @@ public class EpubTextExtractorTests : IDisposable
         Assert.NotNull(spans);
         Assert.Equal(3, spans.Count);
         Assert.NotNull(html.DocumentNode.SelectSingleNode("//em/span[@data-idx='0']"));
+
+        // Exactly one of them carries the id, and it is the first. Media Overlays can only point at
+        // an element, so a sentence split three ways needs one agreed place to be pointed at.
+        Assert.Equal(1, spans.Count(span => span.Id == "s0"));
+        Assert.Equal("s0", spans[0].Id);
+    }
+
+    [Fact]
+    public async Task SentenceIdsAreUniqueAcrossTheWholeBook()
+    {
+        // Not per document. A Media Overlay for chapter three writes "ch3.xhtml#s417", and an index
+        // that restarted in each file would point at the wrong sentence in every chapter but the
+        // first.
+        var book = await ExtractAsync(new TestEpubBuilder()
+            .Add("c1", "One", "<p>The house was cold. The fire had gone out.</p>")
+            .Add("c2", "Two", "<p>Nobody came that night.</p>"));
+
+        var ids = new List<string>();
+
+        foreach (var document in book.Text.Spine)
+        {
+            var html = new HtmlDocument();
+            html.LoadHtml(document.Html);
+
+            var spans = html.DocumentNode.SelectNodes("//span[@id]");
+            if (spans is not null) ids.AddRange(spans.Select(span => span.Id ?? ""));
+        }
+
+        Assert.Equal(book.Text.Sentences.Count, ids.Count);
+        Assert.Equal(ids.Count, ids.Distinct().Count());
     }
 
     [Fact]
