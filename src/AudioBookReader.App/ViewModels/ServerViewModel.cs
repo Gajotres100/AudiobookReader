@@ -58,11 +58,15 @@ public class Shelf(string name, IReadOnlyList<ServerBookRow> books) : List<Serve
 
 public partial class ServerViewModel(ServerConnection server) : ObservableObject
 {
-    /// <summary>Books grouped into series, with the unaffiliated ones last.</summary>
+    /// <summary>
+    /// The shelves, in the order they are read: the newest arrivals, then each series, then
+    /// everything belonging to no series.
+    ///
+    /// One kind of thing rather than a special row plus a grouped list. Every shelf is a title and
+    /// a row of covers, so there is one template, one scrolling behaviour, and nothing that behaves
+    /// differently because of where it happens to sit.
+    /// </summary>
     public ObservableCollection<Shelf> Shelves { get; } = [];
-
-    /// <summary>The newest arrivals, across all series, for the row along the top.</summary>
-    public ObservableCollection<ServerBookRow> Recent { get; } = [];
 
     public ObservableCollection<ServerLibraryInfo> Libraries { get; } = [];
 
@@ -71,9 +75,6 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
     public partial bool IsConnected { get; set; }
 
     public bool IsDisconnected => !IsConnected;
-
-    [ObservableProperty]
-    public partial bool HasRecent { get; set; }
 
     [ObservableProperty]
     public partial string Url { get; set; } = "";
@@ -160,10 +161,8 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         server.Disconnect();
 
         IsConnected = false;
-        HasRecent = false;
 
         Shelves.Clear();
-        Recent.Clear();
         Libraries.Clear();
 
         Status = "Odspojeno.";
@@ -204,9 +203,6 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         if (SelectedLibrary is not { } library) return;
 
         Shelves.Clear();
-        Recent.Clear();
-        HasRecent = false;
-
         Status = "Čitam knjige…";
 
         var found = new Progress<int>(count => Status = $"Čitam knjige… {count}");
@@ -214,10 +210,7 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
 
         AppLog.Info($"server: {books.Count} books in '{library.Name}'");
 
-        foreach (var book in Newest(books)) Recent.Add(Row(book));
         foreach (var shelf in Arrange(books)) Shelves.Add(shelf);
-
-        HasRecent = Recent.Count > 0;
 
         Status = books.Count == 0
             ? $"Biblioteka „{library.Name}” je prazna."
@@ -226,20 +219,25 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
 
     private ServerBookRow Row(ServerBook book) => new(book, server.CoverUrl(book.Id));
 
-    private static IEnumerable<ServerBook> Newest(IReadOnlyList<ServerBook> books) =>
-        books.Where(b => b.AddedAt is not null)
-            .OrderByDescending(b => b.AddedAt)
-            .Take(RecentCount);
-
     /// <summary>
-    /// Sorts the library onto shelves: each series in its own reading order, then everything else.
+    /// Sorts the library onto shelves: the newest first, then each series in its own reading order,
+    /// then everything else.
     ///
-    /// Series first, because that is how anyone looks for the next one — and in sequence rather
-    /// than alphabetically, since a series listed by title is a series you have to think about.
-    /// Books in no series go last under one heading rather than each becoming a shelf of one.
+    /// Series in sequence rather than alphabetically, since a series listed by title is a series
+    /// you have to think about. Books in no series go last under one heading rather than each
+    /// becoming a shelf of one.
     /// </summary>
     private IEnumerable<Shelf> Arrange(IReadOnlyList<ServerBook> books)
     {
+        var newest = books
+            .Where(b => b.AddedAt is not null)
+            .OrderByDescending(b => b.AddedAt)
+            .Take(RecentCount)
+            .Select(Row)
+            .ToList();
+
+        if (newest.Count > 0) yield return new Shelf("Nedavno dodano", newest);
+
         var series = books
             .Where(b => b.InSeries)
             .GroupBy(b => b.Series!)

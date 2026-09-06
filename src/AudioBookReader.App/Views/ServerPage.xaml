@@ -14,9 +14,9 @@
     <!--
         Books on an Audiobookshelf server, and bringing them here.
 
-        Arranged the way a shelf is: the newest arrivals along the top, then each series in reading
-        order, then everything that belongs to no series. Covers rather than lines of text, because
-        that is how anyone actually recognises a book they own.
+        Arranged the way shelves are: the newest arrivals, then each series in reading order, then
+        everything that belongs to no series — each one a title and a row of covers pushed sideways.
+        Covers rather than lines of text, because that is how anyone recognises a book they own.
 
         The sign-in half disappears once connected. It is a thing you do once.
     -->
@@ -118,123 +118,107 @@
                 VerticalOptions="Center" />
         </Grid>
 
-        <ScrollView Grid.Row="2" Margin="0,8">
-            <VerticalStackLayout Spacing="14">
+        <!--
+            One shelf per row, and one kind of shelf.
 
-                <!--  Newest arrivals, along the top and sideways  -->
-                <VerticalStackLayout IsVisible="{Binding HasRecent}" Spacing="6">
-                    <Label FontAttributes="Bold" Text="Nedavno dodano" />
+            The newest arrivals, each series, and everything with no series are all the same thing:
+            a title and a row of covers you push sideways. Nothing behaves differently because of
+            where it sits, and there is one template to get right.
 
-                    <CollectionView
-                        HeightRequest="210"
-                        ItemsSource="{Binding Recent}"
-                        SelectionMode="None">
-                        <CollectionView.ItemsLayout>
-                            <LinearItemsLayout ItemSpacing="10" Orientation="Horizontal" />
-                        </CollectionView.ItemsLayout>
+            One scrolling element vertically, too. A CollectionView inside a ScrollView loses its
+            virtualisation — it has to measure itself to an unbounded height, so every row is built
+            at once and every cover starts downloading in the same instant, which is what made this
+            stutter. Each shelf has a fixed height instead, so the outer list can measure a row
+            without building the rest.
+        -->
+        <CollectionView
+            Grid.Row="2"
+            ItemSizingStrategy="MeasureFirstItem"
+            ItemsSource="{Binding Shelves}"
+            Margin="0,8"
+            SelectionMode="None">
 
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ServerBookRow">
-                                <VerticalStackLayout Spacing="4" WidthRequest="110">
-                                    <VerticalStackLayout.GestureRecognizers>
-                                        <TapGestureRecognizer
-                                            Command="{Binding Path=BindingContext.ImportCommand, Source={x:Reference ServerRoot}}"
-                                            CommandParameter="{Binding .}" />
-                                    </VerticalStackLayout.GestureRecognizers>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:Shelf">
+                    <VerticalStackLayout Padding="0,10,0,4" Spacing="6">
 
-                                    <Border HeightRequest="160" StrokeThickness="0">
-                                        <Border.StrokeShape>
-                                            <RoundRectangle CornerRadius="6" />
-                                        </Border.StrokeShape>
-                                        <Image Source="{Binding CoverUrl}" Style="{StaticResource Cover}" />
-                                    </Border>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label
+                                Grid.Column="0"
+                                FontAttributes="Bold"
+                                LineBreakMode="TailTruncation"
+                                Text="{Binding Name}" />
+                            <Label
+                                Grid.Column="1"
+                                Style="{StaticResource Muted}"
+                                Text="{Binding Summary}"
+                                VerticalOptions="Center" />
+                        </Grid>
 
-                                    <Label
-                                        FontSize="12"
-                                        LineBreakMode="TailTruncation"
-                                        MaxLines="2"
-                                        Text="{Binding Title}" />
-                                </VerticalStackLayout>
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
-                </VerticalStackLayout>
+                        <!--
+                            A horizontal list with a fixed height. Horizontal virtualisation works
+                            here precisely because the height is not in question — which is the
+                            difference between this and a list inside a ScrollView.
+                        -->
+                        <CollectionView
+                            HeightRequest="196"
+                            ItemsSource="{Binding .}"
+                            SelectionMode="None">
 
-                <!--  Everything, by series  -->
-                <CollectionView
-                    IsGrouped="True"
-                    ItemsSource="{Binding Shelves}"
-                    SelectionMode="None">
+                            <CollectionView.ItemsLayout>
+                                <LinearItemsLayout ItemSpacing="10" Orientation="Horizontal" />
+                            </CollectionView.ItemsLayout>
 
-                    <CollectionView.GroupHeaderTemplate>
-                        <DataTemplate x:DataType="vm:Shelf">
-                            <Grid Padding="0,14,0,6" ColumnDefinitions="*,Auto">
-                                <Label
-                                    Grid.Column="0"
-                                    FontAttributes="Bold"
-                                    LineBreakMode="TailTruncation"
-                                    Text="{Binding Name}" />
-                                <Label
-                                    Grid.Column="1"
-                                    Style="{StaticResource Muted}"
-                                    Text="{Binding Summary}"
-                                    VerticalOptions="Center" />
-                            </Grid>
-                        </DataTemplate>
-                    </CollectionView.GroupHeaderTemplate>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ServerBookRow">
+                                    <VerticalStackLayout Spacing="4" WidthRequest="104">
+                                        <VerticalStackLayout.GestureRecognizers>
+                                            <TapGestureRecognizer
+                                                Command="{Binding Path=BindingContext.ImportCommand, Source={x:Reference ServerRoot}}"
+                                                CommandParameter="{Binding .}" />
+                                        </VerticalStackLayout.GestureRecognizers>
 
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ServerBookRow">
-                            <Grid
-                                Padding="0,6"
-                                ColumnDefinitions="52,Auto,*,Auto"
-                                ColumnSpacing="10">
+                                        <Grid HeightRequest="150" WidthRequest="104">
+                                            <Border StrokeThickness="0">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="6" />
+                                                </Border.StrokeShape>
+                                                <Image Source="{Binding CoverUrl}" Style="{StaticResource Cover}" />
+                                            </Border>
 
-                                <Grid.GestureRecognizers>
-                                    <TapGestureRecognizer
-                                        Command="{Binding Path=BindingContext.ImportCommand, Source={x:Reference ServerRoot}}"
-                                        CommandParameter="{Binding .}" />
-                                </Grid.GestureRecognizers>
+                                            <!--  What the server has of it, over the corner of the cover.  -->
+                                            <Label
+                                                FontSize="11"
+                                                HorizontalOptions="End"
+                                                Margin="4"
+                                                Text="{Binding Media}"
+                                                VerticalOptions="Start" />
 
-                                <Border
-                                    Grid.Column="0"
-                                    HeightRequest="74"
-                                    StrokeThickness="0">
-                                    <Border.StrokeShape>
-                                        <RoundRectangle CornerRadius="4" />
-                                    </Border.StrokeShape>
-                                    <Image Source="{Binding CoverUrl}" Style="{StaticResource Cover}" />
-                                </Border>
+                                            <Label
+                                                BackgroundColor="{AppThemeBinding Light=#F1EDE5,
+                                                                                  Dark=#15181E}"
+                                                FontSize="11"
+                                                HorizontalOptions="Start"
+                                                IsVisible="{Binding IsNumbered}"
+                                                Margin="4"
+                                                Padding="4,1"
+                                                Text="{Binding Number}"
+                                                VerticalOptions="End" />
+                                        </Grid>
 
-                                <Label
-                                    Grid.Column="1"
-                                    IsVisible="{Binding IsNumbered}"
-                                    Style="{StaticResource Muted}"
-                                    Text="{Binding Number}"
-                                    VerticalOptions="Center" />
-
-                                <VerticalStackLayout
-                                    Grid.Column="2"
-                                    Spacing="2"
-                                    VerticalOptions="Center">
-                                    <Label LineBreakMode="TailTruncation" Text="{Binding Title}" />
-                                    <Label
-                                        LineBreakMode="TailTruncation"
-                                        Style="{StaticResource Muted}"
-                                        Text="{Binding Author}" />
-                                    <Label Style="{StaticResource Muted}" Text="{Binding Note}" />
-                                </VerticalStackLayout>
-
-                                <Label
-                                    Grid.Column="3"
-                                    Text="{Binding Media}"
-                                    VerticalOptions="Center" />
-                            </Grid>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
-            </VerticalStackLayout>
-        </ScrollView>
+                                        <Label
+                                            FontSize="12"
+                                            LineBreakMode="TailTruncation"
+                                            MaxLines="2"
+                                            Text="{Binding Title}" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
 
         <!--  What is happening, and the way to stop it  -->
         <VerticalStackLayout Grid.Row="3" Spacing="6">
