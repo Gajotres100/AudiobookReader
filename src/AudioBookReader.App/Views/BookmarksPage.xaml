@@ -18,13 +18,22 @@
 
     <Grid Padding="20,16" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
 
-        <VerticalStackLayout Grid.Row="0" Spacing="2">
-            <Label Style="{StaticResource Section}" Text="Bookmarci" />
-            <Label
-                LineBreakMode="TailTruncation"
-                Style="{StaticResource Heading}"
-                Text="{Binding Title}" />
-        </VerticalStackLayout>
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                <Label Style="{StaticResource Section}" Text="Bookmarci" />
+                <Label
+                    LineBreakMode="TailTruncation"
+                    Style="{StaticResource Heading}"
+                    Text="{Binding Title}" />
+            </VerticalStackLayout>
+
+            <Button
+                Grid.Column="1"
+                Command="{Binding CloseCommand}"
+                Style="{StaticResource Icon}"
+                Text="✕"
+                VerticalOptions="Center" />
+        </Grid>
 
         <Label
             Grid.Row="1"

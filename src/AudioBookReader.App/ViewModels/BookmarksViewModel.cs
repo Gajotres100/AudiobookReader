@@ -120,6 +120,15 @@ public partial class BookmarksViewModel(
     }
 
     /// <summary>Saves the spot being listened to, or read when there is no audio.</summary>
+    /// <summary>
+    /// Leaves the page.
+    ///
+    /// Its own control, because this page draws no navigation bar — the system's back gesture still
+    /// works, and a screen whose only way out is a gesture is a screen some people are stuck on.
+    /// </summary>
+    [RelayCommand]
+    private Task CloseAsync() => Shell.Current.GoToAsync("..");
+
     [RelayCommand]
     private async Task AddAsync()
     {
