@@ -37,6 +37,8 @@ public static class MauiProgram
 		builder.Services.AddSingleton<BookImporter>();
 		builder.Services.AddSingleton<AlignmentSettingsStore>();
 		builder.Services.AddSingleton<BookFilePicker>();
+		builder.Services.AddSingleton<ServerAccount>();
+		builder.Services.AddSingleton<ServerConnection>();
 
 		// Playback outlives any page, so the controller is shared; pages and their view models are
 		// created fresh each time they are navigated to.
@@ -53,6 +55,8 @@ public static class MauiProgram
 		builder.Services.AddTransient<BookmarksPage>();
 		builder.Services.AddTransient<SettingsViewModel>();
 		builder.Services.AddTransient<SettingsPage>();
+		builder.Services.AddTransient<ServerViewModel>();
+		builder.Services.AddTransient<ServerPage>();
 
 #if DEBUG
 		builder.Logging.AddDebug();

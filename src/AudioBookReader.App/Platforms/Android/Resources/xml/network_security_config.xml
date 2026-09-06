@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Audiobookshelf servers are almost always on the user's own network, on a plain port, with no
+    certificate. Refusing cleartext there would mean the app simply cannot reach the server the user
+    is pointing it at, with a failure that reads as a bug rather than as a policy.
+
+    Cleartext is therefore permitted, and the user's own address decides whether it is used: typing
+    https:// gets https, and nothing here weakens a certificate check on a server that has one.
+-->
+<network-security-config>
+	<base-config cleartextTrafficPermitted="true">
+		<trust-anchors>
+			<certificates src="system" />
+		</trust-anchors>
+	</base-config>
+</network-security-config>

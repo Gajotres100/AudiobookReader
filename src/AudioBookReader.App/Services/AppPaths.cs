@@ -27,9 +27,17 @@ public static class AppPaths
     /// <summary>Extracted cover images.</summary>
     public static string Covers => Path.Combine(Root, "covers");
 
+    /// <summary>
+    /// Where a book coming down from a server lands before the importer takes it.
+    ///
+    /// Its own directory rather than the books one, so a download interrupted halfway can be told
+    /// apart from a book in the library and cleared without touching anything the user owns.
+    /// </summary>
+    public static string Downloads => Path.Combine(Root, "downloads");
+
     public static void EnsureCreated()
     {
-        foreach (var directory in new[] { SyncMaps, Models, Books, Covers })
+        foreach (var directory in new[] { SyncMaps, Models, Books, Covers, Downloads })
             Directory.CreateDirectory(directory);
     }
 }

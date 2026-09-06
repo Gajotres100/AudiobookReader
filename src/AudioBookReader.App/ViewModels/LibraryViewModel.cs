@@ -197,6 +197,10 @@ public partial class LibraryViewModel(
     /// meant a novel with no audio was greeted by an empty transport, and a paired book made you
     /// press "Čitaj" every single time to get to the thing you came for.
     /// </summary>
+    /// <summary>Books that live on an Audiobookshelf server rather than on this phone.</summary>
+    [RelayCommand]
+    private static Task OpenServerAsync() => Shell.Current.GoToAsync("server");
+
     [RelayCommand]
     private static Task OpenAsync(BookCard? card) => card switch
     {

@@ -10,6 +10,7 @@
     <ContentPage.ToolbarItems>
         <ToolbarItem Text="+ Audio" Command="{Binding ImportAudioCommand}" />
         <ToolbarItem Text="+ Knjiga" Command="{Binding ImportEbookCommand}" />
+        <ToolbarItem Text="Server" Command="{Binding OpenServerCommand}" />
     </ContentPage.ToolbarItems>
 
     <Grid RowDefinitions="Auto,Auto,*">
