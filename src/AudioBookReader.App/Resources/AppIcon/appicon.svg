@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+    The ground the icon sits on: brass, the colour of a reading lamp, and the same accent the app
+    uses for the one control that matters on any screen.
+
+    Flat. A gradient here would band on the launchers that scale it and would fight the foreground
+    at small sizes, and a book under a lamp is one colour of light, not two.
+-->
 <svg width="456" height="456" viewBox="0 0 456 456" version="1.1" xmlns="http://www.w3.org/2000/svg">
-    <rect x="0" y="0" width="456" height="456" fill="#512BD4" />
+    <rect x="0" y="0" width="456" height="456" fill="#B26A00" />
 </svg>

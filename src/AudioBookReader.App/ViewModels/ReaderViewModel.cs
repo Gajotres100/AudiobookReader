@@ -166,11 +166,13 @@ public partial class ReaderViewModel(
     /// </summary>
     public static readonly ReaderTheme[] Themes =
     [
-        new("Papir", "#F5EFE1", "#2B2620", "rgba(196, 148, 0, 0.28)"),
-        new("Sepija", "#EBDCC0", "#4A3A26", "rgba(168, 112, 0, 0.30)"),
-        new("Svijetlo", "#FBFBF9", "#1B1B1F", "rgba(255, 196, 0, 0.34)"),
-        new("Prigušeno", "#2A2724", "#D6CFC2", "rgba(255, 196, 0, 0.20)"),
-        new("Noć", "#000000", "#A9A39A", "rgba(255, 196, 0, 0.16)"),
+        // Papir is the app's own page, to the character: opening the reader should feel like
+        // turning into the book rather than like arriving somewhere else.
+        new("Papir", "#FBF8F2", "#241F1A", "rgba(178, 106, 0, 0.22)"),
+        new("Sepija", "#EFE0C6", "#4A3A26", "rgba(168, 112, 0, 0.26)"),
+        new("Svijetlo", "#FDFDFB", "#1B1B1F", "rgba(196, 148, 0, 0.30)"),
+        new("Prigušeno", "#1C212B", "#E9E4DA", "rgba(232, 169, 69, 0.20)"),
+        new("Noć", "#0B0D11", "#A9A39A", "rgba(232, 169, 69, 0.16)"),
     ];
 
     /// <summary>

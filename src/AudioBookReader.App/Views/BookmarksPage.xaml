@@ -6,83 +6,104 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:BookmarksViewModel"
+    Shell.NavBarIsVisible="False"
     Title="Bookmarci">
 
-    <Grid Padding="16,10" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
+    <!--
+        Places kept in one book.
 
-        <Label
-            Grid.Row="0"
-            FontAttributes="Bold"
-            FontSize="17"
-            LineBreakMode="TailTruncation"
-            Text="{Binding Title}" />
+        A row is a chapter, a position, and the words that were there — the last of those is what
+        makes a bookmark findable a week later, so it gets the room rather than being a footnote.
+    -->
+
+    <Grid Padding="20,16" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="2">
+            <Label Style="{StaticResource Section}" Text="Bookmarci" />
+            <Label
+                LineBreakMode="TailTruncation"
+                Style="{StaticResource Heading}"
+                Text="{Binding Title}" />
+        </VerticalStackLayout>
 
         <Label
             Grid.Row="1"
-            FontSize="12"
-            Text="{Binding Message}"
             IsVisible="{Binding HasMessage}"
-            TextColor="#C0392B" />
+            Style="{StaticResource Failure}"
+            Text="{Binding Message}" />
 
         <Label
             Grid.Row="2"
             HorizontalTextAlignment="Center"
             IsVisible="{Binding HasNone}"
-            Text="Još nema bookmarka. Dugi pritisak na zastavicu u playeru sprema mjesto na kojem si."
-            TextColor="Gray"
+            Style="{StaticResource Muted}"
+            Text="Još nema bookmarka. Dugi pritisak na zastavicu ⚑ u playeru sprema mjesto na kojem si."
             VerticalOptions="Center" />
 
-        <CollectionView Grid.Row="2" ItemsSource="{Binding Bookmarks}">
+        <CollectionView
+            Grid.Row="2"
+            ItemsSource="{Binding Bookmarks}"
+            SelectionMode="None">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="vm:BookmarkRow">
-                    <Grid Padding="0,12" ColumnDefinitions="*,Auto">
+                    <Border Margin="0,5" Style="{StaticResource Card}">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
 
-                        <Grid.GestureRecognizers>
-                            <TapGestureRecognizer
-                                Command="{Binding Path=BindingContext.OpenCommand, Source={x:Reference BookmarksRoot}}"
-                                CommandParameter="{Binding .}" />
-                        </Grid.GestureRecognizers>
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding Path=BindingContext.OpenCommand, Source={x:Reference BookmarksRoot}}"
+                                    CommandParameter="{Binding .}" />
+                            </Grid.GestureRecognizers>
 
-                        <VerticalStackLayout Grid.Column="0" Spacing="2">
-                            <Label
-                                FontAttributes="Bold"
-                                LineBreakMode="TailTruncation"
-                                Text="{Binding Chapter}" />
-                            <Label FontSize="13" Text="{Binding Where}" TextColor="Gray" />
-                            <Label
-                                FontSize="12"
-                                IsVisible="{Binding HasPreview}"
-                                LineBreakMode="TailTruncation"
-                                MaxLines="2"
-                                Text="{Binding Preview}"
-                                TextColor="Gray" />
-                        </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="0" Spacing="3">
+                                <Label
+                                    FontFamily="OpenSansSemibold"
+                                    LineBreakMode="TailTruncation"
+                                    Text="{Binding Chapter}" />
 
-                        <Button
-                            Grid.Column="1"
-                            BackgroundColor="Transparent"
-                            Command="{Binding Path=BindingContext.DeleteCommand, Source={x:Reference BookmarksRoot}}"
-                            CommandParameter="{Binding .}"
-                            FontSize="16"
-                            Text="✕"
-                            TextColor="Gray"
-                            VerticalOptions="Center" />
-                    </Grid>
+                                <Label
+                                    Style="{StaticResource Muted}"
+                                    Text="{Binding Where}"
+                                    TextColor="{AppThemeBinding Light={StaticResource Accent},
+                                                                Dark={StaticResource AccentDark}}" />
+
+                                <!--  The words that were there, which is what makes it findable later.  -->
+                                <Label
+                                    IsVisible="{Binding HasPreview}"
+                                    LineBreakMode="TailTruncation"
+                                    Margin="0,2,0,0"
+                                    MaxLines="2"
+                                    Style="{StaticResource Muted}"
+                                    Text="{Binding Preview}" />
+                            </VerticalStackLayout>
+
+                            <Button
+                                Grid.Column="1"
+                                Command="{Binding Path=BindingContext.DeleteCommand, Source={x:Reference BookmarksRoot}}"
+                                CommandParameter="{Binding .}"
+                                Style="{StaticResource Icon}"
+                                Text="✕"
+                                VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <Grid Grid.Row="3" ColumnDefinitions="*,Auto">
+        <Grid
+            Grid.Row="3"
+            ColumnDefinitions="*,Auto"
+            ColumnSpacing="12">
             <Button
                 Grid.Column="0"
                 Command="{Binding AddCommand}"
+                Style="{StaticResource Secondary}"
                 Text="Dodaj bookmark ovdje" />
+
             <Label
                 Grid.Column="1"
-                Margin="12,0,0,0"
-                FontSize="12"
+                Style="{StaticResource Muted}"
                 Text="{Binding CountText}"
-                TextColor="Gray"
                 VerticalOptions="Center" />
         </Grid>
     </Grid>

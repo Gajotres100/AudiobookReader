@@ -6,8 +6,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:BookViewModel"
-    BackgroundColor="{AppThemeBinding Light={StaticResource PaperBackground},
-                                      Dark={StaticResource PaperBackgroundDark}}"
     Shell.NavBarIsVisible="False"
     Title="{Binding Title}">
 
@@ -82,30 +80,32 @@
             VerticalOptions="Start" />
 
         <!--  Cover, with the chapter list opening over it  -->
-        <Grid Grid.Row="1" Margin="0,6">
-            <Image
-                Aspect="AspectFit"
-                IsVisible="{Binding HasCover}"
-                Source="{Binding CoverPath}" />
-
+        <Grid Grid.Row="1" Margin="0,10">
             <Border
-                BackgroundColor="{AppThemeBinding Light=#E4DFD6,
-                                                  Dark=#1B2029}"
-                IsVisible="{Binding HasNoCover}"
-                Margin="30"
+                HorizontalOptions="Center"
+                IsVisible="{Binding HasCover}"
+                Margin="24,0"
+                StrokeShape="RoundRectangle 12"
                 StrokeThickness="0">
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="14" />
-                </Border.StrokeShape>
-                <VerticalStackLayout Padding="24" VerticalOptions="Center">
+                <Image Aspect="AspectFit" Source="{Binding CoverPath}" />
+            </Border>
+
+            <!--
+                No cover, so the book says its own name. Set on the same warm ground a cover would
+                have occupied, at the same size, so a shelf of books with and without covers does
+                not jump about.
+            -->
+            <Border
+                IsVisible="{Binding HasNoCover}"
+                Margin="34"
+                Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="10" VerticalOptions="Center">
                     <Label
-                        FontAttributes="Bold"
-                        FontSize="20"
                         HorizontalTextAlignment="Center"
+                        Style="{StaticResource Display}"
                         Text="{Binding Title}" />
                     <Label
                         HorizontalTextAlignment="Center"
-                        Margin="0,8,0,0"
                         Style="{StaticResource Muted}"
                         Text="{Binding Author}" />
                 </VerticalStackLayout>
@@ -113,15 +113,11 @@
 
             <!--  Chapter list  -->
             <Border
-                BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
-                                                  Dark={StaticResource SurfaceDark}}"
                 IsVisible="{Binding ChaptersExpanded}"
-                StrokeThickness="0">
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="14" />
-                </Border.StrokeShape>
+                Padding="6"
+                Style="{StaticResource Card}">
 
-                <CollectionView ItemsSource="{Binding Chapters}" Margin="6">
+                <CollectionView ItemsSource="{Binding Chapters}" SelectionMode="None">
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="vm:ChapterRow">
                             <Grid Padding="10,12" ColumnDefinitions="20,*,Auto">
@@ -144,9 +140,8 @@
                                     VerticalOptions="Center" />
                                 <Label
                                     Grid.Column="2"
-                                    FontSize="12"
+                                    Style="{StaticResource Muted}"
                                     Text="{Binding StartText}"
-                                    TextColor="Gray"
                                     VerticalOptions="Center" />
                             </Grid>
                         </DataTemplate>
@@ -168,6 +163,7 @@
 
             <Label
                 Grid.Column="1"
+                FontFamily="OpenSansSemibold"
                 HorizontalTextAlignment="Center"
                 LineBreakMode="TailTruncation"
                 Text="{Binding ChapterHeading}"
@@ -209,14 +205,14 @@
                 SizeChanged="OnTrackSizeChanged">
 
                 <BoxView
-                    BackgroundColor="{AppThemeBinding Light=#C9C3B6,
-                                                      Dark=#333A46}"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Line},
+                                                      Dark={StaticResource LineDark}}"
                     HeightRequest="1"
                     VerticalOptions="Center" />
 
                 <BoxView
-                    BackgroundColor="{AppThemeBinding Light=#2E3440,
-                                                      Dark=#9FB4E8}"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Accent},
+                                                      Dark={StaticResource AccentDark}}"
                     HeightRequest="12"
                     HorizontalOptions="Start"
                     VerticalOptions="Center"
@@ -245,7 +241,8 @@
             Grid.Row="4"
             HorizontalOptions="Center"
             IsVisible="{Binding HasAudio}"
-            Spacing="26">
+            Margin="0,6"
+            Spacing="30">
             <Button
                 Command="{Binding BackCommand}"
                 Style="{StaticResource Skip}"
@@ -274,7 +271,7 @@
                 Command="{Binding OpenReaderCommand}"
                 HorizontalOptions="Center"
                 IsVisible="{Binding HasText}"
-                Style="{StaticResource Plain}"
+                Style="{StaticResource Secondary}"
                 Text="Čitaj" />
 
             <Label

@@ -6,8 +6,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:ServerViewModel"
-    BackgroundColor="{AppThemeBinding Light={StaticResource PaperBackground},
-                                      Dark={StaticResource PaperBackgroundDark}}"
     Shell.NavBarIsVisible="False"
     Title="Server">
 
@@ -20,13 +18,6 @@
 
         The sign-in half disappears once connected. It is a thing you do once.
     -->
-
-    <ContentPage.Resources>
-        <Style x:Key="Cover" TargetType="Image">
-            <Setter Property="Aspect" Value="AspectFill" />
-            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#E4DFD6, Dark=#1B2029}" />
-        </Style>
-    </ContentPage.Resources>
 
     <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="14,10">
 
@@ -99,7 +90,7 @@
 
             <Button
                 Command="{Binding ConnectCommand}"
-                Style="{StaticResource Plain}"
+                Style="{StaticResource Primary}"
                 Text="Poveži se" />
 
             <Label
@@ -203,8 +194,8 @@
                                                 VerticalOptions="Start" />
 
                                             <Label
-                                                BackgroundColor="{AppThemeBinding Light=#F1EDE5,
-                                                                                  Dark=#15181E}"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Chrome},
+                                                                                  Dark={StaticResource ChromeDark}}"
                                                 FontSize="11"
                                                 HorizontalOptions="Start"
                                                 IsVisible="{Binding IsNumbered}"
@@ -247,6 +238,7 @@
 
             <Button
                 Command="{Binding DisconnectCommand}"
+                HorizontalOptions="Start"
                 IsVisible="{Binding IsConnected}"
                 Style="{StaticResource IconWide}"
                 Text="Odspoji se" />

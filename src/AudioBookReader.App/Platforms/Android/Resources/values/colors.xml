@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    What Android itself paints before any of the app's own styles are loaded: the status bar, the
+    task switcher entry, the window behind the splash. Left as the template's purple, these are the
+    few places the app would still look like a new project.
+-->
 <resources>
-    <color name="colorPrimary">#512BD4</color>
-    <color name="colorPrimaryDark">#2B0B98</color>
-    <color name="colorAccent">#2B0B98</color>
+    <color name="colorPrimary">#B26A00</color>
+    <color name="colorPrimaryDark">#8A5200</color>
+    <color name="colorAccent">#B26A00</color>
 </resources>

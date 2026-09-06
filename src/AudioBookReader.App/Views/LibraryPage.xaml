@@ -5,57 +5,112 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:LibraryViewModel"
+    Shell.NavBarIsVisible="False"
     Title="Moje knjige">
 
-    <ContentPage.ToolbarItems>
-        <ToolbarItem Text="+ Audio" Command="{Binding ImportAudioCommand}" />
-        <ToolbarItem Text="+ Knjiga" Command="{Binding ImportEbookCommand}" />
-        <ToolbarItem Text="Server" Command="{Binding OpenServerCommand}" />
-    </ContentPage.ToolbarItems>
+    <!--
+        The shelf. The first screen anyone sees, so it is the one that decides what the app is.
 
-    <Grid RowDefinitions="Auto,Auto,*">
+        A row per book with its cover, because a cover is how anyone finds a book they own — and a
+        line of progress under the ones already started, since the question the shelf answers most
+        often is "where was I". Nothing is filled or coloured except that line: on a screen of a
+        dozen books, colour spent on chrome is colour taken from the covers.
+    -->
 
-        <VerticalStackLayout
+    <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+        <!--  ======== Title, and the three ways a book gets here ========  -->
+
+        <Grid
             Grid.Row="0"
-            Padding="16,12"
-            IsVisible="{Binding IsBusy}"
-            Spacing="8">
-            <ActivityIndicator IsRunning="{Binding IsBusy}" />
-            <Label HorizontalOptions="Center" Text="{Binding BusyMessage}" />
+            Padding="20,16,12,8"
+            ColumnDefinitions="*,Auto,Auto,Auto">
 
-            <!--  Copying a whole audiobook takes time; without a number it reads as a hang.  -->
-            <ProgressBar
-                Margin="40,6,40,0"
-                IsVisible="{Binding HasBusyFraction}"
-                Progress="{Binding BusyFraction}" />
-        </VerticalStackLayout>
+            <Label
+                Grid.Column="0"
+                Style="{StaticResource Display}"
+                Text="Knjige"
+                VerticalOptions="Center" />
+
+            <Button
+                Grid.Column="1"
+                Command="{Binding ImportAudioCommand}"
+                Style="{StaticResource Icon}"
+                Text="🎧" />
+
+            <Button
+                Grid.Column="2"
+                Command="{Binding ImportEbookCommand}"
+                Style="{StaticResource Icon}"
+                Text="📖" />
+
+            <Button
+                Grid.Column="3"
+                Command="{Binding OpenServerCommand}"
+                Style="{StaticResource Icon}"
+                Text="☁" />
+        </Grid>
+
+        <!--  Importing a whole audiobook takes time; without a number it reads as a hang.  -->
+        <Border
+            Grid.Row="1"
+            IsVisible="{Binding IsBusy}"
+            Margin="16,4"
+            Style="{StaticResource Card}">
+            <VerticalStackLayout Spacing="10">
+                <HorizontalStackLayout Spacing="12">
+                    <ActivityIndicator
+                        HeightRequest="18"
+                        IsRunning="{Binding IsBusy}"
+                        VerticalOptions="Center"
+                        WidthRequest="18" />
+                    <Label
+                        Text="{Binding BusyMessage}"
+                        VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
+                <ProgressBar IsVisible="{Binding HasBusyFraction}" Progress="{Binding BusyFraction}" />
+            </VerticalStackLayout>
+        </Border>
 
         <Label
-            Grid.Row="1"
-            Margin="16,12"
+            Grid.Row="2"
             IsVisible="{Binding HasError}"
-            Text="{Binding Error}"
-            TextColor="#C0392B" />
+            Margin="20,8"
+            Style="{StaticResource Failure}"
+            Text="{Binding Error}" />
+
+        <!--  ======== An empty shelf, which is a first impression too ========  -->
 
         <VerticalStackLayout
-            Grid.Row="2"
-            Padding="32"
+            Grid.Row="3"
             IsVisible="{Binding IsEmpty}"
-            Spacing="12"
+            Padding="36"
+            Spacing="14"
             VerticalOptions="Center">
-            <Label
-                FontSize="18"
-                HorizontalTextAlignment="Center"
-                Text="Još nema knjiga" />
+
             <Label
                 HorizontalTextAlignment="Center"
-                Text="Dodaj audioknjigu, e-knjigu, ili oboje. Ako dodaš oboje za isti naslov, tekst će pratiti naraciju."
-                TextColor="Gray" />
+                Style="{StaticResource Heading}"
+                Text="Polica je prazna" />
+
+            <Label
+                HorizontalTextAlignment="Center"
+                Style="{StaticResource Muted}"
+                Text="Dodaj audioknjigu 🎧, e-knjigu 📖, ili oboje. Kad dodaš oboje za isti naslov, tekst počne pratiti naraciju." />
+
+            <Label
+                HorizontalTextAlignment="Center"
+                Style="{StaticResource Muted}"
+                Text="☁ dohvaća knjige s tvog Audiobookshelf servera." />
         </VerticalStackLayout>
+
+        <!--  ======== The books ========  -->
 
         <CollectionView
             x:Name="BookList"
-            Grid.Row="2"
+            Grid.Row="3"
+            ItemSizingStrategy="MeasureFirstItem"
             ItemsSource="{Binding Books}"
             SelectionMode="None">
 
@@ -65,60 +120,78 @@
                         <SwipeView.RightItems>
                             <SwipeItems Mode="Execute">
                                 <SwipeItem
-                                    BackgroundColor="#C0392B"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Alarm},
+                                                                      Dark={StaticResource AlarmDark}}"
                                     Command="{Binding Path=BindingContext.DeleteCommand, Source={x:Reference BookList}}"
                                     CommandParameter="{Binding .}"
                                     Text="Obriši" />
                             </SwipeItems>
                         </SwipeView.RightItems>
 
-                    <Grid Padding="16,12" ColumnDefinitions="64,*,Auto">
+                        <Grid
+                            Padding="20,10"
+                            ColumnDefinitions="58,*,Auto"
+                            ColumnSpacing="14"
+                            HeightRequest="92">
 
-                        <Grid.GestureRecognizers>
-                            <TapGestureRecognizer
-                                Command="{Binding Path=BindingContext.OpenCommand, Source={x:Reference BookList}}"
-                                CommandParameter="{Binding .}" />
-                        </Grid.GestureRecognizers>
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding Path=BindingContext.OpenCommand, Source={x:Reference BookList}}"
+                                    CommandParameter="{Binding .}" />
+                            </Grid.GestureRecognizers>
 
-                        <Image
-                            Grid.Column="0"
-                            Aspect="AspectFill"
-                            HeightRequest="64"
-                            IsVisible="{Binding HasCover}"
-                            Source="{Binding CoverPath}"
-                            WidthRequest="64" />
+                            <!--
+                                The cover keeps its place whether or not there is one to show, so a
+                                shelf of books with and without covers still reads as a column.
+                            -->
+                            <Border
+                                Grid.Column="0"
+                                HeightRequest="76"
+                                StrokeShape="RoundRectangle 6"
+                                StrokeThickness="0"
+                                VerticalOptions="Center"
+                                WidthRequest="58">
+                                <Image Source="{Binding CoverPath}" Style="{StaticResource Cover}" />
+                            </Border>
 
-                        <VerticalStackLayout
-                            Grid.Column="1"
-                            Padding="12,0"
-                            Spacing="2">
-                            <Label
-                                FontAttributes="Bold"
-                                LineBreakMode="TailTruncation"
-                                Text="{Binding Title}" />
-                            <Label
-                                FontSize="13"
-                                LineBreakMode="TailTruncation"
-                                Text="{Binding Author}"
-                                TextColor="Gray" />
-                            <Label
-                                FontSize="12"
-                                Text="{Binding Subtitle}"
-                                TextColor="Gray" />
-                            <Label
-                                FontSize="11"
-                                IsVisible="{Binding HasSyncBadge}"
-                                Text="{Binding SyncBadge}"
-                                TextColor="Gray" />
-                            <ProgressBar IsVisible="{Binding HasProgress}" Progress="{Binding Progress}" />
-                        </VerticalStackLayout>
+                            <VerticalStackLayout
+                                Grid.Column="1"
+                                Spacing="3"
+                                VerticalOptions="Center">
 
-                        <Label
-                            Grid.Column="2"
-                            FontSize="16"
-                            Text="{Binding MediaBadge}"
-                            VerticalOptions="Center" />
-                    </Grid>
+                                <Label
+                                    FontFamily="OpenSansSemibold"
+                                    LineBreakMode="TailTruncation"
+                                    Text="{Binding Title}" />
+
+                                <Label
+                                    LineBreakMode="TailTruncation"
+                                    Style="{StaticResource Muted}"
+                                    Text="{Binding Author}" />
+
+                                <Label
+                                    FontSize="12"
+                                    LineBreakMode="TailTruncation"
+                                    Style="{StaticResource Muted}"
+                                    Text="{Binding Subtitle}" />
+
+                                <!--
+                                    Where you got to. The only coloured thing on the row, because it
+                                    is the only question the shelf is usually being asked.
+                                -->
+                                <ProgressBar
+                                    HeightRequest="3"
+                                    IsVisible="{Binding HasProgress}"
+                                    Margin="0,3,0,0"
+                                    Progress="{Binding Progress}" />
+                            </VerticalStackLayout>
+
+                            <Label
+                                Grid.Column="2"
+                                FontSize="15"
+                                Text="{Binding MediaBadge}"
+                                VerticalOptions="Center" />
+                        </Grid>
                     </SwipeView>
                 </DataTemplate>
             </CollectionView.ItemTemplate>

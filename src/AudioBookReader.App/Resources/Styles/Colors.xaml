@@ -1,44 +1,69 @@
 ﻿<?xml version="1.0" encoding="UTF-8" ?>
-<ResourceDictionary 
+<ResourceDictionary
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-    <!-- Note: For Android please see also Platforms\Android\Resources\values\colors.xml -->
+    <!--
+        Paper and ink, and one warm light.
 
-    <Color x:Key="Primary">#512BD4</Color>
-    <Color x:Key="PrimaryDark">#ac99ea</Color>
-    <Color x:Key="PrimaryDarkText">#242424</Color>
-    <Color x:Key="Secondary">#DFD8F7</Color>
-    <Color x:Key="SecondaryDarkText">#9880e5</Color>
-    <Color x:Key="Tertiary">#2B0B98</Color>
+        The app is a book, so it is built out of the two colours a book is made of: warm paper and
+        dark ink. Nothing here is grey — greys read as software, and the whole point is that this
+        does not. The light theme is a cream page under a lamp; the dark theme is not that page
+        inverted but a different thing, a room at night, blue-black rather than black so it does not
+        vibrate against the text.
 
-    <Color x:Key="White">White</Color>
-    <Color x:Key="Black">Black</Color>
-    <Color x:Key="Magenta">#D600AA</Color>
-    <Color x:Key="MidnightBlue">#190649</Color>
-    <Color x:Key="OffBlack">#1f1f1f</Color>
+        The one saturated colour is brass — the colour of a reading lamp. It is deliberately not a
+        technology blue or purple, and it is the same amber the reader already paints under the
+        sentence being narrated, so the accent and the highlight are one idea rather than two.
 
-    <Color x:Key="Gray100">#E1E1E1</Color>
-    <Color x:Key="Gray200">#C8C8C8</Color>
-    <Color x:Key="Gray300">#ACACAC</Color>
-    <Color x:Key="Gray400">#919191</Color>
-    <Color x:Key="Gray500">#6E6E6E</Color>
-    <Color x:Key="Gray600">#404040</Color>
-    <Color x:Key="Gray900">#212121</Color>
-    <Color x:Key="Gray950">#141414</Color>
+        Every colour is declared in both themes here, and only here. Nothing anywhere else in the
+        app should name a hex value.
+    -->
 
-    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
-    <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
-    <SolidColorBrush x:Key="TertiaryBrush" Color="{StaticResource Tertiary}"/>
-    <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource White}"/>
-    <SolidColorBrush x:Key="BlackBrush" Color="{StaticResource Black}"/>
+    <!--  The page itself.  -->
+    <Color x:Key="Paper">#FBF8F2</Color>
+    <Color x:Key="PaperDark">#12141A</Color>
 
-    <SolidColorBrush x:Key="Gray100Brush" Color="{StaticResource Gray100}"/>
-    <SolidColorBrush x:Key="Gray200Brush" Color="{StaticResource Gray200}"/>
-    <SolidColorBrush x:Key="Gray300Brush" Color="{StaticResource Gray300}"/>
-    <SolidColorBrush x:Key="Gray400Brush" Color="{StaticResource Gray400}"/>
-    <SolidColorBrush x:Key="Gray500Brush" Color="{StaticResource Gray500}"/>
-    <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
-    <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
-    <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
+    <!--  Recessed: fields, wells, anything the page is behind.  -->
+    <Color x:Key="Sunken">#F1EADD</Color>
+    <Color x:Key="SunkenDark">#191D25</Color>
+
+    <!--  Raised: cards and sheets that sit above the page.  -->
+    <Color x:Key="Surface">#FFFFFF</Color>
+    <Color x:Key="SurfaceDark">#1C212B</Color>
+
+    <!--  A bar attached to the page rather than floating over it.  -->
+    <Color x:Key="Chrome">#F5F0E6</Color>
+    <Color x:Key="ChromeDark">#171B23</Color>
+
+    <Color x:Key="Ink">#241F1A</Color>
+    <Color x:Key="InkDark">#E9E4DA</Color>
+
+    <!--  Second-rank text: subtitles, captions, anything said quietly.  -->
+    <Color x:Key="InkMuted">#7C7268</Color>
+    <Color x:Key="InkMutedDark">#948E84</Color>
+
+    <!--  Hairlines. Never a border you notice, only one you would miss.  -->
+    <Color x:Key="Line">#E7DFD1</Color>
+    <Color x:Key="LineDark">#2B313D</Color>
+
+    <!--  Brass: the reading lamp, and the one saturated colour in the app.  -->
+    <Color x:Key="Accent">#B26A00</Color>
+    <Color x:Key="AccentDark">#E8A945</Color>
+
+    <Color x:Key="OnAccent">#FFFDF8</Color>
+    <Color x:Key="OnAccentDark">#1A1509</Color>
+
+    <!--  The same brass at a whisper, for the ground under a selected thing.  -->
+    <Color x:Key="AccentSoft">#F3E6CD</Color>
+    <Color x:Key="AccentSoftDark">#2C2416</Color>
+
+    <!--  Failure. Warmed towards the palette rather than a pure alarm red.  -->
+    <Color x:Key="Alarm">#B3402C</Color>
+    <Color x:Key="AlarmDark">#E4785F</Color>
+
+    <!--  A cover that has not loaded, and other placeholders shaped like content.  -->
+    <Color x:Key="Placeholder">#E8DFCF</Color>
+    <Color x:Key="PlaceholderDark">#232833</Color>
+
 </ResourceDictionary>

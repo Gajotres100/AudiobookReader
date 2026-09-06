@@ -5,8 +5,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:ServerBookViewModel"
-    BackgroundColor="{AppThemeBinding Light={StaticResource PaperBackground},
-                                      Dark={StaticResource PaperBackgroundDark}}"
     Shell.NavBarIsVisible="False"
     Title="{Binding Title}">
 
@@ -34,23 +32,16 @@
                 <Border
                     HeightRequest="260"
                     HorizontalOptions="Center"
+                    StrokeShape="RoundRectangle 10"
                     StrokeThickness="0"
                     WidthRequest="180">
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="8" />
-                    </Border.StrokeShape>
-                    <Image
-                        Aspect="AspectFill"
-                        BackgroundColor="{AppThemeBinding Light=#E4DFD6,
-                                                          Dark=#1B2029}"
-                        Source="{Binding CoverUrl}" />
+                    <Image Source="{Binding CoverUrl}" Style="{StaticResource Cover}" />
                 </Border>
 
                 <VerticalStackLayout Spacing="4">
                     <Label
-                        FontAttributes="Bold"
-                        FontSize="19"
                         HorizontalTextAlignment="Center"
+                        Style="{StaticResource Heading}"
                         Text="{Binding Title}" />
 
                     <Label
@@ -65,43 +56,47 @@
                         Text="{Binding Series}" />
                 </VerticalStackLayout>
 
-                <BoxView Style="{StaticResource Divider}" />
-
-                <VerticalStackLayout Spacing="6">
-                    <Label Text="{Binding Contents}" />
-                    <Label Style="{StaticResource Muted}" Text="{Binding Length}" />
-                    <Label Style="{StaticResource Muted}" Text="{Binding Chapters}" />
-                </VerticalStackLayout>
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Style="{StaticResource Section}" Text="Na serveru" />
+                        <Label Text="{Binding Contents}" />
+                        <Label Style="{StaticResource Muted}" Text="{Binding Length}" />
+                        <Label Style="{StaticResource Muted}" Text="{Binding Chapters}" />
+                    </VerticalStackLayout>
+                </Border>
 
                 <!--  Why it cannot come, when it cannot — said here, not by a button that refuses.  -->
                 <Label
                     IsVisible="{Binding CannotDownload}"
                     Text="{Binding Obstacle}"
-                    TextColor="#C0392B" />
-
-                <BoxView Style="{StaticResource Divider}" />
+                    Style="{StaticResource Failure}" />
 
                 <!--
                     Where it will go, and the chance to say otherwise. Books belong beside the other
                     books, in a folder the phone can see — not buried in app storage where nothing
                     else can reach them.
                 -->
-                <VerticalStackLayout Spacing="6">
-                    <Label Style="{StaticResource Muted}" Text="{Binding Destination}" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Style="{StaticResource Section}" Text="Kamo se sprema" />
 
-                    <!--  The shelf it will make: author, then the book, then the files.  -->
-                    <Label
-                        FontFamily="Monospace"
-                        FontSize="12"
-                        Style="{StaticResource Muted}"
-                        Text="{Binding Layout}" />
+                        <Label Style="{StaticResource Muted}" Text="{Binding Destination}" />
 
-                    <Button
-                        Command="{Binding ChooseFolderCommand}"
-                        HorizontalOptions="Start"
-                        Style="{StaticResource IconWide}"
-                        Text="Odaberi mapu…" />
-                </VerticalStackLayout>
+                        <!--  The shelf it will make: author, then the book, then the files.  -->
+                        <Label
+                            FontSize="12"
+                            Style="{StaticResource Muted}"
+                            Text="{Binding Layout}"
+                            TextColor="{AppThemeBinding Light={StaticResource Accent},
+                                                        Dark={StaticResource AccentDark}}" />
+
+                        <Button
+                            Command="{Binding ChooseFolderCommand}"
+                            HorizontalOptions="Start"
+                            Style="{StaticResource Secondary}"
+                            Text="Odaberi mapu…" />
+                    </VerticalStackLayout>
+                </Border>
             </VerticalStackLayout>
         </ScrollView>
 
@@ -127,19 +122,19 @@
                 Command="{Binding DownloadCommand}"
                 IsEnabled="{Binding CanDownload}"
                 IsVisible="{Binding IsIdle}"
-                Style="{StaticResource Plain}"
+                Style="{StaticResource Primary}"
                 Text="Preuzmi" />
 
             <Button
                 Command="{Binding CancelCommand}"
                 IsVisible="{Binding IsDownloading}"
-                Style="{StaticResource Plain}"
+                Style="{StaticResource Secondary}"
                 Text="Prekini preuzimanje" />
 
             <Button
                 Command="{Binding OpenCommand}"
                 IsVisible="{Binding IsInLibrary}"
-                Style="{StaticResource IconWide}"
+                Style="{StaticResource Secondary}"
                 Text="Otvori knjigu" />
         </VerticalStackLayout>
     </Grid>
