@@ -14,17 +14,55 @@ public record ServerLibrary(string Id, string Name, string MediaType)
 /// Zero for a text-only title, one for the ordinary tagged container, more for a folder of
 /// per-chapter files — which is the commonest shape on a server and the one the app cannot hold yet.
 /// </param>
+/// <param name="Series">
+/// The series this belongs to, without the number — "The Raven's Mark". The server sends name and
+/// sequence as one string, and comma-separated when a book is in more than one; only the first is
+/// kept, because a shelf can only stand a book in one place.
+/// </param>
+/// <param name="Sequence">Its place in that series, as written — "1", "2.5", or empty.</param>
+/// <param name="AddedAt">When the server first saw it, for the recently-added shelf.</param>
 public record ServerBook(
     string Id,
     string Title,
     string? Author,
     int AudioFileCount,
     string? EbookFormat,
-    double DurationSeconds)
+    double DurationSeconds,
+    string? Series = null,
+    string? Sequence = null,
+    DateTimeOffset? AddedAt = null)
 {
     public bool HasAudio => AudioFileCount > 0;
 
     public bool HasEbook => !string.IsNullOrEmpty(EbookFormat);
+
+    public bool InSeries => !string.IsNullOrEmpty(Series);
+
+    /// <summary>
+    /// Splits what the server sends into a name and a place in it.
+    ///
+    /// The wire carries "The Raven's Mark #1", and several of those comma-separated when a book
+    /// belongs to more than one series. Sorting a shelf needs the two apart, and the number has to
+    /// sort as a number: "#10" belongs after "#9", which it does not as text.
+    /// </summary>
+    public static (string? Series, string? Sequence) SplitSeries(string? seriesName)
+    {
+        if (string.IsNullOrWhiteSpace(seriesName)) return (null, null);
+
+        var first = seriesName.Split(',')[0].Trim();
+        var hash = first.LastIndexOf('#');
+
+        return hash < 0
+            ? (first, null)
+            : (first[..hash].Trim(), first[(hash + 1)..].Trim());
+    }
+
+    /// <summary>Its place in the series as a number, for ordering. Unnumbered books go last.</summary>
+    public double SequenceOrder =>
+        double.TryParse(Sequence, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? value
+            : double.MaxValue;
 }
 
 /// <param name="Ino">The server's own handle for a file within an item; what a download is addressed by.</param>
@@ -75,6 +113,7 @@ internal record ItemsResponse(
 
 internal record WireItem(
     [property: JsonPropertyName("id")] string? Id,
+    [property: JsonPropertyName("addedAt")] long? AddedAt,
     [property: JsonPropertyName("media")] WireMedia? Media);
 
 internal record WireMedia(
@@ -89,7 +128,8 @@ internal record WireMedia(
 
 internal record WireMetadata(
     [property: JsonPropertyName("title")] string? Title,
-    [property: JsonPropertyName("authorName")] string? AuthorName);
+    [property: JsonPropertyName("authorName")] string? AuthorName,
+    [property: JsonPropertyName("seriesName")] string? SeriesName);
 
 internal record WireAudioFile(
     [property: JsonPropertyName("ino")] string? Ino,

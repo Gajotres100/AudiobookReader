@@ -96,6 +96,9 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
         IsConnected = false;
     }
 
+    /// <summary>Where a book's cover can be fetched from, for a shelf to draw.</summary>
+    public string CoverUrl(string itemId) => _client.CoverUrl(itemId);
+
     public Task<IReadOnlyList<ServerLibraryInfo>> GetLibrariesAsync(CancellationToken ct = default) =>
         Wrap(async () =>
         {
@@ -136,40 +139,56 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
 
         int? bookId = null;
 
-        if (detail.AudioFiles.Count == 1)
-        {
-            var file = detail.AudioFiles[0];
+        // Deleted whichever way this goes. The importer makes its own copy in app storage, so a
+        // download left behind is a second copy of a three-hundred-megabyte file that nothing will
+        // ever open — and on a cancelled download it is half of one.
+        var downloaded = new List<string>();
 
-            var path = await DownloadAsync(
-                file.FileName,
-                (to, report) => _client.DownloadFileAsync(book.Id, file.Ino, to, report, ct),
-                $"Skidam zvuk — {book.Title}",
-                progress,
-                ct);
+        try
+            {
+            if (detail.AudioFiles.Count == 1)
+            {
+                var file = detail.AudioFiles[0];
 
-            var imported = await importer.ImportAudioAsync(
-                new PickedMedia(path, file.FileName), null, progress, ct);
+                var path = await DownloadAsync(
+                    file.FileName,
+                    (to, report) => _client.DownloadFileAsync(book.Id, file.Ino, to, report, ct),
+                    $"Skidam zvuk — {book.Title}",
+                    progress,
+                    ct);
 
-            bookId = imported.Id;
+                downloaded.Add(path);
+
+                var imported = await importer.ImportAudioAsync(
+                    new PickedMedia(path, file.FileName), null, progress, ct);
+
+                bookId = imported.Id;
+            }
+
+            if (detail.Ebook is { } ebook)
+            {
+                var path = await DownloadAsync(
+                    ebook.FileName,
+                    (to, report) => _client.DownloadEbookAsync(book.Id, to, report, ct),
+                    $"Skidam tekst — {book.Title}",
+                    progress,
+                    ct);
+
+                downloaded.Add(path);
+
+                var imported = await importer.ImportEbookAsync(
+                    new PickedMedia(path, ebook.FileName), bookId, progress, ct);
+
+                bookId ??= imported.Id;
+            }
+
+            return bookId ?? throw new NotSupportedException(
+                $"„{book.Title}” na serveru nema ni zvuka ni teksta.");
         }
-
-        if (detail.Ebook is { } ebook)
+        finally
         {
-            var path = await DownloadAsync(
-                ebook.FileName,
-                (to, report) => _client.DownloadEbookAsync(book.Id, to, report, ct),
-                $"Skidam tekst — {book.Title}",
-                progress,
-                ct);
-
-            var imported = await importer.ImportEbookAsync(
-                new PickedMedia(path, ebook.FileName), bookId, progress, ct);
-
-            bookId ??= imported.Id;
+            foreach (var path in downloaded) TryDelete(path);
         }
-
-        return bookId ?? throw new NotSupportedException(
-            $"„{book.Title}” na serveru nema ni zvuka ni teksta.");
     }
 
     /// <summary>

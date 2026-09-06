@@ -12,13 +12,23 @@
     Title="Server">
 
     <!--
-        Connecting to an Audiobookshelf server, and taking books off it.
+        Books on an Audiobookshelf server, and bringing them here.
 
-        The sign-in half disappears once connected, because it is a thing you do once. What stays is
-        the library: pick which one, then the books in it.
+        Arranged the way a shelf is: the newest arrivals along the top, then each series in reading
+        order, then everything that belongs to no series. Covers rather than lines of text, because
+        that is how anyone actually recognises a book they own.
+
+        The sign-in half disappears once connected. It is a thing you do once.
     -->
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="16,10">
+    <ContentPage.Resources>
+        <Style x:Key="Cover" TargetType="Image">
+            <Setter Property="Aspect" Value="AspectFill" />
+            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#E4DFD6, Dark=#1B2029}" />
+        </Style>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="14,10">
 
         <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
             <Button
@@ -48,14 +58,12 @@
             IsVisible="{Binding IsDisconnected}"
             Spacing="10">
 
-            <Label
-                Style="{StaticResource Muted}"
-                Text="Adresa servera, npr. 192.168.1.10:13378" />
+            <Label Style="{StaticResource Muted}" Text="Adresa servera, npr. 192.168.1.10:13378" />
 
             <Entry Keyboard="Url" Text="{Binding Url}" />
 
             <!--
-                Two ways in. A token is the better one and is offered first-class rather than hidden:
+                Two ways in. A token is the better one and is offered as an equal rather than hidden:
                 it can be revoked from the server without changing the account password, and the
                 password then never has to be typed into this app at all.
             -->
@@ -92,73 +100,175 @@
         </VerticalStackLayout>
 
         <!--  Which library on the server  -->
-        <VerticalStackLayout
+        <Grid
             Grid.Row="1"
-            IsVisible="{Binding IsConnected}"
-            Spacing="6">
-
-            <Label Style="{StaticResource Muted}" Text="{Binding Url}" />
+            ColumnDefinitions="*,Auto"
+            IsVisible="{Binding IsConnected}">
 
             <Picker
+                Grid.Column="0"
                 ItemDisplayBinding="{Binding Name}"
                 ItemsSource="{Binding Libraries}"
                 SelectedItem="{Binding SelectedLibrary}" />
-        </VerticalStackLayout>
 
-        <!--  The books  -->
-        <CollectionView
-            Grid.Row="2"
-            ItemsSource="{Binding Books}"
-            Margin="0,10"
-            SelectionMode="None">
-            <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="vm:ServerBookRow">
-                    <Grid Padding="0,12" ColumnDefinitions="*,Auto">
-                        <Grid.GestureRecognizers>
-                            <TapGestureRecognizer
-                                Command="{Binding Path=BindingContext.ImportCommand, Source={x:Reference ServerRoot}}"
-                                CommandParameter="{Binding .}" />
-                        </Grid.GestureRecognizers>
+            <Label
+                Grid.Column="1"
+                Style="{StaticResource Muted}"
+                Text="{Binding Url}"
+                VerticalOptions="Center" />
+        </Grid>
 
-                        <VerticalStackLayout Grid.Column="0" Spacing="2">
-                            <Label LineBreakMode="TailTruncation" Text="{Binding Title}" />
-                            <Label Style="{StaticResource Muted}" Text="{Binding Author}" />
-                            <Label Style="{StaticResource Muted}" Text="{Binding Note}" />
-                        </VerticalStackLayout>
+        <ScrollView Grid.Row="2" Margin="0,8">
+            <VerticalStackLayout Spacing="14">
 
-                        <Label
-                            Grid.Column="1"
-                            Text="{Binding Media}"
-                            VerticalOptions="Center" />
-                    </Grid>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
+                <!--  Newest arrivals, along the top and sideways  -->
+                <VerticalStackLayout IsVisible="{Binding HasRecent}" Spacing="6">
+                    <Label FontAttributes="Bold" Text="Nedavno dodano" />
 
+                    <CollectionView
+                        HeightRequest="210"
+                        ItemsSource="{Binding Recent}"
+                        SelectionMode="None">
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout ItemSpacing="10" Orientation="Horizontal" />
+                        </CollectionView.ItemsLayout>
+
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ServerBookRow">
+                                <VerticalStackLayout Spacing="4" WidthRequest="110">
+                                    <VerticalStackLayout.GestureRecognizers>
+                                        <TapGestureRecognizer
+                                            Command="{Binding Path=BindingContext.ImportCommand, Source={x:Reference ServerRoot}}"
+                                            CommandParameter="{Binding .}" />
+                                    </VerticalStackLayout.GestureRecognizers>
+
+                                    <Border HeightRequest="160" StrokeThickness="0">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="6" />
+                                        </Border.StrokeShape>
+                                        <Image Source="{Binding CoverUrl}" Style="{StaticResource Cover}" />
+                                    </Border>
+
+                                    <Label
+                                        FontSize="12"
+                                        LineBreakMode="TailTruncation"
+                                        MaxLines="2"
+                                        Text="{Binding Title}" />
+                                </VerticalStackLayout>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+                <!--  Everything, by series  -->
+                <CollectionView
+                    IsGrouped="True"
+                    ItemsSource="{Binding Shelves}"
+                    SelectionMode="None">
+
+                    <CollectionView.GroupHeaderTemplate>
+                        <DataTemplate x:DataType="vm:Shelf">
+                            <Grid Padding="0,14,0,6" ColumnDefinitions="*,Auto">
+                                <Label
+                                    Grid.Column="0"
+                                    FontAttributes="Bold"
+                                    LineBreakMode="TailTruncation"
+                                    Text="{Binding Name}" />
+                                <Label
+                                    Grid.Column="1"
+                                    Style="{StaticResource Muted}"
+                                    Text="{Binding Summary}"
+                                    VerticalOptions="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.GroupHeaderTemplate>
+
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ServerBookRow">
+                            <Grid
+                                Padding="0,6"
+                                ColumnDefinitions="52,Auto,*,Auto"
+                                ColumnSpacing="10">
+
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Path=BindingContext.ImportCommand, Source={x:Reference ServerRoot}}"
+                                        CommandParameter="{Binding .}" />
+                                </Grid.GestureRecognizers>
+
+                                <Border
+                                    Grid.Column="0"
+                                    HeightRequest="74"
+                                    StrokeThickness="0">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="4" />
+                                    </Border.StrokeShape>
+                                    <Image Source="{Binding CoverUrl}" Style="{StaticResource Cover}" />
+                                </Border>
+
+                                <Label
+                                    Grid.Column="1"
+                                    IsVisible="{Binding IsNumbered}"
+                                    Style="{StaticResource Muted}"
+                                    Text="{Binding Number}"
+                                    VerticalOptions="Center" />
+
+                                <VerticalStackLayout
+                                    Grid.Column="2"
+                                    Spacing="2"
+                                    VerticalOptions="Center">
+                                    <Label LineBreakMode="TailTruncation" Text="{Binding Title}" />
+                                    <Label
+                                        LineBreakMode="TailTruncation"
+                                        Style="{StaticResource Muted}"
+                                        Text="{Binding Author}" />
+                                    <Label Style="{StaticResource Muted}" Text="{Binding Note}" />
+                                </VerticalStackLayout>
+
+                                <Label
+                                    Grid.Column="3"
+                                    Text="{Binding Media}"
+                                    VerticalOptions="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!--  What is happening, and the way to stop it  -->
         <VerticalStackLayout Grid.Row="3" Spacing="6">
-            <ProgressBar IsVisible="{Binding IsBusy}" Progress="{Binding Progress}" />
+            <ProgressBar IsVisible="{Binding IsDownloading}" Progress="{Binding Progress}" />
 
-            <HorizontalStackLayout IsVisible="{Binding HasStatus}" Spacing="10">
-                <ActivityIndicator
-                    HeightRequest="14"
-                    IsRunning="{Binding IsBusy}"
-                    IsVisible="{Binding IsBusy}"
-                    VerticalOptions="Center"
-                    WidthRequest="14" />
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasStatus}">
+                <HorizontalStackLayout Grid.Column="0" Spacing="10">
+                    <ActivityIndicator
+                        HeightRequest="14"
+                        IsRunning="{Binding IsBusy}"
+                        IsVisible="{Binding IsBusy}"
+                        VerticalOptions="Center"
+                        WidthRequest="14" />
 
-                <Label
-                    Style="{StaticResource Muted}"
-                    Text="{Binding Status}"
-                    VerticalOptions="Center" />
-            </HorizontalStackLayout>
+                    <Label
+                        LineBreakMode="TailTruncation"
+                        Style="{StaticResource Muted}"
+                        Text="{Binding Status}"
+                        VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
+                <Button
+                    Grid.Column="1"
+                    Command="{Binding CancelDownloadCommand}"
+                    IsVisible="{Binding IsDownloading}"
+                    Style="{StaticResource IconWide}"
+                    Text="Prekini" />
+            </Grid>
 
             <Button
                 Command="{Binding DisconnectCommand}"
-                FontSize="13"
                 IsVisible="{Binding IsConnected}"
-                Style="{StaticResource Icon}"
-                Text="Odspoji se"
-                WidthRequest="-1" />
+                Style="{StaticResource IconWide}"
+                Text="Odspoji se" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

@@ -6,14 +6,21 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace AudioBookReader.App.ViewModels;
 
-/// <summary>One book on the server, as the list shows it.</summary>
-public class ServerBookRow(ServerBook book)
+/// <summary>One book on the server, as the shelf shows it.</summary>
+public class ServerBookRow(ServerBook book, string coverUrl)
 {
     public ServerBook Book { get; } = book;
 
     public string Title { get; } = book.Title;
 
     public string Author { get; } = book.Author ?? "";
+
+    public string CoverUrl { get; } = coverUrl;
+
+    /// <summary>Its number in the series, shown beside the row rather than folded into the title.</summary>
+    public string Number { get; } = string.IsNullOrEmpty(book.Sequence) ? "" : $"#{book.Sequence}";
+
+    public bool IsNumbered { get; } = !string.IsNullOrEmpty(book.Sequence);
 
     /// <summary>What the server has of it, in the same shorthand the library uses.</summary>
     public string Media { get; } = (book.HasAudio, book.HasEbook) switch
@@ -37,9 +44,25 @@ public class ServerBookRow(ServerBook book)
     public bool CanImport { get; } = book.AudioFileCount <= 1 && (book.HasAudio || book.HasEbook);
 }
 
+/// <summary>
+/// A shelf: either a series in its own order, or the books that belong to no series.
+///
+/// A list rather than a wrapper around one, because that is what a grouped CollectionView binds to.
+/// </summary>
+public class Shelf(string name, IReadOnlyList<ServerBookRow> books) : List<ServerBookRow>(books)
+{
+    public string Name { get; } = name;
+
+    public string Summary { get; } = books.Count == 1 ? "1 knjiga" : $"{books.Count} knjiga";
+}
+
 public partial class ServerViewModel(ServerConnection server) : ObservableObject
 {
-    public ObservableCollection<ServerBookRow> Books { get; } = [];
+    /// <summary>Books grouped into series, with the unaffiliated ones last.</summary>
+    public ObservableCollection<Shelf> Shelves { get; } = [];
+
+    /// <summary>The newest arrivals, across all series, for the row along the top.</summary>
+    public ObservableCollection<ServerBookRow> Recent { get; } = [];
 
     public ObservableCollection<ServerLibraryInfo> Libraries { get; } = [];
 
@@ -48,6 +71,9 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
     public partial bool IsConnected { get; set; }
 
     public bool IsDisconnected => !IsConnected;
+
+    [ObservableProperty]
+    public partial bool HasRecent { get; set; }
 
     [ObservableProperty]
     public partial string Url { get; set; } = "";
@@ -80,6 +106,10 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
     [ObservableProperty]
     public partial double Progress { get; set; }
 
+    /// <summary>True while a book is coming down — the one thing here worth interrupting.</summary>
+    [ObservableProperty]
+    public partial bool IsDownloading { get; set; }
+
     [ObservableProperty]
     public partial ServerLibraryInfo? SelectedLibrary { get; set; }
 
@@ -88,7 +118,9 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         Url = server.Url ?? "";
         IsConnected = await server.RestoreAsync();
 
-        if (IsConnected) await RefreshAsync();
+        // Only the first time. Coming back from a download should not spend a minute re-reading a
+        // shelf that has not changed.
+        if (IsConnected && Shelves.Count == 0) await RefreshAsync();
     }
 
     [RelayCommand]
@@ -128,8 +160,12 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         server.Disconnect();
 
         IsConnected = false;
-        Books.Clear();
+        HasRecent = false;
+
+        Shelves.Clear();
+        Recent.Clear();
         Libraries.Clear();
+
         Status = "Odspojeno.";
     }
 
@@ -160,24 +196,80 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         if (value is not null) _ = LoadBooksAsync();
     }
 
+    /// <summary>How many of the newest arrivals the top row shows.</summary>
+    private const int RecentCount = 12;
+
     private Task LoadBooksAsync() => GuardAsync(async () =>
     {
         if (SelectedLibrary is not { } library) return;
 
-        Books.Clear();
+        Shelves.Clear();
+        Recent.Clear();
+        HasRecent = false;
+
         Status = "Čitam knjige…";
 
         var found = new Progress<int>(count => Status = $"Čitam knjige… {count}");
         var books = await server.GetBooksAsync(library.Id, found);
 
-        foreach (var book in books) Books.Add(new ServerBookRow(book));
+        AppLog.Info($"server: {books.Count} books in '{library.Name}'");
 
-        AppLog.Info($"server: {Books.Count} books in '{library.Name}'");
+        foreach (var book in Newest(books)) Recent.Add(Row(book));
+        foreach (var shelf in Arrange(books)) Shelves.Add(shelf);
 
-        Status = Books.Count == 0
+        HasRecent = Recent.Count > 0;
+
+        Status = books.Count == 0
             ? $"Biblioteka „{library.Name}” je prazna."
-            : $"{Books.Count} knjiga u „{library.Name}”.";
+            : $"{books.Count} knjiga u „{library.Name}”.";
     });
+
+    private ServerBookRow Row(ServerBook book) => new(book, server.CoverUrl(book.Id));
+
+    private static IEnumerable<ServerBook> Newest(IReadOnlyList<ServerBook> books) =>
+        books.Where(b => b.AddedAt is not null)
+            .OrderByDescending(b => b.AddedAt)
+            .Take(RecentCount);
+
+    /// <summary>
+    /// Sorts the library onto shelves: each series in its own reading order, then everything else.
+    ///
+    /// Series first, because that is how anyone looks for the next one — and in sequence rather
+    /// than alphabetically, since a series listed by title is a series you have to think about.
+    /// Books in no series go last under one heading rather than each becoming a shelf of one.
+    /// </summary>
+    private IEnumerable<Shelf> Arrange(IReadOnlyList<ServerBook> books)
+    {
+        var series = books
+            .Where(b => b.InSeries)
+            .GroupBy(b => b.Series!)
+            .OrderBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
+            .Select(g => new Shelf(
+                g.Key,
+                [.. g.OrderBy(b => b.SequenceOrder).ThenBy(b => b.Title).Select(Row)]));
+
+        var loose = books
+            .Where(b => !b.InSeries)
+            .OrderBy(b => b.Title, StringComparer.CurrentCultureIgnoreCase)
+            .Select(Row)
+            .ToList();
+
+        foreach (var shelf in series) yield return shelf;
+
+        if (loose.Count > 0) yield return new Shelf("Bez serije", loose);
+    }
+
+    /// <summary>The download in flight, so it can be stopped.</summary>
+    private CancellationTokenSource? _downloading;
+
+    [RelayCommand]
+    private void CancelDownload()
+    {
+        if (_downloading is null) return;
+
+        _downloading.Cancel();
+        Status = "Prekidam preuzimanje…";
+    }
 
     [RelayCommand]
     private Task ImportAsync(ServerBookRow? row) => GuardAsync(async () =>
@@ -190,16 +282,53 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
             return;
         }
 
-        var progress = new Progress<ImportProgress>(p =>
+        // One at a time, and said rather than silently ignored. Two downloads over a phone's
+        // connection finish later than two in a row, and only one progress bar can be believed.
+        if (IsDownloading)
         {
-            Status = p.Message;
-            Progress = p.Fraction;
-        });
+            Status = "Već preuzimam jednu knjigu — pričekaj ili je prekini.";
+            return;
+        }
 
-        await server.ImportAsync(row.Book, progress);
+        // Asked before it starts. A tap that begins a three-hundred-megabyte download with no
+        // warning is a tap nobody meant to make.
+        var confirmed = await Shell.Current.DisplayAlertAsync(
+            row.Title,
+            row.Note.Length > 0 ? $"Preuzeti sa servera? ({row.Note})" : "Preuzeti sa servera?",
+            "Preuzmi",
+            "Odustani");
 
-        Progress = 0;
-        Status = $"„{row.Title}” je u biblioteci.";
+        if (!confirmed) return;
+
+        using var downloading = new CancellationTokenSource();
+
+        _downloading = downloading;
+        IsDownloading = true;
+
+        try
+        {
+            var progress = new Progress<ImportProgress>(p =>
+            {
+                Status = p.Message;
+                Progress = p.Fraction;
+            });
+
+            await server.ImportAsync(row.Book, progress, downloading.Token);
+
+            Status = $"„{row.Title}” je u biblioteci.";
+        }
+        catch (OperationCanceledException)
+        {
+            // The half-finished file is already gone: whatever was written is deleted by the code
+            // that was writing it, whichever way the download ended.
+            Status = $"Preuzimanje knjige „{row.Title}” je prekinuto.";
+        }
+        finally
+        {
+            _downloading = null;
+            IsDownloading = false;
+            Progress = 0;
+        }
     });
 
     /// <summary>

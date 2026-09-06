@@ -333,6 +333,7 @@ public class AudiobookshelfClient(HttpClient http)
         if (item.Id is null) return null;
 
         var media = item.Media;
+        var (series, sequence) = ServerBook.SplitSeries(media?.Metadata?.SeriesName);
 
         return new ServerBook(
             item.Id,
@@ -340,7 +341,10 @@ public class AudiobookshelfClient(HttpClient http)
             media?.Metadata?.AuthorName,
             media?.NumAudioFiles ?? media?.AudioFiles?.Count ?? 0,
             media?.EbookFormat ?? media?.EbookFileFormat,
-            media?.Duration ?? 0);
+            media?.Duration ?? 0,
+            series,
+            sequence,
+            item.AddedAt is > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(item.AddedAt.Value) : null);
     }
 
     private string Url(string path) =>
