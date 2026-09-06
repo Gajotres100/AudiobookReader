@@ -1006,6 +1006,11 @@ public partial class ReaderViewModel(
         // and while following, the map grows under us continuously, so keep looking regardless.
         if (_sync is null || MeasuresWhileReading) MaybeRefreshSyncMap();
 
+        // A player that has failed says nothing on its own: the button responds, the glyph does not
+        // change, and no sound comes out. Say which of the two it is.
+        if (playback.LastError is { } failure)
+            FollowStatus = $"Zvuk se ne može otvoriti ({failure}). Provjeri datoteku knjige preko ☰.";
+
         // Playback outlives pages and can be on a different book entirely. Following it then would
         // walk this book's text to another book's playhead.
         var playingThisBook = playback.BookId == BookId;

@@ -7,11 +7,13 @@ public partial class PlaybackController
 {
     private static PlaybackService? Service => PlaybackService.Current;
 
+    public partial bool IsReady => Service is not null;
     public partial bool IsPlaying => Service?.IsPlaying ?? false;
     public partial long PositionMs => Service?.PositionMs ?? 0;
     public partial long DurationMs => Service?.DurationMs ?? 0;
     public partial float Speed => Service?.Speed ?? 1f;
     public partial TimeSpan? SleepRemaining => Service?.SleepRemaining;
+    public partial string? LastError => Service?.LastError;
 
     /// <summary>
     /// Starts the service and waits for it to publish itself.

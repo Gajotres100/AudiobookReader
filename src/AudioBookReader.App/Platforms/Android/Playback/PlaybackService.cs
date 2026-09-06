@@ -4,6 +4,7 @@ using Android.OS;
 using AndroidX.Media3.Common;
 using AndroidX.Media3.ExoPlayer;
 using AndroidX.Media3.Session;
+using AudioBookReader.App.Services;
 
 namespace AudioBookReader.App.Platforms.Android.Playback;
 
@@ -97,10 +98,49 @@ public class PlaybackService : MediaSessionService
 
     private static bool OnPlayerThread => Looper.MyLooper() == Looper.MainLooper;
 
+    private int _lastPlaybackState = -1;
+    private string? _lastErrorMessage;
+
+    /// <summary>The last thing the player refused to do, or null. Read by the app to say so.</summary>
+    public string? LastError { get; private set; }
+
     /// <summary>Copies the player's state out, and schedules the next copy. Player thread only.</summary>
     private void PublishState()
     {
         if (_player is null) return;
+
+        // Nothing was watching the player. ExoPlayer answers a source it cannot open by going to
+        // an error state and staying there — no exception, no callback anybody had registered — so
+        // pressing play did nothing at all and left no trace of why. A file moved, a content URI
+        // whose permission did not survive a reboot, a codec the device lacks: all of them looked
+        // identical from outside, which is to say like a broken button.
+        if (_player.PlaybackState != _lastPlaybackState)
+        {
+            _lastPlaybackState = _player.PlaybackState;
+
+            AppLog.Info(
+                $"player: state {Describe(_lastPlaybackState)}, playWhenReady {_player.PlayWhenReady}, " +
+                $"duration {_player.Duration} ms");
+        }
+
+        if (_player.PlayerError is { } failure)
+        {
+            var message = $"{failure.ErrorCodeName}: {failure.Message}";
+
+            if (message != _lastErrorMessage)
+            {
+                _lastErrorMessage = message;
+                LastError = failure.ErrorCodeName;
+
+                AppLog.Info($"player FAILED: {message}");
+                if (failure.Cause is { } cause) AppLog.Info($"player   caused by {cause}");
+            }
+        }
+        else
+        {
+            _lastErrorMessage = null;
+            LastError = null;
+        }
 
         Interlocked.Exchange(ref _statePositionMs, _player.CurrentPosition);
         Interlocked.Exchange(ref _stateDurationMs, _player.Duration is var d && d > 0 ? d : 0);
@@ -111,6 +151,30 @@ public class PlaybackService : MediaSessionService
         // never works from a stale playhead, cheap enough to leave running while a book plays.
         _playerThread.PostDelayed(PublishState, 200);
     }
+
+    private static string Describe(int state) => state switch
+    {
+        1 => "idle",
+        2 => "buffering",
+        3 => "ready",
+        4 => "ended",
+        _ => state.ToString(),
+    };
+
+    /// <summary>
+    /// Puts a player that has failed back into a state where it can try again.
+    ///
+    /// ExoPlayer latches an error: once a source has failed, every later play is ignored until the
+    /// player is prepared again. Without this, one failure — a file briefly unreadable, a permission
+    /// not yet regranted — made the button dead for the life of the process.
+    /// </summary>
+    public void Retry() => OnPlayer(() =>
+    {
+        if (_player?.PlayerError is null) return;
+
+        AppLog.Info("player: preparing again after an error");
+        _player.Prepare();
+    });
 
     /// <summary>Runs a player call on the player's own thread, immediately when already there.</summary>
     private void OnPlayer(Action work)
@@ -163,7 +227,13 @@ public class PlaybackService : MediaSessionService
         _player.SeekTo(startMs);
     }
 
-    public void Play() => OnPlayer(() => _player?.Play());
+    public void Play() => OnPlayer(() =>
+    {
+        if (_player is null) return;
+
+        if (_player.PlayerError is not null) Retry();
+        _player.Play();
+    });
 
     public void Pause() => OnPlayer(() => _player?.Pause());
 

@@ -11,14 +11,31 @@ namespace AudioBookReader.App.Services;
 /// </summary>
 public partial class PlaybackController
 {
-    /// <summary>Book currently loaded, so a page can tell whether it is looking at what is playing.</summary>
-    public int? BookId { get; private set; }
+    private int? _bookId;
+
+    /// <summary>
+    /// Book currently loaded, so a page can tell whether it is looking at what is playing.
+    ///
+    /// Null once the service is gone, and that is the whole point. This object is a singleton and
+    /// outlives the service by design — but the service stops itself when the app is dismissed with
+    /// nothing playing, and the field went on claiming a book was loaded. Every caller asks the same
+    /// question, "is this book the one loaded", and every one of them got yes: the reader skipped
+    /// loading it, play was forwarded to a service that no longer existed, and the button did
+    /// nothing at all with nothing to show for it.
+    /// </summary>
+    public int? BookId => IsReady ? _bookId : null;
+
+    /// <summary>Whether the playback service is actually up.</summary>
+    public partial bool IsReady { get; }
 
     public partial bool IsPlaying { get; }
     public partial long PositionMs { get; }
     public partial long DurationMs { get; }
     public partial float Speed { get; }
     public partial TimeSpan? SleepRemaining { get; }
+
+    /// <summary>Why the last attempt to play produced silence, or null. Named codes, not prose.</summary>
+    public partial string? LastError { get; }
 
     /// <summary>Starts the playback service if it is not running and waits for it to come up.</summary>
     public partial Task<bool> ConnectAsync(CancellationToken ct = default);
@@ -43,7 +60,7 @@ public partial class PlaybackController
         if (!await ConnectAsync(ct)) return false;
 
         LoadCore(audioPath, startMs, speed);
-        BookId = bookId;
+        _bookId = bookId;
         return true;
     }
 
