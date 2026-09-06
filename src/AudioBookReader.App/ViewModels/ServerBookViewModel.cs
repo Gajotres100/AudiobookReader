@@ -61,8 +61,8 @@ public partial class ServerBookViewModel(
     private void DescribeDestination()
     {
         Destination = folder.IsChosen
-            ? $"Sprema se u „{folder.Describe()}” i odmah se pojavljuje u Knjigama."
-            : "Nije odabrana mapa — pitat ću te kad pritisneš Preuzmi.";
+            ? $"Zadnji put odabrano: „{folder.Describe()}”. Pitat ću te i sad."
+            : "Pitat ću te gdje spremiti kad pritisneš Preuzmi.";
 
         var author = DownloadFolder.SafeName(Author.Length > 0 ? Author : "Nepoznat autor");
         Layout = $"{author} / {DownloadFolder.SafeName(Title)} /";
@@ -197,7 +197,7 @@ public partial class ServerBookViewModel(
     {
         if (_detail is null || !CanDownload || IsDownloading) return;
 
-        if (!await AgreeOnAFolderAsync()) return;
+        if (await AgreeOnAFolderAsync() is not { } toAppStorage) return;
 
         using var downloading = new CancellationTokenSource();
 
@@ -213,7 +213,8 @@ public partial class ServerBookViewModel(
                 Progress = p.Fraction;
             });
 
-            BookId = await server.ImportAsync(_detail.Book, progress, downloading.Token);
+            BookId = await server.ImportAsync(
+                _detail.Book, progress, downloading.Token, toAppStorage);
 
             Status = "Knjiga je u Knjigama.";
         }
@@ -239,31 +240,41 @@ public partial class ServerBookViewModel(
     /// <summary>
     /// Settles where the book will go before a byte of it moves.
     ///
-    /// Asked here rather than assumed, because the answer decides whether the book ends up
-    /// somewhere the rest of the phone can see. Once chosen it is remembered, so this is one tap on
-    /// the first download and none after — but it is still offered, since the second book might
-    /// belong somewhere else.
+    /// Two real places, not one and a silent fallback. A folder of the user's own is where books
+    /// belong — beside the ones already there, visible to every other app and to a cable. The app's
+    /// own storage is the other honest answer: nobody else can see it and it leaves with the app,
+    /// which is right for a book someone wants nowhere near their files. Neither should happen by
+    /// accident, so both are named.
+    ///
+    /// The folder is remembered, so this is one tap on the first download and a confirmation after.
     /// </summary>
-    private async Task<bool> AgreeOnAFolderAsync()
+    /// <returns>Whether to use app storage, or null when the download was called off.</returns>
+    private async Task<bool?> AgreeOnAFolderAsync()
     {
-        var here = folder.IsChosen ? $"Spremi u „{folder.Describe()}”" : null;
-        const string audiobooks = "Odaberi mapu Audiobooks";
-        const string elsewhere = "Odaberi drugu mapu…";
+        var here = folder.IsChosen ? $"Mapa „{folder.Describe()}”" : null;
 
-        var options = here is null ? [audiobooks] : new[] { here, elsewhere };
+        const string audiobooks = "Mapa Audiobooks";
+        const string elsewhere = "Odaberi drugu mapu…";
+        const string appStorage = "Interna pohrana aplikacije";
+
+        string[] options = here is null
+            ? [audiobooks, appStorage]
+            : [here, elsewhere, appStorage];
 
         var chosen = await Shell.Current.DisplayActionSheetAsync(
             "Gdje spremiti knjigu?", "Odustani", null, options);
 
-        if (chosen is null || chosen == "Odustani") return false;
-        if (chosen == here) return true;
+        if (chosen is null || chosen == "Odustani") return null;
 
-        // Opens at Audiobooks either way; the system will not hand over a folder without someone
+        if (chosen == appStorage) return true;
+        if (chosen == here) return false;
+
+        // Opens at Audiobooks either way: the system will not hand over a folder without someone
         // confirming it, but it will start them in the right place.
-        if (await folder.ChooseAsync() is null) return false;
+        if (await folder.ChooseAsync() is null) return null;
 
         DescribeDestination();
-        return true;
+        return false;
     }
 
     [RelayCommand]

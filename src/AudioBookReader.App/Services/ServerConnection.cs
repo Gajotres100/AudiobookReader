@@ -184,10 +184,16 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
     /// With no folder chosen it falls back to app storage, which works but leaves the book
     /// invisible to everything else on the phone.
     /// </summary>
+    /// <param name="toAppStorage">
+    /// Keeps the book in the app's own storage instead of the chosen folder. Its own space, out of
+    /// sight of everything else on the phone, and gone when the app is uninstalled — which is
+    /// exactly right for a book someone wants nowhere near their own files, and wrong by default.
+    /// </param>
     public async Task<int> ImportAsync(
         ServerBook book,
         IProgress<ImportProgress>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool toAppStorage = false)
     {
         var detail = await Wrap(() => _client.GetBookAsync(book.Id, ct));
 
@@ -213,7 +219,7 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
                 var file = detail.AudioFiles[0];
 
                 var path = await DownloadAsync(
-                    Shelf(book),
+                    toAppStorage ? null : Shelf(book),
                     file.FileName,
                     (to, report) => _client.DownloadFileAsync(book.Id, file.Ino, to, report, ct),
                     $"Skidam zvuk — {book.Title}",
@@ -231,7 +237,7 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
             if (detail.Ebook is { } ebook)
             {
                 var path = await DownloadAsync(
-                    Shelf(book),
+                    toAppStorage ? null : Shelf(book),
                     ebook.FileName,
                     (to, report) => _client.DownloadEbookAsync(book.Id, to, report, ct),
                     $"Skidam tekst — {book.Title}",
@@ -279,8 +285,9 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
         DownloadFolder.SafeName(book.Title),
     ];
 
+    /// <param name="folders">Where under the chosen folder it goes, or null to keep it in app storage.</param>
     private async Task<string> DownloadAsync(
-        IReadOnlyList<string> folders,
+        IReadOnlyList<string>? folders,
         string fileName,
         Func<Stream, IProgress<double?>, Task> download,
         string message,
@@ -310,10 +317,10 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
     }
 
     private async Task<(Stream Stream, string Location)> OpenDestinationAsync(
-        IReadOnlyList<string> folders,
+        IReadOnlyList<string>? folders,
         string fileName)
     {
-        if (folder.IsChosen)
+        if (folders is not null && folder.IsChosen)
         {
             try
             {
