@@ -14,14 +14,25 @@ public static partial class AudioMetadata
     {
         using var retriever = new MediaMetadataRetriever();
 
+        global::Android.OS.ParcelFileDescriptor? descriptor = null;
+
         try
         {
             // A book is either kept in app storage or referenced where the user has it, so the
             // location is either a path or a content URI.
+            //
+            // The URI form goes through a file descriptor rather than through the resolver. These
+            // books are hundreds of megabytes with their metadata atom at the very end — not
+            // fast-started — so reading it means seeking to the end and back, and a descriptor is
+            // the one handle that reliably seeks.
             if (location.StartsWith("content://", StringComparison.OrdinalIgnoreCase))
             {
                 var context = global::Android.App.Application.Context;
-                retriever.SetDataSource(context, AndroidUri.Parse(location)!);
+
+                descriptor = context.ContentResolver?.OpenFileDescriptor(AndroidUri.Parse(location)!, "r")
+                             ?? throw new IOException($"Ne mogu otvoriti '{location}'.");
+
+                retriever.SetDataSource(descriptor.FileDescriptor);
             }
             else
             {
@@ -29,6 +40,13 @@ public static partial class AudioMetadata
             }
 
             var durationMs = Length(retriever);
+
+            AppLog.Info(
+                $"metadata fallback: duration '{retriever.ExtractMetadata(MetadataKey.Duration)}', " +
+                $"album '{retriever.ExtractMetadata(MetadataKey.Album)}', " +
+                $"title '{retriever.ExtractMetadata(MetadataKey.Title)}', " +
+                $"mime '{retriever.ExtractMetadata(MetadataKey.Mimetype)}'");
+
             if (durationMs <= 0) return null;
 
             var title = Text(retriever, MetadataKey.Album) ?? Text(retriever, MetadataKey.Title);
@@ -53,8 +71,16 @@ public static partial class AudioMetadata
         {
             // Both the managed reader and the platform have now refused it, so it is not audio this
             // device can play whatever it is called.
-            AppLog.Info($"metadata fallback failed for '{Path.GetFileName(fileName)}': {ex.Message}");
+            AppLog.Info(
+                $"metadata fallback failed for '{Path.GetFileName(fileName)}': " +
+                $"{ex.GetType().Name}: {ex.Message}");
+
             return null;
+        }
+        finally
+        {
+            descriptor?.Close();
+            descriptor?.Dispose();
         }
     }
 
