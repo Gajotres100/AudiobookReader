@@ -12,6 +12,16 @@ namespace AudioBookReader.Core.Servers;
 /// Separate from a network failure on purpose: "the server said no" and "there is no server there"
 /// need different words in front of the user, and only one of them is worth retrying.
 /// </summary>
+/// <summary>
+/// What the app has to keep in order to stay signed in.
+///
+/// Two, not one, and both matter. The access token is what every request carries and it is good for
+/// about an hour; the refresh token is what buys the next one, for thirty days, and it is rotated
+/// each time it is used — so storing the pair from sign-in and never updating it is only slightly
+/// better than storing nothing.
+/// </summary>
+public record ServerTokens(string Access, string? Refresh);
+
 public sealed class ServerException(string message, HttpStatusCode? status = null, Exception? inner = null)
     : Exception(message, inner)
 {
@@ -46,6 +56,7 @@ public class AudiobookshelfClient(HttpClient http)
 {
     private string? _baseUrl;
     private string? _token;
+    private string? _refreshToken;
 
     /// <summary>The server this client is pointed at, normalised, or null before it is set.</summary>
     public string? BaseUrl => _baseUrl;
@@ -53,12 +64,22 @@ public class AudiobookshelfClient(HttpClient http)
     public bool IsSignedIn => _token is not null;
 
     /// <summary>
-    /// Points the client at a server and, optionally, gives it a token it already has.
+    /// Raised whenever the server hands out a new pair, so the caller can store them.
+    ///
+    /// It happens on its own schedule, not only at sign-in: an access token lasts an hour, and the
+    /// refresh that replaces it usually rotates the refresh token too. A caller that stores only
+    /// what sign-in returned would be back to typing a password every hour.
     /// </summary>
-    public void Connect(string baseUrl, string? token = null)
+    public event EventHandler<ServerTokens>? TokensChanged;
+
+    /// <summary>
+    /// Points the client at a server and, optionally, gives it tokens it already has.
+    /// </summary>
+    public void Connect(string baseUrl, string? token = null, string? refreshToken = null)
     {
         _baseUrl = Normalise(baseUrl);
         _token = token;
+        _refreshToken = refreshToken;
     }
 
     /// <summary>
@@ -79,24 +100,89 @@ public class AudiobookshelfClient(HttpClient http)
         return trimmed;
     }
 
-    /// <summary>Signs in and keeps the token. Returns it so the caller can store it.</summary>
-    public async Task<string> SignInAsync(string username, string password, CancellationToken ct = default)
+    /// <summary>Signs in and keeps the tokens. Returns them so the caller can store them.</summary>
+    public async Task<ServerTokens> SignInAsync(
+        string username,
+        string password,
+        CancellationToken ct = default)
     {
         var response = await SendAsync(
-            () => new HttpRequestMessage(HttpMethod.Post, Url("/login"))
+            () =>
             {
-                Content = JsonContent.Create(
-                    new Credentials(username, password), ServerJsonContext.Default.Credentials),
+                var request = new HttpRequestMessage(HttpMethod.Post, Url("/login"))
+                {
+                    Content = JsonContent.Create(
+                        new Credentials(username, password), ServerJsonContext.Default.Credentials),
+                };
+
+                // Without this the server keeps the refresh token to itself, in a cookie, and hands
+                // back only an access token good for an hour. This is the header its own mobile app
+                // sends, and it is the difference between signing in once and signing in hourly.
+                request.Headers.Add("x-return-tokens", "true");
+                return request;
             },
             authenticated: false,
             ct);
 
         var login = await ReadAsync(response, ServerJsonContext.Default.LoginResponse, ct);
 
-        _token = login?.User?.Token
-                 ?? throw new ServerException("Prijava je prošla, ali server nije vratio token.");
+        return Adopt(login?.User)
+               ?? throw new ServerException("Prijava je prošla, ali server nije vratio token.");
+    }
 
-        return _token;
+    /// <summary>
+    /// Takes whatever the server offered, newest scheme first.
+    ///
+    /// Older servers issue one long-lived API token as <c>token</c> and nothing else; newer ones
+    /// issue a short <c>accessToken</c> and a <c>refreshToken</c> beside it. Preferring the access
+    /// token and keeping the old field as a fallback means both kinds of server work without the
+    /// caller knowing which it is talking to.
+    /// </summary>
+    private ServerTokens? Adopt(LoginUser? user)
+    {
+        if ((user?.AccessToken ?? user?.Token) is not { Length: > 0 } access) return null;
+
+        _token = access;
+        _refreshToken = user?.RefreshToken ?? _refreshToken;
+
+        var tokens = new ServerTokens(access, _refreshToken);
+        TokensChanged?.Invoke(this, tokens);
+
+        return tokens;
+    }
+
+    /// <summary>Trades the refresh token for a fresh access token.</summary>
+    /// <returns>True when it worked and the call that prompted it is worth retrying.</returns>
+    private async Task<bool> RefreshAsync(CancellationToken ct)
+    {
+        if (_refreshToken is not { Length: > 0 } refresh) return false;
+
+        HttpResponseMessage response;
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, Url("/auth/refresh"));
+            request.Headers.Add("x-refresh-token", refresh);
+
+            response = await http.SendAsync(request, ct);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            response.Dispose();
+
+            // Thirty days gone, or the session was revoked from the server. Either way this token
+            // is spent, and keeping it would mean retrying against it forever.
+            _refreshToken = null;
+            return false;
+        }
+
+        var body = await ReadAsync(response, ServerJsonContext.Default.LoginResponse, ct);
+        return Adopt(body?.User) is not null;
     }
 
     public async Task<IReadOnlyList<ServerLibrary>> GetLibrariesAsync(CancellationToken ct = default)
@@ -268,7 +354,8 @@ public class AudiobookshelfClient(HttpClient http)
         bool authenticated,
         CancellationToken ct,
         HttpStatusCode? tolerate = null,
-        HttpCompletionOption completion = HttpCompletionOption.ResponseContentRead)
+        HttpCompletionOption completion = HttpCompletionOption.ResponseContentRead,
+        bool mayRefresh = true)
     {
         var request = build();
 
@@ -296,6 +383,19 @@ public class AudiobookshelfClient(HttpClient http)
         }
 
         if (response.IsSuccessStatusCode || response.StatusCode == tolerate) return response;
+
+        // An access token lasts an hour, so this is the ordinary case rather than the exceptional
+        // one: trade the refresh token for a new one and try the same call again, exactly once.
+        if (response.StatusCode == HttpStatusCode.Unauthorized && authenticated && mayRefresh)
+        {
+            response.Dispose();
+
+            if (await RefreshAsync(ct))
+                return await SendAsync(build, authenticated, ct, tolerate, completion, mayRefresh: false);
+
+            throw new ServerException(
+                "Prijava na server više ne vrijedi.", HttpStatusCode.Unauthorized);
+        }
 
         response.Dispose();
 

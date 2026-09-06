@@ -20,6 +20,22 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
 
     public bool IsConnected { get; private set; }
 
+    private bool _listening;
+
+    /// <summary>
+    /// Stores every pair the server issues, not only the one sign-in returned.
+    ///
+    /// Subscribed once, lazily, because the client is built with this object and the event fires
+    /// from inside its own calls.
+    /// </summary>
+    private void KeepTokens()
+    {
+        if (_listening) return;
+
+        _listening = true;
+        _client.TokensChanged += async (_, tokens) => await account.SaveTokensAsync(tokens.Access, tokens.Refresh);
+    }
+
     public string? Url => account.Url;
 
     /// <summary>
@@ -32,20 +48,25 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
     public async Task<bool> RestoreAsync()
     {
         if (account.Url is not { } url) return IsConnected = false;
-        if (await account.GetTokenAsync() is not { } token) return IsConnected = false;
 
-        _client.Connect(url, token);
+        var (token, refresh) = await account.GetTokensAsync();
+        if (token is null) return IsConnected = false;
+
+        KeepTokens();
+        _client.Connect(url, token, refresh);
+
         return IsConnected = true;
     }
 
     /// <summary>Signs in with a username and password, and keeps only the token that comes back.</summary>
     public async Task SignInAsync(string url, string username, string password, CancellationToken ct = default)
     {
+        KeepTokens();
         _client.Connect(url);
 
-        var token = await _client.SignInAsync(username, password, ct);
+        var tokens = await _client.SignInAsync(username, password, ct);
 
-        await account.SaveAsync(AudiobookshelfClient.Normalise(url), token);
+        await account.SaveAsync(AudiobookshelfClient.Normalise(url), tokens.Access, tokens.Refresh);
         IsConnected = true;
     }
 
@@ -59,11 +80,13 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
     /// </summary>
     public async Task ConnectWithTokenAsync(string url, string token, CancellationToken ct = default)
     {
+        KeepTokens();
         _client.Connect(url, token);
 
         await _client.GetLibrariesAsync(ct);
 
-        await account.SaveAsync(AudiobookshelfClient.Normalise(url), token);
+        // A pasted API token is the long-lived kind and has nothing to refresh with.
+        await account.SaveAsync(AudiobookshelfClient.Normalise(url), token, refresh: null);
         IsConnected = true;
     }
 

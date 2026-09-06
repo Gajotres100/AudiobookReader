@@ -61,9 +61,9 @@ public class AudiobookshelfClientTests
     {
         var (client, handler) = Connected(_ => Json("""{"user":{"id":"u1","token":"tok-123"}}"""));
 
-        var token = await client.SignInAsync("nikola", "hunter2");
+        var tokens = await client.SignInAsync("nikola", "hunter2");
 
-        Assert.Equal("tok-123", token);
+        Assert.Equal("tok-123", tokens.Access);
         Assert.Equal("http://books.local:13378/login", handler.Requests[0].RequestUri?.ToString());
         Assert.Equal(HttpMethod.Post, handler.Requests[0].Method);
     }
@@ -282,5 +282,87 @@ public class AudiobookshelfClientTests
 
         Assert.Equal(HttpMethod.Patch, handler.Requests[0].Method);
         Assert.Contains("\"isFinished\":true", body);
+    }
+
+    // ---- Staying signed in ----
+
+    [Fact]
+    public async Task AsksForTheRefreshTokenRatherThanLettingTheServerKeepIt()
+    {
+        // Without the header the server puts the refresh token in a cookie and hands back only an
+        // access token good for an hour. This is the difference between signing in once and
+        // signing in hourly.
+        var (client, handler) = Connected(_ => Json(
+            """{"user":{"accessToken":"acc-1","refreshToken":"ref-1","token":"legacy"}}"""));
+
+        var tokens = await client.SignInAsync("nikola", "hunter2");
+
+        Assert.True(handler.Requests[0].Headers.Contains("x-return-tokens"));
+        Assert.Equal("acc-1", tokens.Access);
+        Assert.Equal("ref-1", tokens.Refresh);
+    }
+
+    [Fact]
+    public async Task StillWorksWithAnOlderServerThatIssuesOneLongLivedToken()
+    {
+        var (client, _) = Connected(_ => Json("""{"user":{"token":"legacy-only"}}"""));
+
+        var tokens = await client.SignInAsync("nikola", "hunter2");
+
+        Assert.Equal("legacy-only", tokens.Access);
+        Assert.Null(tokens.Refresh);
+    }
+
+    [Fact]
+    public async Task TradesAnExpiredTokenForAFreshOneAndRepeatsTheCall()
+    {
+        var asked = new List<string>();
+
+        var handler = new Recorded(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            asked.Add(path);
+
+            if (path == "/auth/refresh") return Json("""{"user":{"accessToken":"acc-2","refreshToken":"ref-2"}}""");
+
+            // The first library request carries the stale token; the second carries the new one.
+            return request.Headers.Authorization?.Parameter == "acc-2"
+                ? Json("""{"libraries":[{"id":"lib_1","name":"Books","mediaType":"book"}]}""")
+                : new HttpResponseMessage(HttpStatusCode.Unauthorized);
+        });
+
+        var client = new AudiobookshelfClient(new HttpClient(handler));
+        client.Connect("books.local", "acc-1", "ref-1");
+
+        ServerTokens? kept = null;
+        client.TokensChanged += (_, tokens) => kept = tokens;
+
+        var libraries = await client.GetLibrariesAsync();
+
+        Assert.Single(libraries);
+        Assert.Equal(["/api/libraries", "/auth/refresh", "/api/libraries"], asked);
+        Assert.Equal("ref-2", kept?.Refresh);
+    }
+
+    [Fact]
+    public async Task GivesUpOnceWhenTheRefreshTokenIsSpentRatherThanLoopingOnIt()
+    {
+        var attempts = 0;
+
+        var handler = new Recorded(request =>
+        {
+            attempts++;
+            return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+        });
+
+        var client = new AudiobookshelfClient(new HttpClient(handler));
+        client.Connect("books.local", "acc-1", "ref-1");
+
+        var failure = await Assert.ThrowsAsync<ServerException>(() => client.GetLibrariesAsync());
+
+        Assert.True(failure.NeedsSignIn);
+
+        // The call, then the refusal to refresh. Not a third.
+        Assert.Equal(2, attempts);
     }
 }

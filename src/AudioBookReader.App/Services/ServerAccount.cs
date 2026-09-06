@@ -17,6 +17,7 @@ public class ServerAccount
 {
     private const string UrlKey = "server.url";
     private const string TokenKey = "server.token";
+    private const string RefreshKey = "server.refresh";
 
     /// <summary>Raised when the app connects or disconnects, so screens can show the change.</summary>
     public event EventHandler? Changed;
@@ -40,23 +41,47 @@ public class ServerAccount
     /// by a lock-screen change or a restore from backup. That is not worth crashing over — the
     /// answer is the same as having no token, which is to ask the user to sign in again.
     /// </summary>
-    public async Task<string?> GetTokenAsync()
+    public async Task<(string? Token, string? Refresh)> GetTokensAsync()
     {
         try
         {
-            return await SecureStorage.Default.GetAsync(TokenKey);
+            return (await SecureStorage.Default.GetAsync(TokenKey),
+                    await SecureStorage.Default.GetAsync(RefreshKey));
         }
         catch (Exception ex)
         {
-            AppLog.Info($"server token unreadable ({ex.GetType().Name}); treating it as absent");
-            return null;
+            AppLog.Info($"server tokens unreadable ({ex.GetType().Name}); treating them as absent");
+            return (null, null);
         }
     }
 
-    public async Task SaveAsync(string url, string token)
+    /// <summary>
+    /// Keeps a freshly issued pair.
+    ///
+    /// Called far more often than at sign-in: the access token lasts about an hour and the refresh
+    /// that replaces it rotates the refresh token too, so a pair stored once and never updated is
+    /// only slightly better than none.
+    /// </summary>
+    public async Task SaveTokensAsync(string token, string? refresh)
+    {
+        try
+        {
+            await SecureStorage.Default.SetAsync(TokenKey, token);
+
+            if (refresh is { Length: > 0 }) await SecureStorage.Default.SetAsync(RefreshKey, refresh);
+        }
+        catch (Exception ex)
+        {
+            // A keystore that will not write is a signed-in session that lasts until the app is
+            // closed. Worth saying, not worth failing over.
+            AppLog.Info($"server tokens not stored ({ex.GetType().Name})");
+        }
+    }
+
+    public async Task SaveAsync(string url, string token, string? refresh)
     {
         Url = url;
-        await SecureStorage.Default.SetAsync(TokenKey, token);
+        await SaveTokensAsync(token, refresh);
 
         Changed?.Invoke(this, EventArgs.Empty);
     }
@@ -66,6 +91,7 @@ public class ServerAccount
     {
         Url = null;
         SecureStorage.Default.Remove(TokenKey);
+        SecureStorage.Default.Remove(RefreshKey);
 
         Changed?.Invoke(this, EventArgs.Empty);
     }

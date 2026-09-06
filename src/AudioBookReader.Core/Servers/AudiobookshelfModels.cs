@@ -55,7 +55,10 @@ public record ServerProgress(double CurrentTimeSeconds, double DurationSeconds, 
 
 internal record LoginResponse([property: JsonPropertyName("user")] LoginUser? User);
 
-internal record LoginUser([property: JsonPropertyName("token")] string? Token);
+internal record LoginUser(
+    [property: JsonPropertyName("token")] string? Token,
+    [property: JsonPropertyName("accessToken")] string? AccessToken,
+    [property: JsonPropertyName("refreshToken")] string? RefreshToken);
 
 internal record LibrariesResponse([property: JsonPropertyName("libraries")] List<WireLibrary>? Libraries);
 
