@@ -39,5 +39,26 @@ public static class AppPaths
     {
         foreach (var directory in new[] { SyncMaps, Models, Books, Covers, Downloads })
             Directory.CreateDirectory(directory);
+
+        SweepDownloads();
+    }
+
+    /// <summary>
+    /// Clears anything left in the staging directory.
+    ///
+    /// Its contents are only ever mid-import. A download deletes what it wrote whichever way it
+    /// ends — but not when the app is killed while it is running, and what is left then is half a
+    /// book taking up hundreds of megabytes that nothing will ever look at again.
+    /// </summary>
+    private static void SweepDownloads()
+    {
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(Downloads)) File.Delete(file);
+        }
+        catch (IOException)
+        {
+            // Worth a try, not worth failing startup over.
+        }
     }
 }

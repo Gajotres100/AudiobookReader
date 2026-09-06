@@ -10,6 +10,7 @@ namespace AudioBookReader.App;
 public class MainActivity : MauiAppCompatActivity
 {
     private const int PickDocumentRequest = 0x_B0_0C;
+    private const int PickFolderRequest = 0x_B0_0D;
 
     private static TaskCompletionSource<AndroidUri?>? _pending;
 
@@ -50,11 +51,41 @@ public class MainActivity : MauiAppCompatActivity
         return _pending.Task;
     }
 
+    /// <summary>
+    /// Asks for a folder and keeps the right to write in it.
+    ///
+    /// A whole tree rather than one document, because the app writes into it repeatedly — a book
+    /// downloaded today and another next month, both landing beside the ones already there. The
+    /// persistable grant is what makes that survive a reboot; without it the folder would have to be
+    /// chosen again every time.
+    /// </summary>
+    public static Task<AndroidUri?> PickFolderAsync()
+    {
+        _pending?.TrySetResult(null);
+        _pending = new TaskCompletionSource<AndroidUri?>();
+
+        var intent = new Intent(Intent.ActionOpenDocumentTree);
+
+        intent.AddFlags(ActivityFlags.GrantReadUriPermission
+                        | ActivityFlags.GrantWriteUriPermission
+                        | ActivityFlags.GrantPersistableUriPermission);
+
+        var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
+        if (activity is null)
+        {
+            _pending.TrySetResult(null);
+            return _pending.Task;
+        }
+
+        activity.StartActivityForResult(intent, PickFolderRequest);
+        return _pending.Task;
+    }
+
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
 
-        if (requestCode != PickDocumentRequest) return;
+        if (requestCode is not (PickDocumentRequest or PickFolderRequest)) return;
 
         var pending = _pending;
         _pending = null;

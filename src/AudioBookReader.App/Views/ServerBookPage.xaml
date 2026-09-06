@@ -79,7 +79,22 @@
                     Text="{Binding Obstacle}"
                     TextColor="#C0392B" />
 
-                <Label Style="{StaticResource Muted}" Text="{Binding Destination}" />
+                <BoxView Style="{StaticResource Divider}" />
+
+                <!--
+                    Where it will go, and the chance to say otherwise. Books belong beside the other
+                    books, in a folder the phone can see — not buried in app storage where nothing
+                    else can reach them.
+                -->
+                <VerticalStackLayout Spacing="6">
+                    <Label Style="{StaticResource Muted}" Text="{Binding Destination}" />
+
+                    <Button
+                        Command="{Binding ChooseFolderCommand}"
+                        HorizontalOptions="Start"
+                        Style="{StaticResource IconWide}"
+                        Text="Odaberi mapu…" />
+                </VerticalStackLayout>
             </VerticalStackLayout>
         </ScrollView>
 

@@ -38,6 +38,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<AlignmentSettingsStore>();
 		builder.Services.AddSingleton<BookFilePicker>();
 		builder.Services.AddSingleton<ServerAccount>();
+		builder.Services.AddSingleton<DownloadFolder>();
 		builder.Services.AddSingleton<ServerConnection>();
 
 		// Playback outlives any page, so the controller is shared; pages and their view models are

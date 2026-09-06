@@ -14,7 +14,10 @@ namespace AudioBookReader.App.ViewModels;
 /// voice, and — the one that decides everything — whether the server keeps it as one file or forty.
 /// </summary>
 [QueryProperty(nameof(ItemId), "id")]
-public partial class ServerBookViewModel(ServerConnection server, LibraryDatabase database) : ObservableObject
+public partial class ServerBookViewModel(
+    ServerConnection server,
+    LibraryDatabase database,
+    DownloadFolder folder) : ObservableObject
 {
     public string ItemId { get; set; } = "";
 
@@ -45,9 +48,28 @@ public partial class ServerBookViewModel(ServerConnection server, LibraryDatabas
     [ObservableProperty]
     public partial string Chapters { get; set; } = "";
 
-    /// <summary>Where it will be kept, said plainly before anything is copied.</summary>
-    public string Destination =>
-        "Sprema se u vlastiti spremnik aplikacije i odmah se pojavljuje u Knjigama.";
+    /// <summary>
+    /// Where it will be kept, said before anything is written rather than discovered afterwards.
+    /// </summary>
+    [ObservableProperty]
+    public partial string Destination { get; set; } = "";
+
+    private void DescribeDestination() =>
+        Destination = folder.IsChosen
+            ? $"Sprema se u „{folder.Describe()}” i odmah se pojavljuje u Knjigama."
+            : "Nije odabrana mapa — knjiga bi otišla u spremnik aplikacije, gdje je druge aplikacije ne vide.";
+
+    /// <summary>Lets the user say where downloads land. Their folder, beside their other books.</summary>
+    [RelayCommand]
+    private async Task ChooseFolderAsync()
+    {
+        if (await folder.ChooseAsync() is null) return;
+
+        DescribeDestination();
+        Status = "";
+    }
+
+    public string FolderName => folder.Describe();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CannotDownload))]
@@ -122,6 +144,8 @@ public partial class ServerBookViewModel(ServerConnection server, LibraryDatabas
                     : "";
 
             CanDownload = Obstacle.Length == 0;
+
+            DescribeDestination();
 
             // Already here? Then say so instead of offering to fetch it twice. Matched by title,
             // which is all the two sides share before a file has been downloaded and hashed.

@@ -9,7 +9,7 @@ namespace AudioBookReader.App.Services;
 /// screen that asks about the server is asking about the same one. It wraps the Core client with
 /// the stored account, so no screen has to know how signing in works or where the token is kept.
 /// </summary>
-public class ServerConnection(ServerAccount account, BookImporter importer)
+public class ServerConnection(ServerAccount account, BookImporter importer, DownloadFolder folder)
 {
     private readonly AudiobookshelfClient _client = new(new HttpClient
     {
@@ -175,10 +175,14 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
     /// <summary>
     /// Brings a book down from the server and adds it to the library here.
     ///
-    /// The audio and the ebook are downloaded into app storage and then handed to the ordinary
-    /// importer, so a book from a server goes through exactly the same path as one picked from the
-    /// phone — same tag reading, same hashing, same pairing rules. Nothing downstream needs to know
-    /// where it came from.
+    /// It lands in the folder the user chose — beside the audiobooks they already keep — and is
+    /// then handed to the ordinary importer, so a book from a server goes through exactly the same
+    /// path as one picked off the phone: same tag reading, same hashing, same pairing rules, and
+    /// referenced where it lies rather than copied into app storage. It is copied in only if
+    /// alignment is started, which is what that copy is for.
+    ///
+    /// With no folder chosen it falls back to app storage, which works but leaves the book
+    /// invisible to everything else on the phone.
     /// </summary>
     public async Task<int> ImportAsync(
         ServerBook book,
@@ -197,10 +201,10 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
 
         int? bookId = null;
 
-        // Deleted whichever way this goes. The importer makes its own copy in app storage, so a
-        // download left behind is a second copy of a three-hundred-megabyte file that nothing will
-        // ever open — and on a cancelled download it is half of one.
-        var downloaded = new List<string>();
+        // Everything written for this import, so a download that does not finish leaves nothing
+        // behind. What succeeds is kept: it is the book itself, in the user's own folder.
+        var written = new List<string>();
+        var finished = false;
 
         try
             {
@@ -215,7 +219,7 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
                     progress,
                     ct);
 
-                downloaded.Add(path);
+                written.Add(path);
 
                 var imported = await importer.ImportAudioAsync(
                     new PickedMedia(path, file.FileName), null, progress, ct);
@@ -232,7 +236,7 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
                     progress,
                     ct);
 
-                downloaded.Add(path);
+                written.Add(path);
 
                 var imported = await importer.ImportEbookAsync(
                     new PickedMedia(path, ebook.FileName), bookId, progress, ct);
@@ -240,51 +244,94 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
                 bookId ??= imported.Id;
             }
 
+            finished = true;
+
             return bookId ?? throw new NotSupportedException(
                 $"„{book.Title}” na serveru nema ni zvuka ni teksta.");
         }
         finally
         {
-            foreach (var path in downloaded) TryDelete(path);
+            if (!finished) foreach (var location in written) Discard(location);
+            else foreach (var location in written) DiscardIfTemporary(location);
         }
     }
 
     /// <summary>
-    /// Downloads into a temporary file, and hands the importer a path rather than a stream.
+    /// Writes the file where it is meant to live, and hands the importer a location rather than a
+    /// stream.
     ///
-    /// The importer copies or references a file and reads its tags by seeking around it, which a
-    /// network stream cannot do. The temporary copy is deleted whichever way the import goes: it
-    /// succeeds and the importer has made its own copy, or it fails and this was rubbish.
+    /// The importer reads tags by seeking around the file, which a network stream cannot do, so
+    /// the download has to land somewhere first — and where it lands is the user's own folder
+    /// whenever they have chosen one.
     /// </summary>
-    private static async Task<string> DownloadAsync(
+    private async Task<string> DownloadAsync(
         string fileName,
         Func<Stream, IProgress<double?>, Task> download,
         string message,
         IProgress<ImportProgress>? progress,
         CancellationToken ct)
     {
-        Directory.CreateDirectory(AppPaths.Downloads);
-
-        var path = Path.Combine(AppPaths.Downloads, Sanitise(fileName));
+        var (stream, location) = await OpenDestinationAsync(fileName);
 
         try
         {
-            await using (var file = File.Create(path))
+            await using (stream)
             {
                 var report = new Progress<double?>(fraction =>
                     progress?.Report(new ImportProgress(message, fraction ?? 0)));
 
-                await download(file, report);
+                await download(stream, report);
             }
 
-            AppLog.Info($"server: downloaded '{fileName}' ({new FileInfo(path).Length:N0} bytes)");
-            return path;
+            AppLog.Info($"server: '{fileName}' written to {location}");
+            return location;
         }
         catch
         {
-            TryDelete(path);
+            Discard(location);
             throw;
         }
+    }
+
+    private async Task<(Stream Stream, string Location)> OpenDestinationAsync(string fileName)
+    {
+        if (folder.IsChosen)
+        {
+            try
+            {
+                return await folder.CreateAsync(Sanitise(fileName));
+            }
+            catch (Exception ex)
+            {
+                // The folder was moved, or the card holding it was taken out. Falling back beats
+                // refusing the download, and the log says which happened.
+                AppLog.Info($"chosen download folder unusable ({ex.Message}); using app storage");
+            }
+        }
+
+        Directory.CreateDirectory(AppPaths.Downloads);
+
+        var path = Path.Combine(AppPaths.Downloads, Sanitise(fileName));
+        return (File.Create(path), path);
+    }
+
+    /// <summary>Removes something this wrote, wherever it wrote it.</summary>
+    private void Discard(string location)
+    {
+        if (location.StartsWith("content://", StringComparison.OrdinalIgnoreCase)) folder.Delete(location);
+        else TryDelete(location);
+    }
+
+    /// <summary>
+    /// Removes it only if it was app storage.
+    ///
+    /// A book in the user's folder is the book, and the library refers to it there. A file in the
+    /// app's own downloads directory is a staging copy the importer has already duplicated, so
+    /// leaving it would be a second copy of the whole book that nothing will ever open.
+    /// </summary>
+    private static void DiscardIfTemporary(string location)
+    {
+        if (!location.StartsWith("content://", StringComparison.OrdinalIgnoreCase)) TryDelete(location);
     }
 
     /// <summary>Keeps a server's filename from escaping the downloads folder or upsetting the disk.</summary>

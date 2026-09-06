@@ -42,7 +42,28 @@ public partial class MediaReferences
         }
         catch (Java.Lang.SecurityException)
         {
+            // A document inside a folder the app already holds: the grant is on the tree, not on
+            // this URI, so taking one for it is refused — while reading it is not. If it opens, it
+            // is ours to keep, and copying it in would be a second copy of a book the user can see
+            // in their own folder.
+            if (CanOpen(location)) return true;
+
             AppLog.Info($"no persistable permission for {location}; will copy instead");
+            return false;
+        }
+    }
+
+    private static bool CanOpen(string location)
+    {
+        try
+        {
+            using var descriptor = Context.ContentResolver?.OpenFileDescriptor(
+                AndroidUri.Parse(location)!, "r");
+
+            return descriptor is not null;
+        }
+        catch (Exception)
+        {
             return false;
         }
     }
