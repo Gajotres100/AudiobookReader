@@ -81,6 +81,14 @@
                     IsPassword="True"
                     Placeholder="Lozinka"
                     Text="{Binding Password}" />
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label
+                        Grid.Column="0"
+                        Text="Zapamti prijavu"
+                        VerticalOptions="Center" />
+                    <Switch Grid.Column="1" IsToggled="{Binding RemembersSignIn}" />
+                </Grid>
             </VerticalStackLayout>
 
             <Entry
@@ -96,7 +104,7 @@
 
             <Label
                 Style="{StaticResource Muted}"
-                Text="Lozinka se ne sprema. Zamijeni se za token, a token stoji u zaštićenom spremniku uređaja." />
+                Text="Sve stoji u zaštićenom spremniku uređaja, uz ključ u sustavskom keystoreu. Bez „Zapamti prijavu” ostaješ prijavljen 30 dana od zadnjeg otvaranja aplikacije." />
         </VerticalStackLayout>
 
         <!--  Which library on the server  -->
@@ -222,31 +230,20 @@
 
         <!--  What is happening, and the way to stop it  -->
         <VerticalStackLayout Grid.Row="3" Spacing="6">
-            <ProgressBar IsVisible="{Binding IsDownloading}" Progress="{Binding Progress}" />
+            <HorizontalStackLayout IsVisible="{Binding HasStatus}" Spacing="10">
+                <ActivityIndicator
+                    HeightRequest="14"
+                    IsRunning="{Binding IsBusy}"
+                    IsVisible="{Binding IsBusy}"
+                    VerticalOptions="Center"
+                    WidthRequest="14" />
 
-            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasStatus}">
-                <HorizontalStackLayout Grid.Column="0" Spacing="10">
-                    <ActivityIndicator
-                        HeightRequest="14"
-                        IsRunning="{Binding IsBusy}"
-                        IsVisible="{Binding IsBusy}"
-                        VerticalOptions="Center"
-                        WidthRequest="14" />
-
-                    <Label
-                        LineBreakMode="TailTruncation"
-                        Style="{StaticResource Muted}"
-                        Text="{Binding Status}"
-                        VerticalOptions="Center" />
-                </HorizontalStackLayout>
-
-                <Button
-                    Grid.Column="1"
-                    Command="{Binding CancelDownloadCommand}"
-                    IsVisible="{Binding IsDownloading}"
-                    Style="{StaticResource IconWide}"
-                    Text="Prekini" />
-            </Grid>
+                <Label
+                    LineBreakMode="TailTruncation"
+                    Style="{StaticResource Muted}"
+                    Text="{Binding Status}"
+                    VerticalOptions="Center" />
+            </HorizontalStackLayout>
 
             <Button
                 Command="{Binding DisconnectCommand}"

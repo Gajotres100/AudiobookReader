@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="AudioBookReader.App.Views.ServerBookPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
+    x:DataType="vm:ServerBookViewModel"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PaperBackground},
+                                      Dark={StaticResource PaperBackgroundDark}}"
+    Shell.NavBarIsVisible="False"
+    Title="{Binding Title}">
+
+    <!--
+        One book on the server, before deciding to bring it here.
+
+        A page rather than a tap that starts a download. What is about to come over a phone's
+        connection is worth seeing first — how long it is, whether it has the text as well as the
+        voice, and whether the server keeps it in one file or forty, which is the thing that decides
+        whether it can come at all.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="16,10">
+
+        <Button
+            Grid.Row="0"
+            Command="{Binding CloseCommand}"
+            HorizontalOptions="Start"
+            Style="{StaticResource Icon}"
+            Text="✕" />
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="14">
+
+                <Border
+                    HeightRequest="260"
+                    HorizontalOptions="Center"
+                    StrokeThickness="0"
+                    WidthRequest="180">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Image
+                        Aspect="AspectFill"
+                        BackgroundColor="{AppThemeBinding Light=#E4DFD6,
+                                                          Dark=#1B2029}"
+                        Source="{Binding CoverUrl}" />
+                </Border>
+
+                <VerticalStackLayout Spacing="4">
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="19"
+                        HorizontalTextAlignment="Center"
+                        Text="{Binding Title}" />
+
+                    <Label
+                        HorizontalTextAlignment="Center"
+                        Style="{StaticResource Muted}"
+                        Text="{Binding Author}" />
+
+                    <Label
+                        HorizontalTextAlignment="Center"
+                        IsVisible="{Binding HasSeries}"
+                        Style="{StaticResource Muted}"
+                        Text="{Binding Series}" />
+                </VerticalStackLayout>
+
+                <BoxView Style="{StaticResource Divider}" />
+
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="{Binding Contents}" />
+                    <Label Style="{StaticResource Muted}" Text="{Binding Length}" />
+                    <Label Style="{StaticResource Muted}" Text="{Binding Chapters}" />
+                </VerticalStackLayout>
+
+                <!--  Why it cannot come, when it cannot — said here, not by a button that refuses.  -->
+                <Label
+                    IsVisible="{Binding CannotDownload}"
+                    Text="{Binding Obstacle}"
+                    TextColor="#C0392B" />
+
+                <Label Style="{StaticResource Muted}" Text="{Binding Destination}" />
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <VerticalStackLayout Grid.Row="2" Spacing="8">
+
+            <ProgressBar IsVisible="{Binding IsDownloading}" Progress="{Binding Progress}" />
+
+            <HorizontalStackLayout IsVisible="{Binding HasStatus}" Spacing="10">
+                <ActivityIndicator
+                    HeightRequest="14"
+                    IsRunning="{Binding IsBusy}"
+                    IsVisible="{Binding IsBusy}"
+                    VerticalOptions="Center"
+                    WidthRequest="14" />
+
+                <Label
+                    Style="{StaticResource Muted}"
+                    Text="{Binding Status}"
+                    VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <Button
+                Command="{Binding DownloadCommand}"
+                IsEnabled="{Binding CanDownload}"
+                IsVisible="{Binding IsIdle}"
+                Style="{StaticResource Plain}"
+                Text="Preuzmi" />
+
+            <Button
+                Command="{Binding CancelCommand}"
+                IsVisible="{Binding IsDownloading}"
+                Style="{StaticResource Plain}"
+                Text="Prekini preuzimanje" />
+
+            <Button
+                Command="{Binding OpenCommand}"
+                IsVisible="{Binding IsInLibrary}"
+                Style="{StaticResource IconWide}"
+                Text="Otvori knjigu" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

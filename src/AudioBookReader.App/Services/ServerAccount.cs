@@ -9,15 +9,19 @@ namespace AudioBookReader.App.Services;
 /// <see cref="SecureStorage"/> — on Android that is encrypted shared preferences with the key held
 /// in the platform keystore, so it is not readable by pulling the app's files off the device.
 ///
-/// The password is stored nowhere at all. It is exchanged for a token once, at sign-in, and then
-/// forgotten: a token can be revoked from the server's own settings page, and a password taken from
-/// a phone is the same password as everywhere else.
+/// The password is kept only if asked for, and then in the same protected place. It is not needed
+/// to stay signed in — the refresh token does that — but that token dies after thirty unused days,
+/// and a book app can easily go a month unopened. Without the password that means typing everything
+/// again; with it the app quietly signs itself back in. The choice belongs to whoever owns the
+/// phone, so it is a switch rather than a decision made here.
 /// </summary>
 public class ServerAccount
 {
     private const string UrlKey = "server.url";
     private const string TokenKey = "server.token";
     private const string RefreshKey = "server.refresh";
+    private const string UserKey = "server.username";
+    private const string PasswordKey = "server.password";
 
     /// <summary>Raised when the app connects or disconnects, so screens can show the change.</summary>
     public event EventHandler? Changed;
@@ -86,12 +90,54 @@ public class ServerAccount
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// Keeps the sign-in itself, so a session that has expired beyond recovery can be renewed
+    /// without asking. Only ever called when the user has asked for it.
+    /// </summary>
+    public async Task RememberSignInAsync(string username, string password)
+    {
+        try
+        {
+            await SecureStorage.Default.SetAsync(UserKey, username);
+            await SecureStorage.Default.SetAsync(PasswordKey, password);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Info($"server sign-in not stored ({ex.GetType().Name})");
+        }
+    }
+
+    public void ForgetSignIn()
+    {
+        SecureStorage.Default.Remove(UserKey);
+        SecureStorage.Default.Remove(PasswordKey);
+    }
+
+    /// <summary>The stored sign-in, or nulls when there is none to use.</summary>
+    public async Task<(string? Username, string? Password)> GetSignInAsync()
+    {
+        try
+        {
+            return (await SecureStorage.Default.GetAsync(UserKey),
+                    await SecureStorage.Default.GetAsync(PasswordKey));
+        }
+        catch (Exception ex)
+        {
+            AppLog.Info($"server sign-in unreadable ({ex.GetType().Name}); treating it as absent");
+            return (null, null);
+        }
+    }
+
+    /// <summary>Whether a sign-in is stored, without reading it.</summary>
+    public async Task<bool> RemembersSignInAsync() => (await GetSignInAsync()).Password is { Length: > 0 };
+
     /// <summary>Forgets the server entirely. The token on the server itself is untouched.</summary>
     public void Forget()
     {
         Url = null;
         SecureStorage.Default.Remove(TokenKey);
         SecureStorage.Default.Remove(RefreshKey);
+        ForgetSignIn();
 
         Changed?.Invoke(this, EventArgs.Empty);
     }

@@ -57,6 +57,8 @@ public static class MauiProgram
 		builder.Services.AddTransient<SettingsPage>();
 		builder.Services.AddTransient<ServerViewModel>();
 		builder.Services.AddTransient<ServerPage>();
+		builder.Services.AddTransient<ServerBookViewModel>();
+		builder.Services.AddTransient<ServerBookPage>();
 
 #if DEBUG
 		builder.Logging.AddDebug();

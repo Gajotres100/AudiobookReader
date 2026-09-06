@@ -88,6 +88,16 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
     [ObservableProperty]
     public partial string Token { get; set; } = "";
 
+    /// <summary>
+    /// Whether to keep the sign-in itself, not only the tokens.
+    ///
+    /// On by default, because the alternative is worse than it sounds: the tokens last thirty
+    /// unused days, and a book app can easily go a month unopened — after which everything has to
+    /// be typed again for no reason the user can see.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool RemembersSignIn { get; set; } = true;
+
     /// <summary>Signing in with a pasted token instead of a password, for anyone who prefers it.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UsesPassword))]
@@ -107,16 +117,15 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
     [ObservableProperty]
     public partial double Progress { get; set; }
 
-    /// <summary>True while a book is coming down — the one thing here worth interrupting.</summary>
-    [ObservableProperty]
-    public partial bool IsDownloading { get; set; }
-
     [ObservableProperty]
     public partial ServerLibraryInfo? SelectedLibrary { get; set; }
 
     public async Task LoadAsync()
     {
         Url = server.Url ?? "";
+        // Reflects what was chosen last time, and starts on for a server never connected to.
+        RemembersSignIn = await server.RemembersSignInAsync() || server.Url is null;
+
         IsConnected = await server.RestoreAsync();
 
         // Only the first time. Coming back from a download should not spend a minute re-reading a
@@ -140,7 +149,7 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         }
         else
         {
-            await server.SignInAsync(Url.Trim(), Username.Trim(), Password);
+            await server.SignInAsync(Url.Trim(), Username.Trim(), Password, RemembersSignIn);
         }
 
         // Kept nowhere else, and cleared from the screen the moment it has been exchanged for a
@@ -257,77 +266,18 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         if (loose.Count > 0) yield return new Shelf("Bez serije", loose);
     }
 
-    /// <summary>The download in flight, so it can be stopped.</summary>
-    private CancellationTokenSource? _downloading;
-
+    /// <summary>
+    /// Opens the book rather than fetching it.
+    ///
+    /// A tap used to begin a three-hundred-megabyte download on the spot. What is about to come
+    /// over a phone's connection deserves a page first — and the reason a book cannot come at all
+    /// belongs there too, rather than in a button that refuses.
+    /// </summary>
     [RelayCommand]
-    private void CancelDownload()
-    {
-        if (_downloading is null) return;
-
-        _downloading.Cancel();
-        Status = "Prekidam preuzimanje…";
-    }
-
-    [RelayCommand]
-    private Task ImportAsync(ServerBookRow? row) => GuardAsync(async () =>
-    {
-        if (row is null) return;
-
-        if (!row.CanImport)
-        {
-            Status = row.Note;
-            return;
-        }
-
-        // One at a time, and said rather than silently ignored. Two downloads over a phone's
-        // connection finish later than two in a row, and only one progress bar can be believed.
-        if (IsDownloading)
-        {
-            Status = "Već preuzimam jednu knjigu — pričekaj ili je prekini.";
-            return;
-        }
-
-        // Asked before it starts. A tap that begins a three-hundred-megabyte download with no
-        // warning is a tap nobody meant to make.
-        var confirmed = await Shell.Current.DisplayAlertAsync(
-            row.Title,
-            row.Note.Length > 0 ? $"Preuzeti sa servera? ({row.Note})" : "Preuzeti sa servera?",
-            "Preuzmi",
-            "Odustani");
-
-        if (!confirmed) return;
-
-        using var downloading = new CancellationTokenSource();
-
-        _downloading = downloading;
-        IsDownloading = true;
-
-        try
-        {
-            var progress = new Progress<ImportProgress>(p =>
-            {
-                Status = p.Message;
-                Progress = p.Fraction;
-            });
-
-            await server.ImportAsync(row.Book, progress, downloading.Token);
-
-            Status = $"„{row.Title}” je u biblioteci.";
-        }
-        catch (OperationCanceledException)
-        {
-            // The half-finished file is already gone: whatever was written is deleted by the code
-            // that was writing it, whichever way the download ended.
-            Status = $"Preuzimanje knjige „{row.Title}” je prekinuto.";
-        }
-        finally
-        {
-            _downloading = null;
-            IsDownloading = false;
-            Progress = 0;
-        }
-    });
+    private static Task ImportAsync(ServerBookRow? row) =>
+        row is null
+            ? Task.CompletedTask
+            : Shell.Current.GoToAsync($"serverbook?id={Uri.EscapeDataString(row.Book.Id)}");
 
     /// <summary>
     /// How deep the guarded calls are nested.

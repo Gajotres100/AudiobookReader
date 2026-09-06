@@ -45,12 +45,17 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
     /// client. Whether they still work is discovered by the first request that needs them, which is
     /// the only honest way to find out anyway.
     /// </summary>
+    /// <summary>Whether the sign-in is kept, so the switch can show its state.</summary>
+    public Task<bool> RemembersSignInAsync() => account.RemembersSignInAsync();
+
     public async Task<bool> RestoreAsync()
     {
         if (account.Url is not { } url) return IsConnected = false;
 
         var (token, refresh) = await account.GetTokensAsync();
-        if (token is null) return IsConnected = false;
+
+        // No token but a stored sign-in is still a connection: the first call renews it.
+        if (token is null) return IsConnected = await RenewAsync();
 
         KeepTokens();
         _client.Connect(url, token, refresh);
@@ -58,8 +63,17 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
         return IsConnected = true;
     }
 
-    /// <summary>Signs in with a username and password, and keeps only the token that comes back.</summary>
-    public async Task SignInAsync(string url, string username, string password, CancellationToken ct = default)
+    /// <summary>Signs in with a username and password.</summary>
+    /// <param name="remember">
+    /// Whether to keep the sign-in itself. The tokens alone last thirty unused days, and a book app
+    /// can go longer than that between openings.
+    /// </param>
+    public async Task SignInAsync(
+        string url,
+        string username,
+        string password,
+        bool remember,
+        CancellationToken ct = default)
     {
         KeepTokens();
         _client.Connect(url);
@@ -67,7 +81,47 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
         var tokens = await _client.SignInAsync(username, password, ct);
 
         await account.SaveAsync(AudiobookshelfClient.Normalise(url), tokens.Access, tokens.Refresh);
+
+        if (remember) await account.RememberSignInAsync(username, password);
+        else account.ForgetSignIn();
+
         IsConnected = true;
+    }
+
+    /// <summary>
+    /// Signs in again from what was stored, when the tokens have run out entirely.
+    ///
+    /// The last resort, and only reachable if the user asked for the sign-in to be kept. Everything
+    /// short of this is handled by the refresh token inside the client.
+    /// </summary>
+    private async Task<bool> RenewAsync()
+    {
+        if (account.Url is not { } url) return false;
+
+        var (username, password) = await account.GetSignInAsync();
+        if (username is null || password is null) return false;
+
+        try
+        {
+            AppLog.Info("server: tokens exhausted, signing in again from the stored sign-in");
+
+            KeepTokens();
+            _client.Connect(url);
+
+            var tokens = await _client.SignInAsync(username, password);
+            await account.SaveTokensAsync(tokens.Access, tokens.Refresh);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            // The password has been changed on the server, or the account is gone. Keeping it would
+            // mean retrying it against every call from now on.
+            AppLog.Info($"server: stored sign-in no longer works ({ex.Message})");
+            account.ForgetSignIn();
+
+            return false;
+        }
     }
 
     /// <summary>
@@ -107,6 +161,10 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
             return (IReadOnlyList<ServerLibraryInfo>)
                 [.. libraries.Where(l => l.IsBooks).Select(l => new ServerLibraryInfo(l.Id, l.Name))];
         });
+
+    /// <summary>One book in full: its files, its chapter marks, and what it is made of.</summary>
+    public Task<ServerBookDetail> GetBookAsync(string itemId, CancellationToken ct = default) =>
+        Wrap(() => _client.GetBookAsync(itemId, ct));
 
     public Task<IReadOnlyList<ServerBook>> GetBooksAsync(
         string libraryId,
@@ -265,6 +323,11 @@ public class ServerConnection(ServerAccount account, BookImporter importer)
         }
         catch (ServerException ex) when (ex.NeedsSignIn)
         {
+            // One more try, from the sign-in the user asked us to keep. This is the thirty-days-away
+            // case: the refresh token is gone, and without this the only way back is typing
+            // everything again.
+            if (await RenewAsync()) return await call();
+
             IsConnected = false;
             throw;
         }
