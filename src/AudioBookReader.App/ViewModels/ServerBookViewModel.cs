@@ -48,38 +48,6 @@ public partial class ServerBookViewModel(
     [ObservableProperty]
     public partial string Chapters { get; set; } = "";
 
-    /// <summary>Where it will land under the chosen folder, so it is no surprise afterwards.</summary>
-    [ObservableProperty]
-    public partial string Layout { get; set; } = "";
-
-    /// <summary>
-    /// Where it will be kept, said before anything is written rather than discovered afterwards.
-    /// </summary>
-    [ObservableProperty]
-    public partial string Destination { get; set; } = "";
-
-    private void DescribeDestination()
-    {
-        Destination = folder.IsChosen
-            ? $"Zadnji put odabrano: „{folder.Describe()}”. Pitat ću te i sad."
-            : "Pitat ću te gdje spremiti kad pritisneš Preuzmi.";
-
-        var author = DownloadFolder.SafeName(Author.Length > 0 ? Author : "Nepoznat autor");
-        Layout = $"{author} / {DownloadFolder.SafeName(Title)} /";
-    }
-
-    /// <summary>Lets the user say where downloads land. Their folder, beside their other books.</summary>
-    [RelayCommand]
-    private async Task ChooseFolderAsync()
-    {
-        if (await folder.ChooseAsync() is null) return;
-
-        DescribeDestination();
-        Status = "";
-    }
-
-    public string FolderName => folder.Describe();
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CannotDownload))]
     public partial bool CanDownload { get; set; }
@@ -153,8 +121,6 @@ public partial class ServerBookViewModel(
                     : "";
 
             CanDownload = Obstacle.Length == 0;
-
-            DescribeDestination();
 
             // Already here? Then say so instead of offering to fetch it twice. Matched by title,
             // which is all the two sides share before a file has been downloaded and hashed.
@@ -238,43 +204,34 @@ public partial class ServerBookViewModel(
     }
 
     /// <summary>
-    /// Settles where the book will go before a byte of it moves.
+    /// Settles where the book will go, at the one moment the question matters.
     ///
-    /// Two real places, not one and a silent fallback. A folder of the user's own is where books
-    /// belong — beside the ones already there, visible to every other app and to a cable. The app's
-    /// own storage is the other honest answer: nobody else can see it and it leaves with the app,
-    /// which is right for a book someone wants nowhere near their files. Neither should happen by
-    /// accident, so both are named.
+    /// Two places, and only two. A folder of the user's own is where books belong — beside the ones
+    /// already there, visible to every other app and over a cable. The app's own storage is the
+    /// other honest answer: nobody else can see it and it leaves with the app. Neither should
+    /// happen by accident, so both are named and nothing is a fallback.
     ///
-    /// The folder is remembered, so this is one tap on the first download and a confirmation after.
+    /// Asked here and nowhere else. The page used to offer a folder too, which made the same
+    /// decision available twice with no way to tell which one had won.
     /// </summary>
     /// <returns>Whether to use app storage, or null when the download was called off.</returns>
     private async Task<bool?> AgreeOnAFolderAsync()
     {
-        var here = folder.IsChosen ? $"Mapa „{folder.Describe()}”" : null;
-
-        const string audiobooks = "Mapa Audiobooks";
-        const string elsewhere = "Odaberi drugu mapu…";
+        var mine = folder.IsChosen ? $"Mapa „{folder.Describe()}”" : "Mapa Audiobooks";
         const string appStorage = "Interna pohrana aplikacije";
 
-        string[] options = here is null
-            ? [audiobooks, appStorage]
-            : [here, elsewhere, appStorage];
-
         var chosen = await Shell.Current.DisplayActionSheetAsync(
-            "Gdje spremiti knjigu?", "Odustani", null, options);
+            "Gdje spremiti knjigu?", "Odustani", null, mine, appStorage);
 
         if (chosen is null || chosen == "Odustani") return null;
-
         if (chosen == appStorage) return true;
-        if (chosen == here) return false;
 
-        // Opens at Audiobooks either way: the system will not hand over a folder without someone
-        // confirming it, but it will start them in the right place.
-        if (await folder.ChooseAsync() is null) return null;
+        // Already granted, so nothing to ask. Otherwise the picker opens at Audiobooks: the system
+        // will not hand over a folder without someone confirming it, but it will start them in the
+        // right place, which makes this one tap rather than a hunt.
+        if (folder.IsChosen) return false;
 
-        DescribeDestination();
-        return false;
+        return await folder.ChooseAsync() is null ? null : false;
     }
 
     [RelayCommand]

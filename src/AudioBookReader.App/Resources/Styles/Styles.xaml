@@ -112,7 +112,18 @@
         <Setter Property="MinimumHeightRequest" Value="48" />
     </Style>
 
-    <Style TargetType="Editor" BasedOn="{StaticResource Key=Entry}" />
+    <!--
+        Spelled out rather than based on the entry above it. An implicit style has no key, so there
+        is nothing to base anything on — which is a compile-time silence and a startup crash.
+    -->
+    <Style TargetType="Editor">
+        <Setter Property="FontFamily" Value="OpenSansRegular" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Ink}, Dark={StaticResource InkDark}}" />
+        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource InkMuted}, Dark={StaticResource InkMutedDark}}" />
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Sunken}, Dark={StaticResource SunkenDark}}" />
+        <Setter Property="MinimumHeightRequest" Value="48" />
+    </Style>
 
     <Style TargetType="Picker">
         <Setter Property="FontFamily" Value="OpenSansRegular" />

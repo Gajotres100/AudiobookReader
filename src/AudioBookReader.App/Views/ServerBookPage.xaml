@@ -72,31 +72,10 @@
                     Style="{StaticResource Failure}" />
 
                 <!--
-                    Where it will go, and the chance to say otherwise. Books belong beside the other
-                    books, in a folder the phone can see — not buried in app storage where nothing
-                    else can reach them.
+                    Nothing about where it goes. That question is asked once, by Preuzmi, and asking
+                    it here as well made the same decision available in two places with no way to
+                    tell which one had won.
                 -->
-                <Border Style="{StaticResource Card}">
-                    <VerticalStackLayout Spacing="8">
-                        <Label Style="{StaticResource Section}" Text="Kamo se sprema" />
-
-                        <Label Style="{StaticResource Muted}" Text="{Binding Destination}" />
-
-                        <!--  The shelf it will make: author, then the book, then the files.  -->
-                        <Label
-                            FontSize="12"
-                            Style="{StaticResource Muted}"
-                            Text="{Binding Layout}"
-                            TextColor="{AppThemeBinding Light={StaticResource Accent},
-                                                        Dark={StaticResource AccentDark}}" />
-
-                        <Button
-                            Command="{Binding ChooseFolderCommand}"
-                            HorizontalOptions="Start"
-                            Style="{StaticResource Secondary}"
-                            Text="Odaberi mapu…" />
-                    </VerticalStackLayout>
-                </Border>
             </VerticalStackLayout>
         </ScrollView>
 
