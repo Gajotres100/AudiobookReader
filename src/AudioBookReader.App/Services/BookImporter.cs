@@ -91,12 +91,31 @@ public class BookImporter(
         }
     }
 
-    private Task<AudioBookInfo> ProbeAsync(string location, string fileName, bool referenced, CancellationToken ct)
+    /// <summary>
+    /// Reads what the book is, and does not give up on the first reader that cannot.
+    ///
+    /// The tag library is asked first because it is the only thing that reports chapter marks, and
+    /// chapter marks are what make an audiobook navigable. When it refuses — which real books do
+    /// provoke; an ordinary MP4 audiobook named "…m4b.mp3" was enough — the platform's own
+    /// extractor is asked instead. That loses the chapters and keeps the book.
+    /// </summary>
+    private async Task<AudioBookInfo> ProbeAsync(string location, string fileName, bool referenced, CancellationToken ct)
     {
-        if (!referenced) return AudioBookProbe.ProbeAsync(location, ct);
+        try
+        {
+            if (!referenced) return await AudioBookProbe.ProbeAsync(location, ct);
 
-        var stream = references.OpenRead(location);
-        return ProbeAndCloseAsync(stream, fileName, ct);
+            var stream = references.OpenRead(location);
+            return await ProbeAndCloseAsync(stream, fileName, ct);
+        }
+        catch (UnreadableAudioException ex)
+        {
+            AppLog.Info($"tags unreadable for '{fileName}' ({ex.InnerException?.GetType().Name}); asking the platform");
+
+            return await AudioMetadata.ReadAsync(location, fileName)
+                   ?? throw new NotSupportedException(
+                       $"'{fileName}' se ne može pročitati kao audioknjiga — ni oznake ni sam zapis.", ex);
+        }
     }
 
     private static async Task<AudioBookInfo> ProbeAndCloseAsync(Stream stream, string fileName, CancellationToken ct)
