@@ -104,6 +104,33 @@ public class BookSync(BookText text, SyncMap map, IReadOnlyList<Chapter> chapter
         return chapterMap.TryGetAudioMs(charOffset, out var at) ? at : null;
     }
 
+    /// <summary>
+    /// Where to seek for a place in the text, or for the first place shortly after it that the map
+    /// does cover.
+    ///
+    /// A chapter's very first character is the likeliest one to fall outside its own anchors: the
+    /// heading, the drop capital and the first few words are often what a probe skipped over, so
+    /// the exact offset refuses and the caller falls back to guessing at a book that is fully
+    /// mapped a sentence later. Walking forward a little turns that into an exact answer.
+    /// </summary>
+    public long? AudioPositionAtOrAfterChar(int charOffset, int withinChars)
+    {
+        if (AudioPositionAtChar(charOffset) is { } here) return here;
+
+        var sentence = text.SentenceAt(charOffset);
+        if (sentence is null) return null;
+
+        for (var i = sentence.Value.Index + 1; i < text.Sentences.Count; i++)
+        {
+            var next = text.Sentences[i];
+            if (next.Start - charOffset > withinChars) break;
+
+            if (AudioPositionAtChar(next.Start) is { } at) return at;
+        }
+
+        return null;
+    }
+
     public long? AudioPositionAtSentence(int sentenceIndex) =>
         sentenceIndex >= 0 && sentenceIndex < text.Sentences.Count
             ? AudioPositionAtChar(text.Sentences[sentenceIndex].Start)

@@ -28,6 +28,14 @@ public partial class PlaybackController
     /// <summary>Whether the playback service is actually up.</summary>
     public partial bool IsReady { get; }
 
+    /// <summary>
+    /// Whether the player has finished buffering and is sitting where it was sent.
+    ///
+    /// A seek is a request. Until this is true the player is still on the old position or fetching
+    /// the new one, and playing then plays the passage being left.
+    /// </summary>
+    public partial bool IsReadyToPlay { get; }
+
     public partial bool IsPlaying { get; }
     public partial long PositionMs { get; }
     public partial long DurationMs { get; }

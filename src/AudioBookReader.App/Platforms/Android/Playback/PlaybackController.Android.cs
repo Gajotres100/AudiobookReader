@@ -8,6 +8,7 @@ public partial class PlaybackController
     private static PlaybackService? Service => PlaybackService.Current;
 
     public partial bool IsReady => Service is not null;
+    public partial bool IsReadyToPlay => Service?.IsReadyToPlay ?? false;
     public partial bool IsPlaying => Service?.IsPlaying ?? false;
     public partial long PositionMs => Service?.PositionMs ?? 0;
     public partial long DurationMs => Service?.DurationMs ?? 0;

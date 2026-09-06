@@ -152,6 +152,10 @@ public class PlaybackService : MediaSessionService
         _playerThread.PostDelayed(PublishState, 200);
     }
 
+    /// <summary>True once the player has buffered and is sitting on the position it was sent to.</summary>
+    public bool IsReadyToPlay =>
+        OnPlayerThread ? _player?.PlaybackState == 3 : _lastPlaybackState == 3;
+
     private static string Describe(int state) => state switch
     {
         1 => "idle",

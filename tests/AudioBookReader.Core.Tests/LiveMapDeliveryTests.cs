@@ -1,3 +1,4 @@
+using AudioBookReader.Core.Books;
 using AudioBookReader.Core.Models;
 
 namespace AudioBookReader.Core.Tests;
@@ -155,4 +156,68 @@ public class LiveMapDeliveryTests
         Assert.True(twoPlaces.Covers(600_000));
         Assert.False(twoPlaces.IsMeasuredAt(600_000, windowMs: 20_000, boundaryConfidence: 0.2f));
     }
+
+    [Fact]
+    public void FindsTheFirstPlaceAfterAHeadingThatTheMapCovers()
+    {
+        // A chapter's opening characters are the likeliest to fall outside its own anchors — a
+        // heading and a drop capital are what a probe skips over — so asking for the exact offset
+        // refuses on a book that is fully mapped one sentence later.
+        var text = TextOf("Chapter Nineteen. The river had frozen over. Nobody crossed it that winter.");
+
+        var chapters = new List<Chapter>
+        {
+            new() { Index = 0, StartMs = 0, EndMs = 60_000, TextStart = 0, TextEnd = text.PlainText.Length },
+        };
+
+        var second = text.Sentences[1];
+
+        var map = new SyncMap();
+        map.SetChapter(new ChapterSyncMap
+        {
+            ChapterIndex = 0,
+            Anchors =
+            [
+                new Anchor(10_000, second.Start, 0.9f),
+                new Anchor(20_000, text.Sentences[2].Start, 0.9f),
+            ],
+        });
+
+        var sync = new BookSync(text, map, chapters);
+
+        Assert.Null(sync.AudioPositionAtChar(0));
+        Assert.Equal(10_000, sync.AudioPositionAtOrAfterChar(0, withinChars: 1_200));
+    }
+
+    [Fact]
+    public void StopsLookingOnceItIsNoLongerTheSamePlace()
+    {
+        var text = TextOf("Chapter Nineteen. The river had frozen over.");
+
+        var chapters = new List<Chapter>
+        {
+            new() { Index = 0, StartMs = 0, EndMs = 60_000, TextStart = 0, TextEnd = text.PlainText.Length },
+        };
+
+        var map = new SyncMap();
+        map.SetChapter(new ChapterSyncMap
+        {
+            ChapterIndex = 0,
+            Anchors =
+            [
+                new Anchor(10_000, text.Sentences[1].Start, 0.9f),
+                new Anchor(20_000, text.PlainText.Length - 1, 0.9f),
+            ],
+        });
+
+        Assert.Null(new BookSync(text, map, chapters).AudioPositionAtOrAfterChar(0, withinChars: 5));
+    }
+
+    /// <summary>A one-document book, split into sentences the way the extractor would.</summary>
+    private static BookText TextOf(string prose) => new()
+    {
+        PlainText = prose,
+        Sentences = [.. SentenceSplitter.Split(prose).Select((r, i) => new Sentence(i, r.Start, r.End, 0))],
+        Spine = [new SpineDocument { Index = 0, Href = "one.xhtml", TextStart = 0, TextEnd = prose.Length, Html = "" }],
+    };
 }

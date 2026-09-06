@@ -598,6 +598,12 @@ public partial class ReaderViewModel(
         await TakeNarrationToAsync(start);
     }
 
+    /// <summary>
+    /// How far past a requested offset to look for one the map covers. About a paragraph — far
+    /// enough past a heading and an opening line, near enough that it is still the same place.
+    /// </summary>
+    private const int LookAheadChars = 1_200;
+
     /// <summary>How long to hold playback while measuring catches up with a chapter just opened.</summary>
     private const int ReadyWaitSeconds = 45;
 
@@ -648,11 +654,16 @@ public partial class ReaderViewModel(
         // veto the next move.
         _lastSentence = -1;
 
-        // Nothing to wait for when the whole book is aligned in advance: either this chapter is
-        // already mapped or it never will be from here, and standing still would just look broken.
+        // A book aligned in advance has nothing to measure, but it still has a seek to land. Play
+        // called in the same breath as the seek starts on whatever the player is still holding, so
+        // a jump began with a second or two of the passage being left before the new one arrived.
+        // A short settle costs nothing and removes it.
         if (!MeasuresWhileReading)
         {
-            if (wasPlaying) playback.Play();
+            var settling = new CancellationTokenSource();
+            _holding = settling;
+
+            await SettleSeekAsync(resume: wasPlaying, settling.Token);
             return;
         }
 
@@ -689,6 +700,46 @@ public partial class ReaderViewModel(
     /// target converts back into time — a correction anchored on a measurement rather than on a
     /// proportion across ten hours, which is what makes it converge instead of merely differing.
     /// </summary>
+    /// <summary>How long to give a seek before speaking anyway.</summary>
+    private const int SettleSeconds = 5;
+
+    /// <summary>
+    /// Waits for the player to actually be sitting on the position it was sent to, then speaks.
+    ///
+    /// A seek is a request, not a fact: the player reports the old position for a moment and then
+    /// buffers, and starting playback in that window plays the passage being left. Two hundred
+    /// milliseconds of the wrong chapter is still the wrong chapter, and it is the first thing
+    /// heard after asking for a new one.
+    /// </summary>
+    private async Task SettleSeekAsync(bool resume, CancellationToken ct)
+    {
+        IsWaitingToSpeak = true;
+        FollowStatus = "Pripremam poglavlje…";
+
+        try
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(SettleSeconds);
+
+            while (DateTime.UtcNow < deadline && !playback.IsReadyToPlay)
+                await Task.Delay(150, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            IsWaitingToSpeak = false;
+        }
+
+        FollowStatus = "";
+
+        // Whatever is showing was chosen against the old position; let the next tick place it.
+        _lastSentence = -1;
+
+        if (resume) playback.Play();
+    }
+
     private async Task HoldUntilMeasuredAsync(int targetChar, bool resume, CancellationToken ct)
     {
         IsWaitingToSpeak = true;
@@ -861,8 +912,9 @@ public partial class ReaderViewModel(
             && Preferences.Default.Get(PositionKey(documentIndex), 0L) is > 0 and var remembered)
             return remembered;
 
-        // A map that already covers this passage knows exactly when it is read.
-        if (_sync?.AudioPositionAtChar(textStart) is { } known) return known;
+        // A map that already covers this passage knows exactly when it is read — or the first
+        // sentence just after it does, which for a chapter opening is usually the case.
+        if (_sync?.AudioPositionAtOrAfterChar(textStart, LookAheadChars) is { } known) return known;
 
         var chapters = await database.GetChaptersAsync(BookId);
 
