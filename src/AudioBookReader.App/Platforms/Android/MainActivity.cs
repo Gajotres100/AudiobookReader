@@ -59,12 +59,19 @@ public class MainActivity : MauiAppCompatActivity
     /// persistable grant is what makes that survive a reboot; without it the folder would have to be
     /// chosen again every time.
     /// </summary>
-    public static Task<AndroidUri?> PickFolderAsync()
+    /// <param name="startAt">
+    /// Where to open the picker. The system will not grant a folder without someone confirming it,
+    /// but it will start them in the right place — which turns "go and find Audiobooks" into one tap.
+    /// </param>
+    public static Task<AndroidUri?> PickFolderAsync(AndroidUri? startAt = null)
     {
         _pending?.TrySetResult(null);
         _pending = new TaskCompletionSource<AndroidUri?>();
 
         var intent = new Intent(Intent.ActionOpenDocumentTree);
+
+        if (startAt is not null && Build.VERSION.SdkInt >= BuildVersionCodes.O)
+            intent.PutExtra(Android.Provider.DocumentsContract.ExtraInitialUri, startAt);
 
         intent.AddFlags(ActivityFlags.GrantReadUriPermission
                         | ActivityFlags.GrantWriteUriPermission

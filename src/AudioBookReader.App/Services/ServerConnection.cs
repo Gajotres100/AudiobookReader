@@ -213,6 +213,7 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
                 var file = detail.AudioFiles[0];
 
                 var path = await DownloadAsync(
+                    Shelf(book),
                     file.FileName,
                     (to, report) => _client.DownloadFileAsync(book.Id, file.Ino, to, report, ct),
                     $"Skidam zvuk — {book.Title}",
@@ -230,6 +231,7 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
             if (detail.Ebook is { } ebook)
             {
                 var path = await DownloadAsync(
+                    Shelf(book),
                     ebook.FileName,
                     (to, report) => _client.DownloadEbookAsync(book.Id, to, report, ct),
                     $"Skidam tekst — {book.Title}",
@@ -264,14 +266,28 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
     /// the download has to land somewhere first — and where it lands is the user's own folder
     /// whenever they have chosen one.
     /// </summary>
+    /// <summary>
+    /// Where a book goes under the chosen folder: the author, then the book.
+    ///
+    /// The audio and the text of one title land together, and two books by the same author land
+    /// under one name. That is how every other audiobook tool arranges a library on disk, and it is
+    /// what keeps a folder of two hundred books navigable.
+    /// </summary>
+    private static string[] Shelf(ServerBook book) =>
+    [
+        DownloadFolder.SafeName(book.Author ?? "Nepoznat autor"),
+        DownloadFolder.SafeName(book.Title),
+    ];
+
     private async Task<string> DownloadAsync(
+        IReadOnlyList<string> folders,
         string fileName,
         Func<Stream, IProgress<double?>, Task> download,
         string message,
         IProgress<ImportProgress>? progress,
         CancellationToken ct)
     {
-        var (stream, location) = await OpenDestinationAsync(fileName);
+        var (stream, location) = await OpenDestinationAsync(folders, fileName);
 
         try
         {
@@ -293,13 +309,15 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
         }
     }
 
-    private async Task<(Stream Stream, string Location)> OpenDestinationAsync(string fileName)
+    private async Task<(Stream Stream, string Location)> OpenDestinationAsync(
+        IReadOnlyList<string> folders,
+        string fileName)
     {
         if (folder.IsChosen)
         {
             try
             {
-                return await folder.CreateAsync(Sanitise(fileName));
+                return await folder.CreateAsync(folders, Sanitise(fileName));
             }
             catch (Exception ex)
             {

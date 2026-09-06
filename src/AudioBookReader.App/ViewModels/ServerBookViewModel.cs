@@ -48,16 +48,25 @@ public partial class ServerBookViewModel(
     [ObservableProperty]
     public partial string Chapters { get; set; } = "";
 
+    /// <summary>Where it will land under the chosen folder, so it is no surprise afterwards.</summary>
+    [ObservableProperty]
+    public partial string Layout { get; set; } = "";
+
     /// <summary>
     /// Where it will be kept, said before anything is written rather than discovered afterwards.
     /// </summary>
     [ObservableProperty]
     public partial string Destination { get; set; } = "";
 
-    private void DescribeDestination() =>
+    private void DescribeDestination()
+    {
         Destination = folder.IsChosen
             ? $"Sprema se u „{folder.Describe()}” i odmah se pojavljuje u Knjigama."
-            : "Nije odabrana mapa — knjiga bi otišla u spremnik aplikacije, gdje je druge aplikacije ne vide.";
+            : "Nije odabrana mapa — pitat ću te kad pritisneš Preuzmi.";
+
+        var author = DownloadFolder.SafeName(Author.Length > 0 ? Author : "Nepoznat autor");
+        Layout = $"{author} / {DownloadFolder.SafeName(Title)} /";
+    }
 
     /// <summary>Lets the user say where downloads land. Their folder, beside their other books.</summary>
     [RelayCommand]
@@ -188,6 +197,8 @@ public partial class ServerBookViewModel(
     {
         if (_detail is null || !CanDownload || IsDownloading) return;
 
+        if (!await AgreeOnAFolderAsync()) return;
+
         using var downloading = new CancellationTokenSource();
 
         _downloading = downloading;
@@ -223,6 +234,36 @@ public partial class ServerBookViewModel(
             IsDownloading = false;
             Progress = 0;
         }
+    }
+
+    /// <summary>
+    /// Settles where the book will go before a byte of it moves.
+    ///
+    /// Asked here rather than assumed, because the answer decides whether the book ends up
+    /// somewhere the rest of the phone can see. Once chosen it is remembered, so this is one tap on
+    /// the first download and none after — but it is still offered, since the second book might
+    /// belong somewhere else.
+    /// </summary>
+    private async Task<bool> AgreeOnAFolderAsync()
+    {
+        var here = folder.IsChosen ? $"Spremi u „{folder.Describe()}”" : null;
+        const string audiobooks = "Odaberi mapu Audiobooks";
+        const string elsewhere = "Odaberi drugu mapu…";
+
+        var options = here is null ? [audiobooks] : new[] { here, elsewhere };
+
+        var chosen = await Shell.Current.DisplayActionSheetAsync(
+            "Gdje spremiti knjigu?", "Odustani", null, options);
+
+        if (chosen is null || chosen == "Odustani") return false;
+        if (chosen == here) return true;
+
+        // Opens at Audiobooks either way; the system will not hand over a folder without someone
+        // confirming it, but it will start them in the right place.
+        if (await folder.ChooseAsync() is null) return false;
+
+        DescribeDestination();
+        return true;
     }
 
     [RelayCommand]

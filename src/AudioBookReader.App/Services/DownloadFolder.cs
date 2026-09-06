@@ -33,9 +33,10 @@ public partial class DownloadFolder
     public partial string Describe();
 
     /// <summary>Asks for a folder and keeps the right to write in it. Null when nothing was chosen.</summary>
-    public async Task<string?> ChooseAsync()
+    /// <param name="startAtAudiobooks">Opens the picker at the Audiobooks folder rather than at the root.</param>
+    public async Task<string?> ChooseAsync(bool startAtAudiobooks = true)
     {
-        var chosen = await ChooseCoreAsync();
+        var chosen = await ChooseCoreAsync(startAtAudiobooks);
         if (chosen is null) return null;
 
         Location = chosen;
@@ -46,13 +47,32 @@ public partial class DownloadFolder
 
     public void Forget() => Location = null;
 
-    private partial Task<string?> ChooseCoreAsync();
+    private partial Task<string?> ChooseCoreAsync(bool startAtAudiobooks);
 
     /// <summary>
-    /// Creates a file in the chosen folder and hands back a stream to write it and the location it
-    /// will be known by afterwards.
+    /// Creates a file under the chosen folder and hands back a stream to write it and the location
+    /// it will be known by afterwards.
     /// </summary>
-    public partial Task<(Stream Stream, string Location)> CreateAsync(string fileName);
+    /// <param name="folders">
+    /// Subfolders to put it under, made if they are not there — author, then title. That is how
+    /// every other audiobook tool lays them out, and it is what makes a folder of two hundred books
+    /// navigable rather than a wall of filenames.
+    /// </param>
+    public partial Task<(Stream Stream, string Location)> CreateAsync(
+        IReadOnlyList<string> folders,
+        string fileName);
+
+    /// <summary>Turns a title or an author into something a filesystem will accept as a folder.</summary>
+    public static string SafeName(string name)
+    {
+        var cleaned = new string([.. name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)]);
+
+        // Trailing dots and spaces are legal in a string and not in a directory name on most of the
+        // filesystems a phone can be carrying.
+        cleaned = cleaned.Trim().TrimEnd('.').Trim();
+
+        return cleaned.Length == 0 ? "Nepoznato" : cleaned;
+    }
 
     /// <summary>Removes a file this created, for a download that did not finish.</summary>
     public partial void Delete(string location);
