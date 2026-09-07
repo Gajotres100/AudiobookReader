@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 using AudioBookReader.Core.Servers;
 
 namespace AudioBookReader.App.Services;
@@ -189,21 +190,26 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
     /// sight of everything else on the phone, and gone when the app is uninstalled — which is
     /// exactly right for a book someone wants nowhere near their own files, and wrong by default.
     /// </param>
+    /// <param name="itemId">
+    /// The book on the server, rather than the record a page happened to be holding. The service
+    /// that runs this is handed an intent, not an object, and everything it needs is in the detail
+    /// it fetches anyway.
+    /// </param>
     public async Task<int> ImportAsync(
-        ServerBook book,
+        string itemId,
         IProgress<ImportProgress>? progress = null,
         CancellationToken ct = default,
         bool toAppStorage = false)
     {
-        var detail = await Wrap(() => _client.GetBookAsync(book.Id, ct));
+        var detail = await Wrap(() => _client.GetBookAsync(itemId, ct));
+        var book = detail.Book;
 
         // One file only, for now. A book split across forty files needs the app to hold more than
         // one audio path per book, and holding it as one long file it is not would be a lie the
         // chapter list and every seek would then repeat.
         if (detail.AudioFiles.Count > 1)
             throw new NotSupportedException(
-                $"„{book.Title}” je na serveru razlomljen na {detail.AudioFiles.Count} datoteka, " +
-                "a to još ne znam složiti u jednu knjigu.");
+                string.Format(Strings.Server_SplitFilesLong, detail.AudioFiles.Count));
 
         int? bookId = null;
 
@@ -221,8 +227,8 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
                 var path = await DownloadAsync(
                     toAppStorage ? null : Shelf(book),
                     file.FileName,
-                    (to, report) => _client.DownloadFileAsync(book.Id, file.Ino, to, report, ct),
-                    $"Skidam zvuk — {book.Title}",
+                    (to, report) => _client.DownloadFileAsync(itemId, file.Ino, to, report, ct),
+                    string.Format(Strings.Server_DownloadingAudio, book.Title),
                     progress,
                     ct);
 
@@ -239,8 +245,8 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
                 var path = await DownloadAsync(
                     toAppStorage ? null : Shelf(book),
                     ebook.FileName,
-                    (to, report) => _client.DownloadEbookAsync(book.Id, to, report, ct),
-                    $"Skidam tekst — {book.Title}",
+                    (to, report) => _client.DownloadEbookAsync(itemId, to, report, ct),
+                    string.Format(Strings.Server_DownloadingText, book.Title),
                     progress,
                     ct);
 
@@ -254,8 +260,7 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
 
             finished = true;
 
-            return bookId ?? throw new NotSupportedException(
-                $"„{book.Title}” na serveru nema ni zvuka ni teksta.");
+            return bookId ?? throw new NotSupportedException(Strings.Server_NothingToDownload);
         }
         finally
         {
@@ -281,7 +286,7 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
     /// </summary>
     private static string[] Shelf(ServerBook book) =>
     [
-        DownloadFolder.SafeName(book.Author ?? "Nepoznat autor"),
+        DownloadFolder.SafeName(book.Author ?? Strings.Server_UnknownAuthor),
         DownloadFolder.SafeName(book.Title),
     ];
 
@@ -300,8 +305,19 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
         {
             await using (stream)
             {
+                // Reported per whole percent, not per chunk. The copy hands back progress every
+                // 128 KB, which on a three hundred megabyte book is a couple of thousand updates,
+                // each one marshalled to the UI thread and each one rebuilding a notification.
+                var lastPercent = -1;
+
                 var report = new Progress<double?>(fraction =>
-                    progress?.Report(new ImportProgress(message, fraction ?? 0)));
+                {
+                    var percent = (int)((fraction ?? 0) * 100);
+                    if (percent == lastPercent) return;
+
+                    lastPercent = percent;
+                    progress?.Report(new ImportProgress(message, fraction ?? 0));
+                });
 
                 await download(stream, report);
             }

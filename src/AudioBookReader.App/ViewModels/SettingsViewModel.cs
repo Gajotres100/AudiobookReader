@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using AudioBookReader.App.Services;
+using AudioBookReader.App.Resources.Strings;
 using AudioBookReader.Core.Alignment;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -13,31 +14,92 @@ public class BudgetOption(CpuBudget budget, bool isSelected)
 
     public CpuBudget Budget { get; } = budget;
 
-    public string Name { get; } = budget.Name;
+    public string Name { get; } = budget.Id switch
+    {
+        "eco" => Strings.Budget_Thrifty,
+        "balanced" => Strings.Budget_Balanced,
+        _ => Strings.Budget_Fast,
+    };
 
     public bool IsSelected { get; } = isSelected;
 
     public string Estimate { get; } = Describe(budget.EstimateAlignmentTime(ReferenceBookMs));
 
-    public string Detail { get; } = budget.Name switch
+    public string Detail { get; } = budget.Id switch
     {
-        "Štedljivo" => "Male jezgre, 25% vremena. Telefon se praktički ne primijeti.",
-        "Uravnoteženo" => "Male jezgre, 50% vremena. Radi u pozadini dok normalno koristiš telefon.",
-        _ => "Sve jezgre, bez pauza. Najbolje uz 'samo dok puni' i ugašen ekran.",
+        "eco" => Strings.Budget_ThriftyDetail,
+        "balanced" => Strings.Budget_BalancedDetail,
+        _ => Strings.Budget_FastDetail,
     };
 
     private static string Describe(TimeSpan estimate) =>
         estimate.TotalHours >= 1
-            ? $"~{estimate.TotalHours:0.#} h za 10-satnu knjigu"
-            : $"~{estimate.TotalMinutes:0} min za 10-satnu knjigu";
+            ? string.Format(Strings.Budget_EstimateHours, estimate.TotalHours.ToString("0.#"))
+            : string.Format(Strings.Budget_EstimateMinutes, estimate.TotalMinutes.ToString("0"));
 }
 
-public partial class SettingsViewModel(AlignmentSettingsStore settings) : ObservableObject
+/// <summary>One language the app can speak, as the setting lists it.</summary>
+public record LanguageOption(string Code, string Name);
+
+/// <summary>One speech model, as the setting offers it.</summary>
+/// <param name="Id">Stored, so it survives a change of wording or language.</param>
+public record RecognitionOption(string Id, string Name, string Detail, bool IsSelected);
+
+public partial class SettingsViewModel(AlignmentSettingsStore settings, Language language) : ObservableObject
 {
     public ObservableCollection<BudgetOption> Budgets { get; } = [];
 
+    /// <summary>
+    /// The languages on offer.
+    ///
+    /// Each named in itself rather than in the language currently showing — somebody who has landed
+    /// in the wrong one needs to recognise their own, and "Croatian" is no help to a person looking
+    /// for "Hrvatski".
+    /// </summary>
+    public IReadOnlyList<LanguageOption> Languages { get; } =
+    [
+        new("", Strings.Settings_LanguageSystem),
+        new("hr", "Hrvatski"),
+        new("en", "English"),
+    ];
+
+    /// <summary>
+    /// The chosen language. Setting it rebuilds the screens, so this view model is on its way out
+    /// as it returns — which is why nothing is done after the call.
+    /// </summary>
+    public LanguageOption? SelectedLanguage
+    {
+        get => Languages.FirstOrDefault(l => l.Code == language.Current) ?? Languages[0];
+        set
+        {
+            if (value is not null) language.Set(value.Code);
+        }
+    }
+
     [ObservableProperty]
     public partial string SelectedBudgetName { get; set; } = "";
+
+    /// <summary>The two speech models, with the cost of the better one said out loud.</summary>
+    public ObservableCollection<RecognitionOption> Recognitions { get; } = [];
+
+    /// <summary>
+    /// Ask the model when each word was spoken.
+    ///
+    /// A setting rather than a constant because the feature is experimental upstream and its cost
+    /// has not been measured on every device. If it slows a phone down, this turns it off without
+    /// waiting for a new build.
+    /// </summary>
+    public bool WordTimestamps
+    {
+        get => settings.WordTimestamps;
+        set
+        {
+            if (value == settings.WordTimestamps) return;
+
+            settings.WordTimestamps = value;
+            OnPropertyChanged();
+        }
+    }
 
     /// <summary>Detailed following diagnostics in the log; off unless something needs explaining.</summary>
     [ObservableProperty]
@@ -53,8 +115,8 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings) : Observ
     public partial double MinimumBatteryPercent { get; set; }
 
     public string MinimumBatteryText => MinimumBatteryPercent <= 0
-        ? "Bez ograničenja baterije"
-        : $"Pauziraj ispod {MinimumBatteryPercent:0}% baterije";
+        ? Strings.Settings_NoBatteryLimit
+        : string.Format(Strings.Settings_PauseBelow, MinimumBatteryPercent.ToString("0"));
 
     public void Load()
     {
@@ -62,9 +124,17 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings) : Observ
 
         Budgets.Clear();
         foreach (var preset in CpuBudget.Presets)
-            Budgets.Add(new BudgetOption(preset, preset.Name == current.Name));
+            Budgets.Add(new BudgetOption(preset, preset.Id == current.Id));
 
-        SelectedBudgetName = current.Name;
+        SelectedBudgetName = current.Id;
+
+        Recognitions.Clear();
+        Recognitions.Add(new RecognitionOption(
+            "tiny", Strings.Recognition_Tiny, Strings.Recognition_TinyDetail, settings.Recognition != "base"));
+        Recognitions.Add(new RecognitionOption(
+            "base", Strings.Recognition_Base, Strings.Recognition_BaseDetail, settings.Recognition == "base"));
+
+        OnPropertyChanged(nameof(WordTimestamps));
         VerboseLog = settings.VerboseLog;
         ChargingOnly = settings.ChargingOnly;
         ScreenOffOnly = settings.ScreenOffOnly;
@@ -74,6 +144,16 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings) : Observ
     public void Select(BudgetOption option)
     {
         settings.Budget = option.Budget;
+        Load();
+    }
+
+    /// <summary>
+    /// Changes the model. Books already aligned keep their maps — this only decides what listens
+    /// to the next one.
+    /// </summary>
+    public void Select(RecognitionOption option)
+    {
+        settings.Recognition = option.Id;
         Load();
     }
 

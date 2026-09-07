@@ -56,7 +56,39 @@ public class PlaybackService : MediaSessionService
         // Pause rather than play on into a room when the headphones come out.
         _player.SetHandleAudioBecomingNoisy(true);
 
-        _session = new MediaSession.Builder(this, _player).Build();
+        // Tapping the lock-screen controls opens the app rather than doing nothing. Without a
+        // session activity the system has nowhere to send the tap, which makes the controls feel
+        // like a dead widget belonging to no app.
+        var open = PendingIntent.GetActivity(
+            this,
+            0,
+            PackageManager?.GetLaunchIntentForPackage(PackageName!)
+                ?.AddFlags(ActivityFlags.SingleTop),
+            PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
+
+        // The session sees a player that can move between chapters; the app keeps using the real
+        // one directly. Wrapping only for the session is deliberate — everything the wrapper
+        // changes is about what the outside world may ask for, and nothing inside the app goes
+        // through it.
+        var session = new MediaSession.Builder(this, new ChapterNavigation(_player, () => _chapterStarts));
+        if (open is not null) session.SetSessionActivity(open);
+
+        _session = session.Build();
+
+        // Registered with the service, not merely built.
+        //
+        // This is what was missing, and it is not obvious: OnGetSession is consulted only when an
+        // external MediaController connects, and this app never makes one — it holds the service
+        // directly and calls methods on it. So the session existed, played audio perfectly, and was
+        // never handed to the service's notification manager, which is the thing that posts the
+        // media notification and publishes the session to the system. The evidence was that the
+        // app owned only two notification channels: Media3 creates its own the first time it posts
+        // one, and it had never posted.
+        //
+        // Without it there are no lock-screen controls, nothing in the shade while listening, and
+        // no response to headset buttons — because as far as the system is concerned there is no
+        // media session at all.
+        AddSession(_session);
         _sleepTimer = new SleepTimer(_player);
 
         Current = this;
@@ -65,6 +97,101 @@ public class PlaybackService : MediaSessionService
     }
 
     public override MediaSession? OnGetSession(MediaSession.ControllerInfo? controllerInfo) => _session;
+
+    /// <summary>Where each chapter begins, for the buttons outside the app to move between them.</summary>
+    private long[] _chapterStarts = [];
+
+    /// <summary>
+    /// A player that can step between chapters, for everything that controls playback from outside.
+    ///
+    /// The lock screen, the shade, headset buttons and a car all offer previous and next depending
+    /// on what the player says it can do — and an audiobook is a single long file, so ExoPlayer
+    /// offers "previous" (which restarts the file) and no "next" at all. That asymmetry is exactly
+    /// what showed on the lock screen: one button where there should be two.
+    ///
+    /// A chapter is the right unit for those buttons in an audiobook, so this reports both commands
+    /// as available and maps them onto chapter boundaries — the same behaviour the buttons inside
+    /// the app already have, which is what makes the two sets of controls agree.
+    /// </summary>
+    private sealed class ChapterNavigation(IPlayer inner, Func<long[]> chapters) : ForwardingPlayer(inner)
+    {
+        /// <summary>
+        /// Past this far into a chapter, "previous" means the start of this one rather than the one
+        /// before. Every music player has trained people on that, and it is what the app's own
+        /// button does.
+        /// </summary>
+        private const long RestartWithinMs = 3_000;
+
+        public override PlayerCommands? AvailableCommands => Chapters().Length > 1
+            ? base.AvailableCommands?.BuildUpon()
+                ?.Add(InterfaceConsts.CommandSeekToNext)
+                ?.Add(InterfaceConsts.CommandSeekToPrevious)
+                ?.Build()
+            : base.AvailableCommands;
+
+        /// <summary>
+        /// Answered here as well as through the command set: ForwardingPlayer passes this straight
+        /// to the player underneath, which would go on denying the very commands added above.
+        /// </summary>
+        public override bool IsCommandAvailable(int command)
+        {
+            if (Chapters().Length > 1
+                && command is InterfaceConsts.CommandSeekToNext or InterfaceConsts.CommandSeekToPrevious)
+            {
+                return true;
+            }
+
+            return base.IsCommandAvailable(command);
+        }
+
+        public override void SeekToNext()
+        {
+            var starts = Chapters();
+            if (starts.Length == 0)
+            {
+                base.SeekToNext();
+                return;
+            }
+
+            var at = CurrentPosition;
+            var next = starts.FirstOrDefault(s => s > at, -1);
+
+            // Past the last chapter there is nowhere to go but the end, which is what stopping at
+            // the end of a book looks like.
+            SeekTo(next >= 0 ? next : Duration);
+        }
+
+        public override void SeekToPrevious()
+        {
+            var starts = Chapters();
+            if (starts.Length == 0)
+            {
+                base.SeekToPrevious();
+                return;
+            }
+
+            var at = CurrentPosition;
+            var current = starts.LastOrDefault(s => s <= at, 0);
+
+            SeekTo(at - current > RestartWithinMs
+                ? current
+                : starts.LastOrDefault(s => s < current, 0));
+        }
+
+        private long[] Chapters()
+        {
+            try
+            {
+                return chapters();
+            }
+            catch (Exception)
+            {
+                // Asked from whichever thread the system happens to use. A book being swapped
+                // underneath is not worth failing a button press over.
+                return [];
+            }
+        }
+    }
 
     /// <summary>
     /// Stops the service when the user dismisses the app without anything playing, rather than
@@ -204,15 +331,30 @@ public class PlaybackService : MediaSessionService
 
     public string? LoadedPath { get; private set; }
 
-    public void Load(string audioPath, long startMs, float speed)
+    /// <param name="title">Shown on the lock screen and in the shade. The file name is a poor stand-in.</param>
+    /// <param name="chapterStarts">
+    /// Where each chapter begins. What the previous and next buttons outside the app move between:
+    /// without it they have nothing to step through, and a single-file audiobook offers no next at
+    /// all.
+    /// </param>
+    public void Load(
+        string audioPath,
+        long startMs,
+        float speed,
+        string? title = null,
+        string? author = null,
+        string? coverPath = null,
+        long[]? chapterStarts = null)
     {
         if (!OnPlayerThread)
         {
-            _playerThread.Post(() => Load(audioPath, startMs, speed));
+            _playerThread.Post(() => Load(audioPath, startMs, speed, title, author, coverPath, chapterStarts));
             return;
         }
 
         if (_player is null) return;
+
+        _chapterStarts = chapterStarts ?? [];
 
         if (LoadedPath != audioPath)
         {
@@ -222,7 +364,26 @@ public class PlaybackService : MediaSessionService
                 ? global::Android.Net.Uri.Parse(audioPath)!
                 : global::Android.Net.Uri.FromFile(new Java.IO.File(audioPath))!;
 
-            _player.SetMediaItem(MediaItem.FromUri(uri));
+            // With the title, the author and the cover.
+            //
+            // These are not decoration: the lock screen, the notification shade, a car head unit
+            // and a smartwatch all draw what the session tells them, and a media item built from a
+            // bare URI tells them nothing. What showed instead was an anonymous set of controls
+            // with no name on it, which is why this app had no presence on the lock screen while
+            // every other player did.
+            // The bang marks are the binding's doing: every builder setter is typed as returning a
+            // nullable builder, though none of them ever returns null.
+            var metadata = new MediaMetadata.Builder()
+                .SetTitle(title ?? System.IO.Path.GetFileNameWithoutExtension(audioPath))!
+                .SetArtist(author)!
+                .SetArtworkUri(Artwork(coverPath))!
+                .Build();
+
+            _player.SetMediaItem(new MediaItem.Builder()
+                .SetUri(uri)!
+                .SetMediaMetadata(metadata)!
+                .Build());
+
             _player.Prepare();
             LoadedPath = audioPath;
         }
@@ -230,6 +391,12 @@ public class PlaybackService : MediaSessionService
         SetSpeed(speed);
         _player.SeekTo(startMs);
     }
+
+    /// <summary>The cover as something the system can fetch, or null when the book has none.</summary>
+    private static global::Android.Net.Uri? Artwork(string? coverPath) =>
+        !string.IsNullOrEmpty(coverPath) && System.IO.File.Exists(coverPath)
+            ? global::Android.Net.Uri.FromFile(new Java.IO.File(coverPath))
+            : null;
 
     public void Play() => OnPlayer(() =>
     {

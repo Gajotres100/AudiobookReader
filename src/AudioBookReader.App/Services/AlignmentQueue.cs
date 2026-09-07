@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 namespace AudioBookReader.App.Services;
 
 public enum AlignmentPhase
@@ -66,7 +67,7 @@ public partial class AlignmentQueue
         // Reported before the service is even asked to start. Bringing up a service, resolving its
         // dependencies and opening a download all take a few seconds during which nothing would
         // otherwise change on screen — and a button that visibly does nothing reads as a hang.
-        Report(new AlignmentStatus(bookId, AlignmentPhase.Starting, "Pokrećem poravnanje…"));
+        Report(new AlignmentStatus(bookId, AlignmentPhase.Starting, Strings.Progress_StartingAlignment));
 
         StartCore(bookId);
     }

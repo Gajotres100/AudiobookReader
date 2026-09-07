@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Every word the app says, in one place.
+
+    Add a language by copying this file to AppResources.<code>.resx and translating the values; the
+    keys and the accessor stay as they are. A key present here and missing there falls back to this
+    file rather than to an empty screen.
+  -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Audio_UnreadableTags" xml:space="preserve">
+    <value>Ne mogu pročitati oznake iz „{0}”.</value>
+  </data>
+  <data name="Book_UnknownFormat" xml:space="preserve">
+    <value>Ovu datoteku ne mogu pročitati kao knjigu. Podržani su EPUB i obični tekst.</value>
+  </data>
+  <data name="Server_NoToken" xml:space="preserve">
+    <value>Prijava je prošla, ali server nije vratio token.</value>
+  </data>
+  <data name="Server_NotConfigured" xml:space="preserve">
+    <value>Server nije podešen.</value>
+  </data>
+  <data name="Server_Unreachable" xml:space="preserve">
+    <value>Ne mogu doći do servera ({0}).</value>
+  </data>
+  <data name="Server_NoAnswer" xml:space="preserve">
+    <value>Server ({0}) ne odgovara.</value>
+  </data>
+  <data name="Server_SignInExpired" xml:space="preserve">
+    <value>Prijava na server više ne vrijedi.</value>
+  </data>
+  <data name="Server_Forbidden" xml:space="preserve">
+    <value>Ovaj račun nema pristup tome na serveru.</value>
+  </data>
+  <data name="Server_NotFound" xml:space="preserve">
+    <value>Server ne zna za to.</value>
+  </data>
+  <data name="Server_Replied" xml:space="preserve">
+    <value>Server je odgovorio {0}.</value>
+  </data>
+  <data name="Server_NotAudiobookshelf" xml:space="preserve">
+    <value>Odgovor s {0} nije ono što Audiobookshelf vraća. Je li adresa točna?</value>
+  </data>
+  <data name="Server_EmptyAddress" xml:space="preserve">
+    <value>Adresa servera je prazna.</value>
+  </data>
+  <data name="Server_UnknownItem" xml:space="preserve">
+    <value>Server je vratio stavku koju ne razumijem.</value>
+  </data>
+  <data name="Server_Untitled" xml:space="preserve">
+    <value>(bez naslova)</value>
+  </data>
+  <data name="Server_NotSignedIn" xml:space="preserve">
+    <value>Nisi prijavljen na server.</value>
+  </data>
+  <data name="Chapter_Numbered" xml:space="preserve">
+    <value>Poglavlje {0}</value>
+  </data>
+  <data name="Section_Numbered" xml:space="preserve">
+    <value>Dio {0}</value>
+  </data>
+</root>

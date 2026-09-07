@@ -28,6 +28,15 @@ public static class AppPaths
     public static string Covers => Path.Combine(Root, "covers");
 
     /// <summary>
+    /// Where the app keeps its own log.
+    ///
+    /// On disk rather than only in the system log, which is a shared ring buffer a few megabytes
+    /// wide: a problem reported the next morning has usually scrolled out of it. Alignment runs for
+    /// hours, so its evidence has to outlive a buffer measured in minutes.
+    /// </summary>
+    public static string Log => Path.Combine(Root, "log.txt");
+
+    /// <summary>
     /// Where a book coming down from a server lands before the importer takes it.
     ///
     /// Its own directory rather than the books one, so a download interrupted halfway can be told

@@ -26,8 +26,7 @@ public class BookTextExtractors(IEnumerable<IBookTextExtractor>? extractors = nu
     {
         var extractor = _extractors.FirstOrDefault(e => e.CanHandle(path))
             ?? ByContent(path)
-            ?? throw new NotSupportedException(
-                "Ovu datoteku ne mogu pročitati kao knjigu. Podržani su EPUB i obični tekst.");
+            ?? throw new NotSupportedException(CoreStrings.Book_UnknownFormat);
 
         return extractor.ExtractAsync(path, ct);
     }

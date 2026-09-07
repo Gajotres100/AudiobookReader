@@ -1,3 +1,5 @@
+using System.Globalization;
+using AudioBookReader.App.Resources.Strings;
 using System.Collections.ObjectModel;
 using AudioBookReader.App.Services;
 using AudioBookReader.Core.Books;
@@ -24,7 +26,7 @@ public class BookmarkRow(Bookmark bookmark, string chapter, string where)
 
     public bool HasPreview => Preview.Length > 0;
 
-    public string Created { get; } = bookmark.CreatedUtc.ToLocalTime().ToString("d.M.yyyy. HH:mm");
+    public string Created { get; } = bookmark.CreatedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
 }
 
 [QueryProperty(nameof(BookId), "id")]
@@ -109,12 +111,12 @@ public partial class BookmarksViewModel(
         var chapter = _chapters.FirstOrDefault(c => c.Index == bookmark.ChapterIndex);
 
         var name = chapter is null || string.IsNullOrWhiteSpace(chapter.Title)
-            ? $"Poglavlje {bookmark.ChapterIndex + 1}"
+            ? string.Format(Strings.Chapter_Numbered, bookmark.ChapterIndex + 1)
             : chapter.Title;
 
         var where = bookmark.PositionMs is { } at
             ? Format(at)
-            : bookmark.TextOffset is { } offset ? $"znak {offset:N0}" : "";
+            : bookmark.TextOffset is { } offset ? string.Format(Strings.Bookmarks_AtChar, offset.ToString("N0")) : "";
 
         return new BookmarkRow(bookmark, name, where);
     }
@@ -136,7 +138,7 @@ public partial class BookmarksViewModel(
 
         if (Count >= Limit)
         {
-            Message = $"Dosegnut je limit od {Limit} bookmarka. Obriši neki prije dodavanja novog.";
+            Message = string.Format(Strings.Bookmarks_LimitReached, Limit);
             return;
         }
 
@@ -150,7 +152,7 @@ public partial class BookmarksViewModel(
 
         if (at is null && offset is null)
         {
-            Message = "Nema pozicije za spremiti — pusti knjigu ili je otvori u čitaču.";
+            Message = Strings.Bookmarks_NoPosition;
             return;
         }
 
@@ -195,7 +197,7 @@ public partial class BookmarksViewModel(
         if (row is null) return;
 
         var confirmed = await Shell.Current.DisplayAlertAsync(
-            "Obrisati bookmark?", row.Where, "Obriši", "Odustani");
+            Strings.Dialog_DeleteBookmarkTitle, row.Where, Strings.Common_Delete, Strings.Common_Cancel);
 
         if (!confirmed) return;
 

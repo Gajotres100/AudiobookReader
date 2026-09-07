@@ -3,10 +3,11 @@
     x:Class="AudioBookReader.App.Views.LibraryPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:LibraryViewModel"
     Shell.NavBarIsVisible="False"
-    Title="Moje knjige">
+    Title="{x:Static s:Strings.Library_Title}">
 
     <!--
         The shelf. The first screen anyone sees, so it is the one that decides what the app is.
@@ -29,7 +30,7 @@
             <Label
                 Grid.Column="0"
                 Style="{StaticResource Display}"
-                Text="Knjige"
+                Text="{x:Static s:Strings.Library_Title}"
                 VerticalOptions="Center" />
 
             <Button
@@ -92,17 +93,17 @@
             <Label
                 HorizontalTextAlignment="Center"
                 Style="{StaticResource Heading}"
-                Text="Polica je prazna" />
+                Text="{x:Static s:Strings.Library_EmptyTitle}" />
 
             <Label
                 HorizontalTextAlignment="Center"
                 Style="{StaticResource Muted}"
-                Text="Dodaj audioknjigu 🎧, e-knjigu 📖, ili oboje. Kad dodaš oboje za isti naslov, tekst počne pratiti naraciju." />
+                Text="{x:Static s:Strings.Library_EmptyBody}" />
 
             <Label
                 HorizontalTextAlignment="Center"
                 Style="{StaticResource Muted}"
-                Text="☁ dohvaća knjige s tvog Audiobookshelf servera." />
+                Text="{x:Static s:Strings.Library_EmptyServer}" />
         </VerticalStackLayout>
 
         <!--  ======== The books ========  -->
@@ -124,7 +125,7 @@
                                                                       Dark={StaticResource AlarmDark}}"
                                     Command="{Binding Path=BindingContext.DeleteCommand, Source={x:Reference BookList}}"
                                     CommandParameter="{Binding .}"
-                                    Text="Obriši" />
+                                    Text="{x:Static s:Strings.Common_Delete}" />
                             </SwipeItems>
                         </SwipeView.RightItems>
 

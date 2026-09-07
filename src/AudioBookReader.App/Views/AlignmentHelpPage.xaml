@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="AudioBookReader.App.Views.AlignmentHelpPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
+    Shell.NavBarIsVisible="False"
+    Title="{x:Static s:Strings.Help_Title}">
+
+    <!--
+        What alignment is doing, and why it is sometimes slow.
+
+        Written because the settings alone could not carry it: three presets with one line each
+        explain what the app will do, not what the reader will experience — and the gap between
+        the estimate and a phone lying idle in a pocket is exactly where someone decides the
+        feature is broken. Better to say it plainly, in one place, reachable from both screens
+        that raise the question.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="18,14,18,18" RowSpacing="12">
+
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="6">
+            <Button
+                Grid.Column="0"
+                Clicked="OnClose"
+                Style="{StaticResource Icon}"
+                Text="✕" />
+
+            <Label
+                Grid.Column="1"
+                Style="{StaticResource Heading}"
+                Text="{x:Static s:Strings.Help_Title}"
+                VerticalOptions="Center" />
+        </Grid>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="12">
+
+                <!--  ======== What it does ========  -->
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Help_WhatSection}" />
+                        <Label Text="{x:Static s:Strings.Help_WhatBody}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <!--  ======== The two routes ========  -->
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Help_WaysSection}" />
+
+                        <VerticalStackLayout Spacing="3">
+                            <Label FontFamily="OpenSansSemibold" Text="{x:Static s:Strings.Help_LiveTitle}" />
+                            <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Help_LiveBody}" />
+                        </VerticalStackLayout>
+
+                        <BoxView Style="{StaticResource Divider}" />
+
+                        <VerticalStackLayout Spacing="3">
+                            <Label FontFamily="OpenSansSemibold" Text="{x:Static s:Strings.Help_AheadTitle}" />
+                            <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Help_AheadBody}" />
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!--  ======== The presets, named as Settings names them ========  -->
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Help_PresetsSection}" />
+
+                        <VerticalStackLayout Spacing="3">
+                            <Label FontFamily="OpenSansSemibold" Text="{x:Static s:Strings.Budget_Thrifty}" />
+                            <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Help_PresetThrifty}" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="3">
+                            <Label FontFamily="OpenSansSemibold" Text="{x:Static s:Strings.Budget_Balanced}" />
+                            <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Help_PresetBalanced}" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="3">
+                            <Label FontFamily="OpenSansSemibold" Text="{x:Static s:Strings.Budget_Fast}" />
+                            <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Help_PresetFast}" />
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!--  ======== The question this page exists for ========  -->
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Help_SlowerSection}" />
+                        <Label Text="{x:Static s:Strings.Help_SlowerHeat}" />
+                        <BoxView Style="{StaticResource Divider}" />
+                        <Label Text="{x:Static s:Strings.Help_SlowerCores}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <!--  ======== What to actually do about it ========  -->
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Help_DoneSection}" />
+                        <Label Text="{x:Static s:Strings.Help_DoneCharging}" />
+                        <BoxView Style="{StaticResource Divider}" />
+                        <Label Text="{x:Static s:Strings.Help_DoneReading}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <!--  ======== Paused is not broken ========  -->
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Help_PausedSection}" />
+                        <Label Text="{x:Static s:Strings.Help_PausedBody}" />
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Button
+            Grid.Row="2"
+            Clicked="OnClose"
+            Style="{StaticResource Secondary}"
+            Text="{x:Static s:Strings.Common_Close}" />
+    </Grid>
+</ContentPage>

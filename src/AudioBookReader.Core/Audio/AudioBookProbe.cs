@@ -98,7 +98,7 @@ public static class AudioBookProbe
                                        or NotSupportedException or FormatException)
         {
             throw new UnreadableAudioException(
-                $"Ne mogu pročitati oznake iz '{Path.GetFileName(nameSource)}'.", ex);
+                string.Format(CoreStrings.Audio_UnreadableTags, Path.GetFileName(nameSource)), ex);
         }
     }
 
@@ -195,7 +195,7 @@ public static class AudioBookProbe
                 new Chapter
                 {
                     Index = 0,
-                    Title = FirstNonEmpty(track.Title, "Chapter 1"),
+                    Title = FirstNonEmpty(track.Title, string.Format(CoreStrings.Chapter_Numbered, 1)),
                     StartMs = 0,
                     EndMs = durationMs,
                 }
@@ -215,7 +215,7 @@ public static class AudioBookProbe
             chapters.Add(new Chapter
             {
                 Index = i,
-                Title = FirstNonEmpty(raw[i].Title, $"Chapter {i + 1}"),
+                Title = FirstNonEmpty(raw[i].Title, string.Format(CoreStrings.Chapter_Numbered, i + 1)),
                 StartMs = start,
                 EndMs = end,
             });

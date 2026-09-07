@@ -22,4 +22,14 @@ public partial class MediaReferences
 
     /// <summary>Opens the file for reading, wherever it is. The stream is seekable.</summary>
     public partial Stream OpenRead(string location);
+
+    /// <summary>
+    /// Deletes the user's own file, when they have asked for that.
+    ///
+    /// Separate from <see cref="Release"/>, which only gives back the permission, because the two
+    /// are different decisions and only one of them is destructive. Returns false rather than
+    /// throwing when the provider refuses — a grant can lapse and a file can be moved, and the
+    /// library entry still has to go either way.
+    /// </summary>
+    public partial bool TryDelete(string location);
 }

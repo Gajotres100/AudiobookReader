@@ -11,7 +11,14 @@ namespace AudioBookReader.Core.Alignment;
 /// </summary>
 public record CpuBudget
 {
-    public required string Name { get; init; }
+    /// <summary>
+    /// Which preset this is, in a form that does not change.
+    ///
+    /// Deliberately not a name to show anyone: this is what gets written into the settings and
+    /// compared against later, so it has to survive both a change of wording and a change of
+    /// language. What the reader sees is looked up from this in the app layer.
+    /// </summary>
+    public required string Id { get; init; }
 
     public required int Threads { get; init; }
 
@@ -33,7 +40,7 @@ public record CpuBudget
 
     public static readonly CpuBudget Eco = new()
     {
-        Name = "Štedljivo",
+        Id = "eco",
         Threads = 2,
         BackgroundPriority = true,
         DutyCycle = 0.25f,
@@ -42,7 +49,7 @@ public record CpuBudget
 
     public static readonly CpuBudget Balanced = new()
     {
-        Name = "Uravnoteženo",
+        Id = "balanced",
         Threads = 4,
         BackgroundPriority = true,
         DutyCycle = 0.5f,
@@ -51,7 +58,7 @@ public record CpuBudget
 
     public static readonly CpuBudget Turbo = new()
     {
-        Name = "Brzo",
+        Id = "turbo",
         Threads = 0, // every available core
         BackgroundPriority = false,
         DutyCycle = 1f,

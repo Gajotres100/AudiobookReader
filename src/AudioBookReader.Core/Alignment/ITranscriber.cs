@@ -1,7 +1,23 @@
 namespace AudioBookReader.Core.Alignment;
 
 /// <summary>A stretch of recognized speech and the moment it was spoken, in absolute book time.</summary>
-public readonly record struct TranscriptSegment(long StartMs, long EndMs, string Text);
+/// <param name="Words">
+/// The segment's words with the time each was actually spoken, when the recognizer reported them.
+/// Null when it did not, and then the words are placed by spreading the segment evenly — a guess
+/// that costs about a second on any anchor taken from the middle of a segment.
+/// </param>
+/// <param name="Probability">
+/// How sure the recognizer was of this segment, 0..1, or 1 when it does not say. Carried through
+/// to the anchor's confidence so that a badly heard segment can be outvoted by well heard ones.
+/// </param>
+/// <param name="NoSpeechProbability">How likely it is that this segment is not speech at all.</param>
+public readonly record struct TranscriptSegment(
+    long StartMs,
+    long EndMs,
+    string Text,
+    IReadOnlyList<TimedWord>? Words = null,
+    float Probability = 1f,
+    float NoSpeechProbability = 0f);
 
 /// <summary>A recognized word, normalized for matching, at the moment it was spoken.</summary>
 public readonly record struct TimedWord(string Value, long AtMs);
@@ -14,7 +30,11 @@ public readonly record struct TimedWord(string Value, long AtMs);
 /// probe be as accurate as a short one: a probe located only at its two ends is a straight line
 /// drawn across everything between them, and narration does not travel in straight lines.
 /// </summary>
-public sealed record TranscriptPhrase(long StartMs, long EndMs, IReadOnlyList<TimedWord> Words);
+public sealed record TranscriptPhrase(
+    long StartMs,
+    long EndMs,
+    IReadOnlyList<TimedWord> Words,
+    float Probability = 1f);
 
 /// <summary>
 /// What one probe heard, with times.
@@ -41,27 +61,29 @@ public sealed class Transcript
 
     public static readonly Transcript Empty = new() { Segments = [], Words = [], Phrases = [] };
 
+    /// <summary>
+    /// Above this, the segment is treated as silence the model talked over rather than speech.
+    ///
+    /// Small models hallucinate on quiet stretches — an audiobook is full of them between scenes —
+    /// and a confident sentence invented over a pause is worse than nothing, because it matches
+    /// somewhere and drags the interpolation around it.
+    /// </summary>
+    private const float NotSpeech = 0.6f;
+
     public static Transcript FromSegments(IEnumerable<TranscriptSegment> segments)
     {
-        var kept = segments.Where(s => s.EndMs >= s.StartMs).ToList();
+        var kept = segments.Where(s => s.EndMs >= s.StartMs && s.NoSpeechProbability < NotSpeech).ToList();
         var phrases = new List<TranscriptPhrase>();
 
         foreach (var segment in kept)
         {
-            var spoken = TextNormalizer.NormalizeTranscript(segment.Text);
-            if (spoken.Count == 0) continue;
+            // Real times when the recognizer gave them; otherwise the old guess, which is still
+            // better than nothing and is what the synthetic transcriber in the tests produces.
+            var words = segment.Words is { Count: > 0 } timed ? timed : SpreadEvenly(segment);
+            if (words.Count == 0) continue;
 
-            // Recognition times a segment, not a word. Spreading the segment evenly across its
-            // words is the best available guess and is wrong by at most a segment's length divided
-            // by its word count — a fraction of a second, against the seconds that a probe-start
-            // assumption costs.
-            var span = segment.EndMs - segment.StartMs;
-
-            var words = new List<TimedWord>(spoken.Count);
-            for (var i = 0; i < spoken.Count; i++)
-                words.Add(new TimedWord(spoken[i], segment.StartMs + span * i / spoken.Count));
-
-            phrases.Add(new TranscriptPhrase(segment.StartMs, segment.EndMs, words));
+            phrases.Add(new TranscriptPhrase(
+                segment.StartMs, segment.EndMs, words, segment.Probability));
         }
 
         return new Transcript
@@ -70,6 +92,26 @@ public sealed class Transcript
             Phrases = phrases,
             Words = [.. phrases.SelectMany(p => p.Words)],
         };
+    }
+
+    /// <summary>
+    /// Places a segment's words by assuming a constant rate across it.
+    ///
+    /// Wrong by however long the narrator paused inside the segment, which is the error that
+    /// per-word times exist to remove. Kept because a recognizer is not obliged to report them.
+    /// </summary>
+    private static List<TimedWord> SpreadEvenly(TranscriptSegment segment)
+    {
+        var spoken = TextNormalizer.NormalizeTranscript(segment.Text);
+        if (spoken.Count == 0) return [];
+
+        var span = segment.EndMs - segment.StartMs;
+
+        var words = new List<TimedWord>(spoken.Count);
+        for (var i = 0; i < spoken.Count; i++)
+            words.Add(new TimedWord(spoken[i], segment.StartMs + span * i / spoken.Count));
+
+        return words;
     }
 
     /// <summary>

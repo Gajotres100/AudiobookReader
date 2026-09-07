@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 using Android.OS;
 using AudioBookReader.App.Services;
 using AudioBookReader.Core.Alignment;
@@ -33,12 +34,12 @@ public sealed class EnvironmentGate(AlignmentSettingsStore settings, IWorkThrott
 
     private string? BlockingReason()
     {
-        if (settings.ChargingOnly && !IsCharging()) return "Čeka punjač";
+        if (settings.ChargingOnly && !IsCharging()) return Strings.Gate_WaitingForCharger;
 
         if (settings.MinimumBatteryPercent > 0 && BatteryPercent() < settings.MinimumBatteryPercent)
-            return $"Baterija ispod {settings.MinimumBatteryPercent}%";
+            return string.Format(Strings.Gate_BatteryBelow, settings.MinimumBatteryPercent);
 
-        if (settings.ScreenOffOnly && IsScreenOn()) return "Čeka da se ekran ugasi";
+        if (settings.ScreenOffOnly && IsScreenOn()) return Strings.Gate_WaitingForScreenOff;
 
         return null;
     }

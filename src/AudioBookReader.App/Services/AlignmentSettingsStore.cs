@@ -15,6 +15,8 @@ public class AlignmentSettingsStore
     private const string ScreenOffOnlyKey = "alignment.screenOffOnly";
     private const string MinimumBatteryKey = "alignment.minimumBattery";
     private const string VerboseLogKey = "diagnostics.verbose";
+    private const string RecognitionKey = "alignment.recognition";
+    private const string WordTimesKey = "alignment.wordTimes";
 
     /// <summary>
     /// Write the detailed following diagnostics to the log.
@@ -39,10 +41,51 @@ public class AlignmentSettingsStore
     {
         get
         {
-            var name = Preferences.Default.Get(BudgetKey, CpuBudget.Balanced.Name);
-            return CpuBudget.Presets.FirstOrDefault(p => p.Name == name) ?? CpuBudget.Balanced;
+            var id = Preferences.Default.Get(BudgetKey, CpuBudget.Balanced.Id);
+
+            // Older versions stored the Croatian preset name. Anyone upgrading has one of those
+            // written down, and losing their choice over a rename would be a poor trade.
+            id = id switch
+            {
+                "Štedljivo" => CpuBudget.Eco.Id,
+                "Uravnoteženo" => CpuBudget.Balanced.Id,
+                "Brzo" => CpuBudget.Turbo.Id,
+                _ => id,
+            };
+
+            return CpuBudget.Presets.FirstOrDefault(p => p.Id == id) ?? CpuBudget.Balanced;
         }
-        set => Preferences.Default.Set(BudgetKey, value.Name);
+        set => Preferences.Default.Set(BudgetKey, value.Id);
+    }
+
+    /// <summary>
+    /// Which speech model to align with: "tiny" or "base".
+    ///
+    /// An id rather than a name, for the same reason the CPU preset uses one — it is written into
+    /// the settings and has to survive both a change of wording and a change of language.
+    /// </summary>
+    public string Recognition
+    {
+        get => Preferences.Default.Get(RecognitionKey, "tiny");
+        set => Preferences.Default.Set(RecognitionKey, value == "base" ? "base" : "tiny");
+    }
+
+    public WhisperModel Model => WhisperModelStore.ById(Recognition);
+
+    /// <summary>
+    /// Ask the model when each word was spoken, rather than assuming a constant rate across the
+    /// few seconds a segment covers.
+    ///
+    /// On by default because the assumption is wrong wherever a narrator pauses mid-sentence, and
+    /// that error lands on every anchor taken from the middle of a segment. Exposed because the
+    /// feature is marked experimental upstream and its cost has not been timed on every device —
+    /// if it turns out to slow a phone down materially, this is how it gets turned off without a
+    /// new build.
+    /// </summary>
+    public bool WordTimestamps
+    {
+        get => Preferences.Default.Get(WordTimesKey, true);
+        set => Preferences.Default.Set(WordTimesKey, value);
     }
 
     /// <summary>Only align while plugged in.</summary>

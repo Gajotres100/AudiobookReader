@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="AudioBookReader.App.Views.DeleteConfirmPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
+    Shell.NavBarIsVisible="False"
+    Title="{x:Static s:Strings.Delete_Title}">
+
+    <!--
+        Confirming a deletion, and deciding how far it goes.
+
+        A page rather than an alert because there is a second question inside the first one. Until
+        now removing a book took the app's own copy and left the user's file where it was — which is
+        the right default and always will be, but it is not always what someone means. Asking is the
+        only honest way to tell those two apart, and an alert has nowhere to ask.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="18,16,18,18" RowSpacing="14">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="6">
+            <Label x:Name="Heading" Style="{StaticResource Heading}" />
+            <Label x:Name="Body" Style="{StaticResource Muted}" />
+        </VerticalStackLayout>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="12">
+
+                <!--  Off by default. Deleting somebody's own audiobook is not a default.  -->
+                <Border x:Name="FileChoice" Style="{StaticResource Choice}">
+                    <VerticalStackLayout Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Grid.Column="0" Spacing="3">
+                                <Label
+                                    FontFamily="OpenSansSemibold"
+                                    Text="{x:Static s:Strings.Delete_AlsoFile}" />
+                                <Label
+                                    Style="{StaticResource Muted}"
+                                    Text="{x:Static s:Strings.Delete_AlsoFileNote}" />
+                            </VerticalStackLayout>
+
+                            <Switch
+                                x:Name="AlsoFile"
+                                Grid.Column="1"
+                                VerticalOptions="Center" />
+                        </Grid>
+
+                        <!--  Which file, spelled out, so nobody deletes one they did not mean to.  -->
+                        <Label
+                            x:Name="Where"
+                            FontSize="12"
+                            LineBreakMode="MiddleTruncation"
+                            Style="{StaticResource Muted}" />
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <VerticalStackLayout Grid.Row="2" Spacing="8">
+            <Button
+                Clicked="OnConfirm"
+                Style="{StaticResource Destructive}"
+                Text="{x:Static s:Strings.Common_Delete}" />
+
+            <Button
+                Clicked="OnCancel"
+                Style="{StaticResource Secondary}"
+                Text="{x:Static s:Strings.Common_Cancel}" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

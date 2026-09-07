@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="AudioBookReader.App.Views.DownloadDestinationPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
+    Shell.NavBarIsVisible="False"
+    Title="{x:Static s:Strings.Server_WhereToSave}">
+
+    <!--
+        Where a downloaded book goes.
+
+        A page of two cards rather than a list of two lines, because the two answers differ in ways
+        a one-line label cannot carry: one leaves the book where every other app can reach it, the
+        other leaves it somewhere nothing else can see and deletes it with the app. That is not a
+        preference, it is a consequence, and it belongs on screen at the moment the choice is made.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="18,16,18,20" RowSpacing="14">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="4">
+            <Label Style="{StaticResource Heading}" Text="{x:Static s:Strings.Server_WhereToSave}" />
+            <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Destination_Layout}" />
+        </VerticalStackLayout>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="12">
+
+                <!--  ======== The user's own folder ========  -->
+
+                <Border Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnFolderTapped" />
+                    </Border.GestureRecognizers>
+
+                    <Grid ColumnDefinitions="42,*" ColumnSpacing="12">
+
+                        <Label
+                            Grid.Column="0"
+                            FontSize="28"
+                            Text="📁"
+                            VerticalOptions="Start" />
+
+                        <VerticalStackLayout Grid.Column="1" Spacing="5">
+                            <Label
+                                FontFamily="OpenSansSemibold"
+                                FontSize="17"
+                                Text="{x:Static s:Strings.Destination_FolderTitle}" />
+
+                            <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Destination_FolderBody}" />
+
+                            <!--  Which folder it is, when one has already been granted.  -->
+                            <Label
+                                x:Name="ChosenFolder"
+                                FontSize="12"
+                                Style="{StaticResource Muted}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+
+                <!--  ======== The app's own storage ========  -->
+
+                <Border Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnAppStorageTapped" />
+                    </Border.GestureRecognizers>
+
+                    <Grid ColumnDefinitions="42,*" ColumnSpacing="12">
+
+                        <Label
+                            Grid.Column="0"
+                            FontSize="28"
+                            Text="🔒"
+                            VerticalOptions="Start" />
+
+                        <VerticalStackLayout Grid.Column="1" Spacing="5">
+                            <Label
+                                FontFamily="OpenSansSemibold"
+                                FontSize="17"
+                                Text="{x:Static s:Strings.Destination_AppTitle}" />
+
+                            <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Destination_AppBody}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Button
+            Grid.Row="2"
+            Clicked="OnCancelled"
+            Style="{StaticResource Secondary}"
+            Text="{x:Static s:Strings.Common_Cancel}" />
+    </Grid>
+</ContentPage>

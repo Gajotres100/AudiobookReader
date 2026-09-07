@@ -4,10 +4,11 @@
     x:Class="AudioBookReader.App.Views.ServerPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:ServerViewModel"
     Shell.NavBarIsVisible="False"
-    Title="Server">
+    Title="{x:Static s:Strings.Server_Title}">
 
     <!--
         Books on an Audiobookshelf server, and bringing them here.
@@ -21,19 +22,42 @@
 
     <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="14,10">
 
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+        <Grid
+            Grid.Row="0"
+            ColumnDefinitions="Auto,*,Auto"
+            ColumnSpacing="4">
+
             <Button
                 Grid.Column="0"
                 Command="{Binding CloseCommand}"
                 Style="{StaticResource Icon}"
                 Text="✕" />
 
-            <Label
+            <!--
+                The address belongs here, under the name, not beside the library chooser.
+
+                It used to sit in an auto-width column next to that chooser, which meant a long
+                address took whatever width it wanted and left the chooser showing four letters of
+                its library. An address is not a control — it says which server you are looking at,
+                which is what a heading is for, and it can be truncated without losing that.
+            -->
+            <VerticalStackLayout
                 Grid.Column="1"
-                FontAttributes="Bold"
-                FontSize="17"
-                Text="Audiobookshelf"
-                VerticalOptions="Center" />
+                Spacing="0"
+                VerticalOptions="Center">
+
+                <Label
+                    FontAttributes="Bold"
+                    FontSize="17"
+                    Text="{x:Static s:Strings.Server_Title}" />
+
+                <Label
+                    FontSize="11"
+                    IsVisible="{Binding IsConnected}"
+                    LineBreakMode="TailTruncation"
+                    Style="{StaticResource Muted}"
+                    Text="{Binding Url}" />
+            </VerticalStackLayout>
 
             <Button
                 Grid.Column="2"
@@ -43,79 +67,76 @@
                 Text="⟳" />
         </Grid>
 
-        <!--  Signing in  -->
-        <VerticalStackLayout
+        <!--  Signing in. A card, so it reads as one form rather than a column of loose fields.  -->
+        <Border
             Grid.Row="1"
             IsVisible="{Binding IsDisconnected}"
-            Spacing="10">
+            Margin="0,8"
+            Style="{StaticResource Card}">
+            <VerticalStackLayout Spacing="10">
 
-            <Label Style="{StaticResource Muted}" Text="Adresa servera, npr. 192.168.1.10:13378" />
+                <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Server_Address}" />
 
-            <Entry Keyboard="Url" Text="{Binding Url}" />
-
-            <!--
-                Two ways in. A token is the better one and is offered as an equal rather than hidden:
-                it can be revoked from the server without changing the account password, and the
-                password then never has to be typed into this app at all.
-            -->
-            <Grid ColumnDefinitions="*,Auto">
-                <Label
-                    Grid.Column="0"
-                    Text="Prijava tokenom umjesto lozinkom"
-                    VerticalOptions="Center" />
-                <Switch Grid.Column="1" IsToggled="{Binding UsesToken}" />
-            </Grid>
-
-            <VerticalStackLayout IsVisible="{Binding UsesPassword}" Spacing="10">
-                <Entry Placeholder="Korisničko ime" Text="{Binding Username}" />
+                <!--  Smaller type, because a server address is long and is read once.  -->
                 <Entry
-                    IsPassword="True"
-                    Placeholder="Lozinka"
-                    Text="{Binding Password}" />
+                    FontSize="14"
+                    Keyboard="Url"
+                    Placeholder="https://"
+                    Text="{Binding Url}" />
 
+                <!--
+                    Two ways in. A token is the better one and is offered as an equal rather than
+                    hidden: it can be revoked from the server without changing the account password,
+                    and the password then never has to be typed into this app at all.
+                -->
                 <Grid ColumnDefinitions="*,Auto">
                     <Label
                         Grid.Column="0"
-                        Text="Zapamti prijavu"
+                        Text="{x:Static s:Strings.Server_UseToken}"
                         VerticalOptions="Center" />
-                    <Switch Grid.Column="1" IsToggled="{Binding RemembersSignIn}" />
+                    <Switch Grid.Column="1" IsToggled="{Binding UsesToken}" />
                 </Grid>
+
+                <VerticalStackLayout IsVisible="{Binding UsesPassword}" Spacing="10">
+                    <Entry Placeholder="{x:Static s:Strings.Server_Username}" Text="{Binding Username}" />
+                    <Entry
+                        IsPassword="True"
+                        Placeholder="{x:Static s:Strings.Server_Password}"
+                        Text="{Binding Password}" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label
+                            Grid.Column="0"
+                            Text="{x:Static s:Strings.Server_RememberSignIn}"
+                            VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding RemembersSignIn}" />
+                    </Grid>
+                </VerticalStackLayout>
+
+                <Entry
+                    IsPassword="True"
+                    IsVisible="{Binding UsesToken}"
+                    Placeholder="{x:Static s:Strings.Server_TokenPlaceholder}"
+                    Text="{Binding Token}" />
+
+                <Button
+                    Command="{Binding ConnectCommand}"
+                    Style="{StaticResource Primary}"
+                    Text="{x:Static s:Strings.Server_Connect}" />
+
+                <Label
+                    Style="{StaticResource Muted}"
+                    Text="{x:Static s:Strings.Server_SecurityNote}" />
             </VerticalStackLayout>
+        </Border>
 
-            <Entry
-                IsPassword="True"
-                IsVisible="{Binding UsesToken}"
-                Placeholder="API token sa stranice tvog računa"
-                Text="{Binding Token}" />
-
-            <Button
-                Command="{Binding ConnectCommand}"
-                Style="{StaticResource Primary}"
-                Text="Poveži se" />
-
-            <Label
-                Style="{StaticResource Muted}"
-                Text="Sve stoji u zaštićenom spremniku uređaja, uz ključ u sustavskom keystoreu. Bez „Zapamti prijavu” ostaješ prijavljen 30 dana od zadnjeg otvaranja aplikacije." />
-        </VerticalStackLayout>
-
-        <!--  Which library on the server  -->
-        <Grid
+        <!--  Which library on the server, with the whole row to show its name in.  -->
+        <Picker
             Grid.Row="1"
-            ColumnDefinitions="*,Auto"
-            IsVisible="{Binding IsConnected}">
-
-            <Picker
-                Grid.Column="0"
-                ItemDisplayBinding="{Binding Name}"
-                ItemsSource="{Binding Libraries}"
-                SelectedItem="{Binding SelectedLibrary}" />
-
-            <Label
-                Grid.Column="1"
-                Style="{StaticResource Muted}"
-                Text="{Binding Url}"
-                VerticalOptions="Center" />
-        </Grid>
+            IsVisible="{Binding IsConnected}"
+            ItemDisplayBinding="{Binding Name}"
+            ItemsSource="{Binding Libraries}"
+            SelectedItem="{Binding SelectedLibrary}" />
 
         <!--
             One shelf per row, and one kind of shelf.
@@ -241,7 +262,7 @@
                 HorizontalOptions="Start"
                 IsVisible="{Binding IsConnected}"
                 Style="{StaticResource IconWide}"
-                Text="Odspoji se" />
+                Text="{x:Static s:Strings.Server_Disconnect}" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

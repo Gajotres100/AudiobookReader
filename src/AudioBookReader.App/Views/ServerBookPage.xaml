@@ -3,6 +3,7 @@
     x:Class="AudioBookReader.App.Views.ServerBookPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:ServerBookViewModel"
     Shell.NavBarIsVisible="False"
@@ -58,7 +59,7 @@
 
                 <Border Style="{StaticResource Card}">
                     <VerticalStackLayout Spacing="6">
-                        <Label Style="{StaticResource Section}" Text="Na serveru" />
+                        <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.ServerBook_OnServer}" />
                         <Label Text="{Binding Contents}" />
                         <Label Style="{StaticResource Muted}" Text="{Binding Length}" />
                         <Label Style="{StaticResource Muted}" Text="{Binding Chapters}" />
@@ -83,38 +84,54 @@
 
             <ProgressBar IsVisible="{Binding IsDownloading}" Progress="{Binding Progress}" />
 
-            <HorizontalStackLayout IsVisible="{Binding HasStatus}" Spacing="10">
-                <ActivityIndicator
-                    HeightRequest="14"
-                    IsRunning="{Binding IsBusy}"
-                    IsVisible="{Binding IsBusy}"
-                    VerticalOptions="Center"
-                    WidthRequest="14" />
+            <!--
+                The message on the left, the figure on the right. A bar answers whether anything is
+                happening; on a book that takes twenty minutes over a phone connection the question
+                is how much longer, and only a number answers that.
+            -->
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasStatus}">
+
+                <HorizontalStackLayout Grid.Column="0" Spacing="10">
+                    <ActivityIndicator
+                        HeightRequest="14"
+                        IsRunning="{Binding IsBusy}"
+                        IsVisible="{Binding IsBusy}"
+                        VerticalOptions="Center"
+                        WidthRequest="14" />
+
+                    <Label
+                        LineBreakMode="TailTruncation"
+                        Style="{StaticResource Muted}"
+                        Text="{Binding Status}"
+                        VerticalOptions="Center" />
+                </HorizontalStackLayout>
 
                 <Label
-                    Style="{StaticResource Muted}"
-                    Text="{Binding Status}"
+                    Grid.Column="1"
+                    FontFamily="OpenSansSemibold"
+                    IsVisible="{Binding HasPercent}"
+                    Text="{Binding Percent}"
                     VerticalOptions="Center" />
-            </HorizontalStackLayout>
+            </Grid>
 
             <Button
                 Command="{Binding DownloadCommand}"
                 IsEnabled="{Binding CanDownload}"
                 IsVisible="{Binding IsIdle}"
                 Style="{StaticResource Primary}"
-                Text="Preuzmi" />
+                Text="{x:Static s:Strings.ServerBook_Download}" />
 
             <Button
                 Command="{Binding CancelCommand}"
                 IsVisible="{Binding IsDownloading}"
                 Style="{StaticResource Secondary}"
-                Text="Prekini preuzimanje" />
+                Text="{x:Static s:Strings.ServerBook_CancelDownload}" />
 
             <Button
                 Command="{Binding OpenCommand}"
                 IsVisible="{Binding IsInLibrary}"
                 Style="{StaticResource Secondary}"
-                Text="Otvori knjigu" />
+                Text="{x:Static s:Strings.ServerBook_OpenBook}" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

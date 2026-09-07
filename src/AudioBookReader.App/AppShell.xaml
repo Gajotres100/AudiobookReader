@@ -3,18 +3,29 @@
     x:Class="AudioBookReader.App.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
     xmlns:views="clr-namespace:AudioBookReader.App.Views"
     Title="AudioBook Reader">
 
+    <!--
+        Icons as well as words.
+
+        Android sizes a bottom bar for an icon whether or not one is given, so two text-only tabs
+        left a tall band with the labels adrift in the space the icons would have used. Filling that
+        space is both the smaller change and the conventional one — every other app on the phone
+        has icons here.
+    -->
     <TabBar>
         <ShellContent
-            Title="Knjige"
+            Title="{x:Static s:Strings.Library_Tab}"
             ContentTemplate="{DataTemplate views:LibraryPage}"
+            Icon="tab_books.png"
             Route="library" />
 
         <ShellContent
-            Title="Postavke"
+            Title="{x:Static s:Strings.Settings_Title}"
             ContentTemplate="{DataTemplate views:SettingsPage}"
+            Icon="tab_settings.png"
             Route="settings" />
     </TabBar>
 

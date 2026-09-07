@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Every word the app says, in one place.
+
+    Add a language by copying this file to AppResources.<code>.resx and translating the values; the
+    keys and the accessor stay as they are. A key present here and missing there falls back to this
+    file rather than to an empty screen.
+  -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Audio_UnreadableTags" xml:space="preserve">
+    <value>Can’t read the tags in “{0}”.</value>
+    <comment>{0} is a file name.</comment>
+  </data>
+  <data name="Book_UnknownFormat" xml:space="preserve">
+    <value>I can’t read this file as a book. EPUB and plain text are supported.</value>
+  </data>
+  <data name="Server_NoToken" xml:space="preserve">
+    <value>The sign-in went through, but the server returned no token.</value>
+  </data>
+  <data name="Server_NotConfigured" xml:space="preserve">
+    <value>No server address has been set.</value>
+  </data>
+  <data name="Server_Unreachable" xml:space="preserve">
+    <value>Can’t reach the server ({0}).</value>
+    <comment>{0} is the server address.</comment>
+  </data>
+  <data name="Server_NoAnswer" xml:space="preserve">
+    <value>The server ({0}) is not answering.</value>
+    <comment>{0} is the server address.</comment>
+  </data>
+  <data name="Server_SignInExpired" xml:space="preserve">
+    <value>The sign-in to the server is no longer valid.</value>
+  </data>
+  <data name="Server_Forbidden" xml:space="preserve">
+    <value>This account has no access to that on the server.</value>
+  </data>
+  <data name="Server_NotFound" xml:space="preserve">
+    <value>The server does not know about that.</value>
+  </data>
+  <data name="Server_Replied" xml:space="preserve">
+    <value>The server replied {0}.</value>
+    <comment>{0} is an HTTP status code, e.g. 500.</comment>
+  </data>
+  <data name="Server_NotAudiobookshelf" xml:space="preserve">
+    <value>The reply from {0} is not what Audiobookshelf returns. Is the address right?</value>
+    <comment>{0} is the server address.</comment>
+  </data>
+  <data name="Server_EmptyAddress" xml:space="preserve">
+    <value>The server address is empty.</value>
+  </data>
+  <data name="Server_UnknownItem" xml:space="preserve">
+    <value>The server returned an item I don’t understand.</value>
+  </data>
+  <data name="Server_Untitled" xml:space="preserve">
+    <value>(untitled)</value>
+  </data>
+  <data name="Server_NotSignedIn" xml:space="preserve">
+    <value>Not signed in to the server.</value>
+  </data>
+  <data name="Chapter_Numbered" xml:space="preserve">
+    <value>Chapter {0}</value>
+    <comment>Fallback name for a chapter whose own title is missing.</comment>
+  </data>
+  <data name="Section_Numbered" xml:space="preserve">
+    <value>Section {0}</value>
+    <comment>Fallback name for a part of an ebook that has no chapter marks.</comment>
+  </data>
+</root>

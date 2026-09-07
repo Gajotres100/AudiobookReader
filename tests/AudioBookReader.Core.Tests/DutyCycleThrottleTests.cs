@@ -147,12 +147,12 @@ public class CpuBudgetTests
     private const long TenHoursMs = 10 * 60 * 60 * 1_000L;
 
     [Theory]
-    [InlineData("Štedljivo", 200)]
-    [InlineData("Uravnoteženo", 50)]
-    [InlineData("Brzo", 12.5)]
+    [InlineData("eco", 200)]
+    [InlineData("balanced", 50)]
+    [InlineData("turbo", 12.5)]
     public void EveryPresetFinishesWellInsideTheTimeItTakesToListenToTheBook(string preset, double expectedMinutes)
     {
-        var budget = CpuBudget.Presets.Single(p => p.Name == preset);
+        var budget = CpuBudget.Presets.Single(p => p.Id == preset);
 
         var estimate = budget.EstimateAlignmentTime(TenHoursMs);
 

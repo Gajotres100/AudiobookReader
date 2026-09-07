@@ -1,0 +1,876 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Every word the app says, in one place.
+
+    Add a language by copying this file to AppResources.<code>.resx and translating the values; the
+    keys and the accessor stay as they are. A key present here and missing there falls back to this
+    file rather than to an empty screen.
+  -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Dismissing a sheet or dialog.</comment>
+  </data>
+  <data name="Common_Delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Common_Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Library_Title" xml:space="preserve">
+    <value>Books</value>
+    <comment>The shelf: the first screen.</comment>
+  </data>
+  <data name="Library_Tab" xml:space="preserve">
+    <value>Books</value>
+    <comment>Tab bar label.</comment>
+  </data>
+  <data name="Library_EmptyTitle" xml:space="preserve">
+    <value>The shelf is empty</value>
+  </data>
+  <data name="Library_EmptyBody" xml:space="preserve">
+    <value>Add an audiobook 🎧, an ebook 📖, or both. Add both for the same title and the text starts following the narration.</value>
+  </data>
+  <data name="Library_EmptyServer" xml:space="preserve">
+    <value>☁ fetches books from your Audiobookshelf server.</value>
+  </data>
+  <data name="Player_Read" xml:space="preserve">
+    <value>Read</value>
+    <comment>Goes from the player to the text.</comment>
+  </data>
+  <data name="Details_AlignmentSection" xml:space="preserve">
+    <value>Aligning text to narration</value>
+  </data>
+  <data name="Details_LiveAlignment" xml:space="preserve">
+    <value>Align on the go</value>
+    <comment>Measures while you read, rather than up front.</comment>
+  </data>
+  <data name="Details_AlignAhead" xml:space="preserve">
+    <value>Align the whole book up front</value>
+  </data>
+  <data name="Details_StopAlignment" xml:space="preserve">
+    <value>Stop aligning</value>
+  </data>
+  <data name="Details_FilesSection" xml:space="preserve">
+    <value>Files</value>
+  </data>
+  <data name="Details_AddAudio" xml:space="preserve">
+    <value>Add audiobook</value>
+  </data>
+  <data name="Details_RemoveAudio" xml:space="preserve">
+    <value>Remove audiobook</value>
+  </data>
+  <data name="Details_AddEbook" xml:space="preserve">
+    <value>Add ebook</value>
+  </data>
+  <data name="Details_RemoveEbook" xml:space="preserve">
+    <value>Remove ebook</value>
+  </data>
+  <data name="Details_DeleteBook" xml:space="preserve">
+    <value>Delete book</value>
+  </data>
+  <data name="Reader_Chapters" xml:space="preserve">
+    <value>Chapters</value>
+  </data>
+  <data name="Bookmarks_Title" xml:space="preserve">
+    <value>Bookmarks</value>
+  </data>
+  <data name="Bookmarks_Empty" xml:space="preserve">
+    <value>No bookmarks yet. Press and hold the ⚑ flag in the player to keep the spot you are on.</value>
+  </data>
+  <data name="Bookmarks_Add" xml:space="preserve">
+    <value>Bookmark this spot</value>
+  </data>
+  <data name="Settings_Title" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="Settings_LoadSection" xml:space="preserve">
+    <value>Load on the phone</value>
+  </data>
+  <data name="Settings_LoadBody" xml:space="preserve">
+    <value>Aligning listens to only a tenth of the recording, so even the slowest setting finishes a book long before you can listen to it.</value>
+  </data>
+  <data name="Settings_WhenSection" xml:space="preserve">
+    <value>When it may work</value>
+  </data>
+  <data name="Settings_OnlyCharging" xml:space="preserve">
+    <value>Only while charging</value>
+  </data>
+  <data name="Settings_OnlyScreenOff" xml:space="preserve">
+    <value>Only while the screen is off</value>
+  </data>
+  <data name="Settings_AlignmentNote" xml:space="preserve">
+    <value>Aligning only pauses and resumes — it never loses progress. It also slows itself down if the phone gets warm, whatever is set here.</value>
+  </data>
+  <data name="Settings_DiagnosticsSection" xml:space="preserve">
+    <value>Diagnostics</value>
+  </data>
+  <data name="Settings_VerboseLog" xml:space="preserve">
+    <value>Detailed log</value>
+  </data>
+  <data name="Settings_VerboseNote" xml:space="preserve">
+    <value>Turn this on only to diagnose something — it writes several times a second while a book is open.</value>
+  </data>
+  <data name="Settings_LanguageSection" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="Settings_LanguageSystem" xml:space="preserve">
+    <value>Phone's language</value>
+    <comment>Follows the device, which is what most people want.</comment>
+  </data>
+  <data name="Settings_LanguageNote" xml:space="preserve">
+    <value>The app restarts its screens when the language changes.</value>
+  </data>
+  <data name="Server_Title" xml:space="preserve">
+    <value>Audiobookshelf</value>
+    <comment>The product's own name; not translated.</comment>
+  </data>
+  <data name="Server_Address" xml:space="preserve">
+    <value>Server address, e.g. 192.168.1.10:13378</value>
+  </data>
+  <data name="Server_UseToken" xml:space="preserve">
+    <value>Sign in with a token instead of a password</value>
+  </data>
+  <data name="Server_Username" xml:space="preserve">
+    <value>Username</value>
+  </data>
+  <data name="Server_Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Server_RememberSignIn" xml:space="preserve">
+    <value>Remember sign-in</value>
+  </data>
+  <data name="Server_TokenPlaceholder" xml:space="preserve">
+    <value>API token from your account page</value>
+  </data>
+  <data name="Server_Connect" xml:space="preserve">
+    <value>Connect</value>
+  </data>
+  <data name="Server_SecurityNote" xml:space="preserve">
+    <value>Everything is kept in the device's protected store, with the key in the system keystore. Without “Remember sign-in” you stay signed in for 30 days from the last time you opened the app.</value>
+  </data>
+  <data name="Server_Disconnect" xml:space="preserve">
+    <value>Disconnect</value>
+  </data>
+  <data name="ServerBook_OnServer" xml:space="preserve">
+    <value>On the server</value>
+  </data>
+  <data name="ServerBook_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="ServerBook_CancelDownload" xml:space="preserve">
+    <value>Stop downloading</value>
+  </data>
+  <data name="ServerBook_OpenBook" xml:space="preserve">
+    <value>Open book</value>
+  </data>
+  <data name="Progress_LoadingAudiobook" xml:space="preserve">
+    <value>Loading audiobook…</value>
+  </data>
+  <data name="Progress_ReadingEbook" xml:space="preserve">
+    <value>Reading ebook…</value>
+  </data>
+  <data name="Progress_ReadingChapters" xml:space="preserve">
+    <value>Reading chapters…</value>
+  </data>
+  <data name="Progress_ReadingText" xml:space="preserve">
+    <value>Reading text…</value>
+  </data>
+  <data name="Progress_StartingAlignment" xml:space="preserve">
+    <value>Starting alignment…</value>
+  </data>
+  <data name="Progress_Stopped" xml:space="preserve">
+    <value>Stopped — it will carry on from here</value>
+  </data>
+  <data name="Chapter_Numbered" xml:space="preserve">
+    <value>Chapter {0}</value>
+    <comment>{0} is the chapter number.</comment>
+  </data>
+  <data name="Chapter_Pick" xml:space="preserve">
+    <value>Chapter</value>
+    <comment>Title of the chapter chooser.</comment>
+  </data>
+  <data name="Duration_Label" xml:space="preserve">
+    <value>Length {0}</value>
+    <comment>{0} is a duration like 4:12:30.</comment>
+  </data>
+  <data name="Player_SleepAfter" xml:space="preserve">
+    <value>⏱ Stop after</value>
+  </data>
+  <data name="Player_SleepEndOfChapter" xml:space="preserve">
+    <value>End of chapter</value>
+  </data>
+  <data name="Player_SleepOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="Player_SleepMinutes" xml:space="preserve">
+    <value>{0} min</value>
+    <comment>{0} is a whole number of minutes.</comment>
+  </data>
+  <data name="Align_ClearMeasured" xml:space="preserve">
+    <value>Clear what was measured and start clean</value>
+  </data>
+  <data name="Align_AgainFromStart" xml:space="preserve">
+    <value>Align again from the start</value>
+  </data>
+  <data name="Align_NothingMeasured" xml:space="preserve">
+    <value>Nothing measured yet.</value>
+  </data>
+  <data name="Align_LiveSummary" xml:space="preserve">
+    <value>Align on the go: measured as you read — open “Read” and start the audio. {0}</value>
+    <comment>{0} is a sentence saying how much has been measured.</comment>
+  </data>
+  <data name="Align_Stale" xml:space="preserve">
+    <value>The earlier alignment was made by an older, less accurate method and will be worked out again.</value>
+  </data>
+  <data name="Align_NotAligned" xml:space="preserve">
+    <value>Not aligned yet.</value>
+  </data>
+  <data name="Align_ResumeFrom" xml:space="preserve">
+    <value>Resuming from {0}.</value>
+    <comment>{0} is a chapter number.</comment>
+  </data>
+  <data name="Dialog_DeleteBookTitle" xml:space="preserve">
+    <value>Delete the book?</value>
+  </data>
+  <data name="Dialog_DeleteBookBody" xml:space="preserve">
+    <value>“{0}” and its files will be permanently deleted.</value>
+    <comment>{0} is the book's title.</comment>
+  </data>
+  <data name="Dialog_RemoveTitle" xml:space="preserve">
+    <value>Remove {0}?</value>
+    <comment>{0} is 'the audiobook' or 'the ebook'.</comment>
+  </data>
+  <data name="Dialog_RemoveBody" xml:space="preserve">
+    <value>The rest of the book stays. Bring the same file back later and the alignment is not repeated.</value>
+  </data>
+  <data name="Dialog_Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Dialog_TheAudiobook" xml:space="preserve">
+    <value>the audiobook</value>
+    <comment>Fills the blank in 'Remove …?'.</comment>
+  </data>
+  <data name="Dialog_TheEbook" xml:space="preserve">
+    <value>the ebook</value>
+    <comment>Fills the blank in 'Remove …?'.</comment>
+  </data>
+  <data name="Dialog_ClearMeasuredTitle" xml:space="preserve">
+    <value>Clear what was measured?</value>
+  </data>
+  <data name="Dialog_RealignTitle" xml:space="preserve">
+    <value>Align again?</value>
+  </data>
+  <data name="Dialog_RealignBody" xml:space="preserve">
+    <value>The alignment so far ({0} of {1} chapters) will be deleted</value>
+    <comment>Continues with one of the two sentences below.</comment>
+  </data>
+  <data name="Dialog_RealignLiveTail" xml:space="preserve">
+    <value>. Everything from here is measured as you read. The book itself and your place are untouched.</value>
+  </data>
+  <data name="Dialog_RealignAheadTail" xml:space="preserve">
+    <value> and worked out again. The book itself and your place are untouched.</value>
+  </data>
+  <data name="Dialog_RealignConfirm" xml:space="preserve">
+    <value>Align again</value>
+  </data>
+  <data name="Dialog_DeleteBookmarkTitle" xml:space="preserve">
+    <value>Delete the bookmark?</value>
+  </data>
+  <data name="Reader_WillFollow" xml:space="preserve">
+    <value>The text will follow the narration once alignment finishes. Start it from ☰.</value>
+  </data>
+  <data name="Reader_MeasuringHere" xml:space="preserve">
+    <value>Measuring this part — the text starts in a moment.</value>
+  </data>
+  <data name="Reader_PartNotAligned" xml:space="preserve">
+    <value>This part of the book is not aligned yet.</value>
+  </data>
+  <data name="Reader_ChapterNotAligned" xml:space="preserve">
+    <value>Chapter {0} is not aligned yet — start aligning on the book's page.</value>
+  </data>
+  <data name="Reader_UnmeasuredCanPlay" xml:space="preserve">
+    <value>This part is not measured yet. You can play the audio, but the text will not follow it for now.</value>
+  </data>
+  <data name="Reader_AudioFailed" xml:space="preserve">
+    <value>The audio cannot be opened ({0}). Check the book's files from ☰.</value>
+    <comment>{0} is a short error code.</comment>
+  </data>
+  <data name="Reader_PreparingChapter" xml:space="preserve">
+    <value>Preparing the chapter…</value>
+  </data>
+  <data name="Reader_ThemeDim" xml:space="preserve">
+    <value>Dim</value>
+    <comment>A reader colour scheme.</comment>
+  </data>
+  <data name="Reader_ThemeNight" xml:space="preserve">
+    <value>Night</value>
+    <comment>A reader colour scheme.</comment>
+  </data>
+  <data name="Reader_ThemePaper" xml:space="preserve">
+    <value>Paper</value>
+    <comment>A reader colour scheme.</comment>
+  </data>
+  <data name="Reader_ThemeSepia" xml:space="preserve">
+    <value>Sepia</value>
+    <comment>A reader colour scheme.</comment>
+  </data>
+  <data name="Reader_ThemeLight" xml:space="preserve">
+    <value>Light</value>
+    <comment>A reader colour scheme.</comment>
+  </data>
+  <data name="Live_Stopped" xml:space="preserve">
+    <value>Align on the go has stopped — close and reopen the reader to try again.</value>
+  </data>
+  <data name="Live_NoModel" xml:space="preserve">
+    <value>The speech model has not been downloaded yet.</value>
+  </data>
+  <data name="Live_NoModelHint" xml:space="preserve">
+    <value>The speech model has not been downloaded yet — start aligning from the book's page.</value>
+  </data>
+  <data name="Live_MeasuredAhead" xml:space="preserve">
+    <value>Aligning on the go — measured {0} s ahead</value>
+    <comment>{0} is a whole number of seconds.</comment>
+  </data>
+  <data name="Live_Working" xml:space="preserve">
+    <value>Aligning on the go…</value>
+  </data>
+  <data name="Bookmarks_LimitReached" xml:space="preserve">
+    <value>The limit of {0} bookmarks is reached. Delete one before adding another.</value>
+  </data>
+  <data name="Bookmarks_NoPosition" xml:space="preserve">
+    <value>Nothing to save — play the book or open it in the reader.</value>
+  </data>
+  <data name="Import_NotAudio" xml:space="preserve">
+    <value>This does not look like an audio file — no sound was found in it.</value>
+  </data>
+  <data name="Import_Unreadable" xml:space="preserve">
+    <value>“{0}” cannot be read as an audiobook — neither its tags nor its sound.</value>
+  </data>
+  <data name="Server_EnterAddress" xml:space="preserve">
+    <value>Type the server address.</value>
+  </data>
+  <data name="Server_PasteToken" xml:space="preserve">
+    <value>Paste the token from your account page on the server.</value>
+  </data>
+  <data name="Server_Connecting" xml:space="preserve">
+    <value>Connecting…</value>
+  </data>
+  <data name="Server_Disconnected" xml:space="preserve">
+    <value>Disconnected.</value>
+  </data>
+  <data name="Server_ReadingLibraries" xml:space="preserve">
+    <value>Reading libraries…</value>
+  </data>
+  <data name="Server_ReadingBooks" xml:space="preserve">
+    <value>Reading books…</value>
+  </data>
+  <data name="Server_ReadingBooksCount" xml:space="preserve">
+    <value>Reading books… {0}</value>
+  </data>
+  <data name="Server_ReadingDetails" xml:space="preserve">
+    <value>Reading details…</value>
+  </data>
+  <data name="Server_NoBookLibraries" xml:space="preserve">
+    <value>This server has no library of books.</value>
+  </data>
+  <data name="Server_LibraryEmpty" xml:space="preserve">
+    <value>The library “{0}” is empty.</value>
+  </data>
+  <data name="Server_BooksInLibrary" xml:space="preserve">
+    <value>{0} books in “{1}”.</value>
+  </data>
+  <data name="Server_SplitFiles" xml:space="preserve">
+    <value>{0} files — cannot be assembled into one book yet</value>
+  </data>
+  <data name="Server_SplitFilesLong" xml:space="preserve">
+    <value>The server keeps the audio split across {0} files. A book here can still hold only one, so this cannot be downloaded yet.</value>
+  </data>
+  <data name="Server_NothingToDownload" xml:space="preserve">
+    <value>This item on the server has neither audio nor text.</value>
+  </data>
+  <data name="Server_HasBoth" xml:space="preserve">
+    <value>Audiobook and ebook — the text can follow the narration.</value>
+  </data>
+  <data name="Server_AudioOnly" xml:space="preserve">
+    <value>Audiobook only.</value>
+  </data>
+  <data name="Server_EbookOnly" xml:space="preserve">
+    <value>Ebook only.</value>
+  </data>
+  <data name="Server_DownloadingAudio" xml:space="preserve">
+    <value>Downloading audio — {0}</value>
+  </data>
+  <data name="Server_DownloadingText" xml:space="preserve">
+    <value>Downloading text — {0}</value>
+  </data>
+  <data name="Server_InLibraryNow" xml:space="preserve">
+    <value>The book is in Books.</value>
+  </data>
+  <data name="Server_DownloadCancelled" xml:space="preserve">
+    <value>The download was stopped.</value>
+  </data>
+  <data name="Server_WhereToSave" xml:space="preserve">
+    <value>Where should the book go?</value>
+  </data>
+  <data name="Server_FolderNamed" xml:space="preserve">
+    <value>The “{0}” folder</value>
+    <comment>{0} is the folder's name.</comment>
+  </data>
+  <data name="Server_FolderAudiobooks" xml:space="preserve">
+    <value>The Audiobooks folder</value>
+  </data>
+  <data name="Server_AppStorage" xml:space="preserve">
+    <value>The app's own storage</value>
+  </data>
+  <data name="Budget_ThriftyDetail" xml:space="preserve">
+    <value>Little cores, a quarter of the time. You will barely notice the phone working.</value>
+  </data>
+  <data name="Budget_BalancedDetail" xml:space="preserve">
+    <value>Little cores, half the time. Works in the background while you use the phone normally.</value>
+  </data>
+  <data name="Budget_FastDetail" xml:space="preserve">
+    <value>All cores, no pauses. Best with “only while charging” and the screen off.</value>
+  </data>
+  <data name="Budget_EstimateHours" xml:space="preserve">
+    <value>~{0} h for a 10-hour book</value>
+  </data>
+  <data name="Budget_EstimateMinutes" xml:space="preserve">
+    <value>~{0} min for a 10-hour book</value>
+  </data>
+  <data name="Settings_NoBatteryLimit" xml:space="preserve">
+    <value>No battery limit</value>
+  </data>
+  <data name="Settings_PauseBelow" xml:space="preserve">
+    <value>Pause below {0}% battery</value>
+    <comment>{0} is a whole number, e.g. 20.</comment>
+  </data>
+  <data name="Budget_Thrifty" xml:space="preserve">
+    <value>Thrifty</value>
+    <comment>The gentlest of three settings for how hard alignment may work the phone.</comment>
+  </data>
+  <data name="Budget_Balanced" xml:space="preserve">
+    <value>Balanced</value>
+    <comment>The middle of three settings for how hard alignment may work the phone.</comment>
+  </data>
+  <data name="Budget_Fast" xml:space="preserve">
+    <value>Fast</value>
+    <comment>The hardest of three settings for how hard alignment may work the phone.</comment>
+  </data>
+  <data name="Sync_Complete" xml:space="preserve">
+    <value>synced</value>
+  </data>
+  <data name="Sync_Partial" xml:space="preserve">
+    <value>partly synced</value>
+  </data>
+  <data name="Sync_InProgress" xml:space="preserve">
+    <value>aligning</value>
+  </data>
+  <data name="Sync_Pending" xml:space="preserve">
+    <value>waiting to be aligned</value>
+  </data>
+  <data name="Sync_Failed" xml:space="preserve">
+    <value>aligning failed</value>
+  </data>
+  <data name="Gate_WaitingForCharger" xml:space="preserve">
+    <value>Waiting for a charger</value>
+  </data>
+  <data name="Gate_WaitingForScreenOff" xml:space="preserve">
+    <value>Waiting for the screen to go off</value>
+  </data>
+  <data name="Folder_Unreadable" xml:space="preserve">
+    <value>The download folder cannot be read.</value>
+  </data>
+  <data name="Folder_Gone" xml:space="preserve">
+    <value>The download folder no longer exists.</value>
+  </data>
+  <data name="Reader_CouldNotOpen" xml:space="preserve">
+    <value>The book could not be opened.</value>
+  </data>
+  <data name="Progress_Finished" xml:space="preserve">
+    <value>Aligning finished</value>
+  </data>
+  <data name="Progress_DownloadingModel" xml:space="preserve">
+    <value>Fetching the speech model…</value>
+  </data>
+  <data name="Progress_DownloadingModelPercent" xml:space="preserve">
+    <value>Fetching the speech model… {0}%</value>
+    <comment>{0} is a whole number.</comment>
+  </data>
+  <data name="Progress_ChapterOf" xml:space="preserve">
+    <value>Chapter {0} of {1} — {2}</value>
+    <comment>{0} and {1} are chapter numbers, {2} is a percentage such as 40%.</comment>
+  </data>
+  <data name="Progress_WholeBook" xml:space="preserve">
+    <value>Aligning — {0}</value>
+    <comment>{0} is a percentage. Used when the book has no chapter marks, so there is only one.</comment>
+  </data>
+  <data name="Progress_ThermalSlowed" xml:space="preserve">
+    <value> — slowed down, the phone is warm</value>
+    <comment>Appended to the line above. Keep the leading separator.</comment>
+  </data>
+  <data name="Notification_AlignChannel" xml:space="preserve">
+    <value>Text alignment</value>
+    <comment>Name of the Android notification channel.</comment>
+  </data>
+  <data name="Notification_AlignChannelBody" xml:space="preserve">
+    <value>Progress of pairing an audiobook with its text</value>
+  </data>
+  <data name="Notification_WholeBook" xml:space="preserve">
+    <value>Whole book {0} %</value>
+    <comment>{0} is a whole number.</comment>
+  </data>
+  <data name="Gate_BatteryBelow" xml:space="preserve">
+    <value>Battery below {0}%</value>
+    <comment>{0} is a whole number.</comment>
+  </data>
+  <data name="Folder_NoSystemAccess" xml:space="preserve">
+    <value>No access to the system's files.</value>
+  </data>
+  <data name="Folder_NotChosen" xml:space="preserve">
+    <value>Not chosen</value>
+  </data>
+  <data name="Folder_InternalStorage" xml:space="preserve">
+    <value>Internal storage</value>
+  </data>
+  <data name="Folder_NotChosenError" xml:space="preserve">
+    <value>No download folder has been chosen.</value>
+  </data>
+  <data name="Folder_CannotCreateFile" xml:space="preserve">
+    <value>Can’t create “{0}” in the chosen folder.</value>
+    <comment>{0} is a file name.</comment>
+  </data>
+  <data name="Folder_CannotWrite" xml:space="preserve">
+    <value>Can’t write to “{0}”.</value>
+    <comment>{0} is a file name.</comment>
+  </data>
+  <data name="Folder_CannotCreateFolder" xml:space="preserve">
+    <value>Can’t create the folder “{0}”.</value>
+    <comment>{0} is a folder name.</comment>
+  </data>
+  <data name="Import_CannotOpen" xml:space="preserve">
+    <value>Can’t open “{0}”.</value>
+    <comment>{0} is a file name or location.</comment>
+  </data>
+  <data name="Picker_ChooseAudiobook" xml:space="preserve">
+    <value>Choose an audiobook</value>
+  </data>
+  <data name="Picker_ChooseEbook" xml:space="preserve">
+    <value>Choose an ebook</value>
+  </data>
+  <data name="Picker_AddAudiobook" xml:space="preserve">
+    <value>Add an audiobook</value>
+  </data>
+  <data name="Picker_AddEbook" xml:space="preserve">
+    <value>Add an ebook</value>
+  </data>
+  <data name="Progress_PreparingAlignment" xml:space="preserve">
+    <value>Getting ready to align…</value>
+  </data>
+  <data name="Import_NoText" xml:space="preserve">
+    <value>I got no text at all out of this file.</value>
+  </data>
+  <data name="Progress_CopyingPercent" xml:space="preserve">
+    <value>Copying… {0}%</value>
+    <comment>{0} is a whole number.</comment>
+  </data>
+  <data name="Progress_CopyingMb" xml:space="preserve">
+    <value>Copying… {0} MB</value>
+    <comment>{0} is a whole number.</comment>
+  </data>
+  <data name="Error_ImportFailed" xml:space="preserve">
+    <value>Import failed: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="Error_DeleteFailed" xml:space="preserve">
+    <value>Deleting failed: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="Error_AddFailed" xml:space="preserve">
+    <value>Adding failed: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="Align_MeasuredOf" xml:space="preserve">
+    <value>Measured {0} of the book’s {1}.</value>
+    <comment>{0} and {1} are durations, e.g. “1 h 20 min”.</comment>
+  </data>
+  <data name="Align_FullyAligned" xml:space="preserve">
+    <value>Fully aligned ({0} chapters).</value>
+  </data>
+  <data name="Align_AlignedOf" xml:space="preserve">
+    <value>{0} of {1} chapters aligned. </value>
+    <comment>Keep the trailing space: another sentence follows.</comment>
+  </data>
+  <data name="Align_Continue" xml:space="preserve">
+    <value>Carry on aligning</value>
+  </data>
+  <data name="Align_Start" xml:space="preserve">
+    <value>Start aligning</value>
+  </data>
+  <data name="Chapter_Toggle" xml:space="preserve">
+    <value>Chapters ({0})  {1}</value>
+    <comment>{1} is an arrow showing whether the list is open.</comment>
+  </data>
+  <data name="Player_SleepAfterTitle" xml:space="preserve">
+    <value>Stop after</value>
+    <comment>Heading of the sleep timer chooser.</comment>
+  </data>
+  <data name="Bookmarks_LimitReachedBook" xml:space="preserve">
+    <value>This book has reached its limit of {0} bookmarks.</value>
+  </data>
+  <data name="Bookmarks_SavedAt" xml:space="preserve">
+    <value>Saved at {0}</value>
+    <comment>{0} is a position, e.g. 1:23:45.</comment>
+  </data>
+  <data name="Bookmarks_Saved" xml:space="preserve">
+    <value>Saved</value>
+  </data>
+  <data name="Bookmarks_AtChar" xml:space="preserve">
+    <value>character {0}</value>
+    <comment>Where a bookmark sits in a book with no audio.</comment>
+  </data>
+  <data name="Media_TextOnly" xml:space="preserve">
+    <value>Text only</value>
+  </data>
+  <data name="Duration_HoursMinutes" xml:space="preserve">
+    <value>{0} h {1} min</value>
+  </data>
+  <data name="Duration_Minutes" xml:space="preserve">
+    <value>{0} min</value>
+  </data>
+  <data name="Reader_FollowOn" xml:space="preserve">
+    <value>Following ✓</value>
+  </data>
+  <data name="Reader_Follow" xml:space="preserve">
+    <value>Follow</value>
+  </data>
+  <data name="Reader_Appearance" xml:space="preserve">
+    <value>Page appearance</value>
+  </data>
+  <data name="Reader_PageOf" xml:space="preserve">
+    <value>p. {0} / {1}</value>
+    <comment>Page number within the chapter.</comment>
+  </data>
+  <data name="Server_Cancelling" xml:space="preserve">
+    <value>Stopping the download…</value>
+  </data>
+  <data name="Server_OneBook" xml:space="preserve">
+    <value>1 book</value>
+  </data>
+  <data name="Server_BookCount" xml:space="preserve">
+    <value>{0} books</value>
+  </data>
+  <data name="Server_RecentlyAdded" xml:space="preserve">
+    <value>Recently added</value>
+  </data>
+  <data name="Server_NoSeries" xml:space="preserve">
+    <value>Not in a series</value>
+  </data>
+  <data name="Chapter_Count" xml:space="preserve">
+    <value>{0} chapters</value>
+  </data>
+  <data name="Common_Stop" xml:space="preserve">
+    <value>Stop</value>
+    <comment>Button that ends a job that is running.</comment>
+  </data>
+  <data name="Download_Preparing" xml:space="preserve">
+    <value>Getting ready…</value>
+  </data>
+  <data name="Notification_DownloadChannel" xml:space="preserve">
+    <value>Downloads</value>
+    <comment>Name of the Android notification channel for books coming from a server.</comment>
+  </data>
+  <data name="Notification_DownloadChannelBody" xml:space="preserve">
+    <value>Progress of books being fetched from a server</value>
+  </data>
+  <data name="Download_AlreadyRunning" xml:space="preserve">
+    <value>Another book is being downloaded. Wait for it to finish.</value>
+  </data>
+  <data name="Destination_FolderTitle" xml:space="preserve">
+    <value>Audiobooks folder</value>
+  </data>
+  <data name="Destination_FolderBody" xml:space="preserve">
+    <value>Beside the audiobooks already on the phone. Other apps and a computer over a cable can see it, and it stays behind if this app is removed.</value>
+  </data>
+  <data name="Destination_FolderChosen" xml:space="preserve">
+    <value>Now: {0}</value>
+    <comment>{0} is the folder the user picked earlier.</comment>
+  </data>
+  <data name="Destination_FolderWillAsk" xml:space="preserve">
+    <value>The system will ask you to confirm the folder.</value>
+  </data>
+  <data name="Destination_AppTitle" xml:space="preserve">
+    <value>Internal app storage</value>
+  </data>
+  <data name="Destination_AppBody" xml:space="preserve">
+    <value>The app’s own space. Nothing else on the phone can see it, and it is deleted along with the app.</value>
+  </data>
+  <data name="Destination_Layout" xml:space="preserve">
+    <value>Books are filed under the author’s name, then the book’s.</value>
+  </data>
+  <data name="Help_Title" xml:space="preserve">
+    <value>How alignment works</value>
+  </data>
+  <data name="Help_WhatSection" xml:space="preserve">
+    <value>What it does</value>
+  </data>
+  <data name="Help_WhatBody" xml:space="preserve">
+    <value>Pairing an audiobook with its text means finding, for every sentence, the moment it is spoken. The phone works that out itself: it listens to short samples and looks up what it heard in the book’s own text. Nothing is sent anywhere.</value>
+  </data>
+  <data name="Help_WaysSection" xml:space="preserve">
+    <value>Two ways to get there</value>
+  </data>
+  <data name="Help_LiveTitle" xml:space="preserve">
+    <value>While you read</value>
+  </data>
+  <data name="Help_LiveBody" xml:space="preserve">
+    <value>Measures the passage you are on, from where the narration is, while the reader is open. Nothing to wait for — the text starts following within seconds — but only for what you actually read.</value>
+  </data>
+  <data name="Help_AheadTitle" xml:space="preserve">
+    <value>Ahead of you</value>
+  </data>
+  <data name="Help_AheadBody" xml:space="preserve">
+    <value>Works through the whole book in the background so it is ready before you get there. This is the one the settings below are about.</value>
+  </data>
+  <data name="Help_PresetsSection" xml:space="preserve">
+    <value>The three settings</value>
+  </data>
+  <data name="Help_PresetThrifty" xml:space="preserve">
+    <value>Two threads on the efficiency cores, a quarter of the time. You will barely notice it — and it is by far the slowest.</value>
+  </data>
+  <data name="Help_PresetBalanced" xml:space="preserve">
+    <value>Four threads on the efficiency cores, half the time. The phone stays smooth for everything else while it works.</value>
+  </data>
+  <data name="Help_PresetFast" xml:space="preserve">
+    <value>Every core, no pauses. Several times faster than the other two, and the phone will get warm.</value>
+  </data>
+  <data name="Help_SlowerSection" xml:space="preserve">
+    <value>Why it can be slower than the estimate</value>
+  </data>
+  <data name="Help_SlowerHeat" xml:space="preserve">
+    <value>Heat. The moment the system reports the phone warming, the app eases off on its own — first to seven tenths of the pace, then further, and it stops outright if the phone gets hot. That is deliberate: pushing through a warm phone does the same work at half speed and keeps it warm.</value>
+  </data>
+  <data name="Help_SlowerCores" xml:space="preserve">
+    <value>A sleeping phone. Work carries on with the screen off — the app holds the processor awake for it — but Thrifty and Balanced only ever use the efficiency cores, and an idle phone runs those at their lowest speed. That is why they can crawl in a pocket while Fast keeps going.</value>
+  </data>
+  <data name="Help_DoneSection" xml:space="preserve">
+    <value>What actually finishes a book</value>
+  </data>
+  <data name="Help_DoneCharging" xml:space="preserve">
+    <value>Fast, with “only while charging” and “only while the screen is off”, overnight. That is what those two switches in Settings are for.</value>
+  </data>
+  <data name="Help_DoneReading" xml:space="preserve">
+    <value>Or do not wait at all: open the reader and read along with the narration. Alignment while reading measures exactly the passage you are on, and the rest of the book can finish whenever it likes.</value>
+  </data>
+  <data name="Help_PausedSection" xml:space="preserve">
+    <value>When it stops on its own</value>
+  </data>
+  <data name="Help_PausedBody" xml:space="preserve">
+    <value>The notification always says why: waiting for a charger, waiting for the screen to go off, or the battery is under the limit you set. Nothing is lost — unplugging for ten minutes costs ten minutes, not the chapter.</value>
+  </data>
+  <data name="Delete_Title" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Delete_AlsoFile" xml:space="preserve">
+    <value>Delete the file too</value>
+  </data>
+  <data name="Delete_AlsoFileNote" xml:space="preserve">
+    <value>Removes it from the phone, not just from this library. There is no way back.</value>
+  </data>
+  <data name="Delete_FileKept" xml:space="preserve">
+    <value>The book is gone from the library. Its file is still on the phone.</value>
+  </data>
+  <data name="Delete_FileRefused" xml:space="preserve">
+    <value>The book is gone from the library, but the file could not be deleted — permission may have lapsed, or it may have been moved.</value>
+  </data>
+  <data name="Delete_RemoveAudioTitle" xml:space="preserve">
+    <value>Remove the audiobook?</value>
+  </data>
+  <data name="Delete_RemoveEbookTitle" xml:space="preserve">
+    <value>Remove the ebook?</value>
+  </data>
+  <data name="Details_LiveAlignmentNote" xml:space="preserve">
+    <value>Measures the passage you are reading, while you read it. Nothing to wait for.</value>
+  </data>
+  <data name="Details_AlignAheadNote" xml:space="preserve">
+    <value>Works through the whole book in the background, so it is ready before you get there.</value>
+  </data>
+  <data name="Settings_RecognitionSection" xml:space="preserve">
+    <value>Recognition accuracy</value>
+  </data>
+  <data name="Settings_RecognitionBody" xml:space="preserve">
+    <value>Which speech model listens to the book. A better one mishears less, so fewer stretches are thrown away and left to be guessed at — which is what makes the text sit closer to the voice.</value>
+  </data>
+  <data name="Recognition_Tiny" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="Recognition_TinyDetail" xml:space="preserve">
+    <value>The small model, about 31 MB. What the app has used until now.</value>
+  </data>
+  <data name="Recognition_Base" xml:space="preserve">
+    <value>More accurate</value>
+  </data>
+  <data name="Recognition_BaseDetail" xml:space="preserve">
+    <value>The next size up, about 58 MB. Around three times longer to align, and noticeably better at languages other than English. Downloaded the first time you align with it.</value>
+  </data>
+  <data name="Settings_WordTimes" xml:space="preserve">
+    <value>Time every word</value>
+  </data>
+  <data name="Settings_WordTimesNote" xml:space="preserve">
+    <value>Asks the model when each word was spoken instead of assuming an even pace across a few seconds. More precise wherever the narrator pauses mid-sentence. Turn it off if aligning gets slower on your phone.</value>
+  </data>
+  <data name="Server_UnknownAuthor" xml:space="preserve">
+    <value>Unknown author</value>
+    <comment>Used as a folder name when a book has no author.</comment>
+  </data>
+</root>

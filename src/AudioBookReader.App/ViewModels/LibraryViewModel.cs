@@ -1,5 +1,7 @@
+using AudioBookReader.App.Resources.Strings;
 using System.Collections.ObjectModel;
 using AudioBookReader.App.Services;
+using AudioBookReader.App.Views;
 using AudioBookReader.Core.Data;
 using AudioBookReader.Core.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -32,11 +34,11 @@ public class BookCard(Book book, ReadingState? state)
 
     public string SyncBadge { get; } = book.SyncState switch
     {
-        SyncState.Complete => "sinkronizirano",
-        SyncState.Partial => "djelomično sinkronizirano",
-        SyncState.InProgress => "poravnavanje u tijeku",
-        SyncState.Pending when book.IsPaired => "čeka poravnanje",
-        SyncState.Failed => "poravnanje nije uspjelo",
+        SyncState.Complete => Strings.Sync_Complete,
+        SyncState.Partial => Strings.Sync_Partial,
+        SyncState.InProgress => Strings.Sync_InProgress,
+        SyncState.Pending when book.IsPaired => Strings.Sync_Pending,
+        SyncState.Failed => Strings.Sync_Failed,
         _ => "",
     };
 
@@ -56,20 +58,92 @@ public class BookCard(Book book, ReadingState? state)
 
     private static string Describe(Book book)
     {
-        if (!book.HasAudio) return "Samo tekst";
+        if (!book.HasAudio) return Strings.Media_TextOnly;
 
         var length = TimeSpan.FromMilliseconds(book.DurationMs);
         return length.TotalHours >= 1
-            ? $"{(int)length.TotalHours} h {length.Minutes} min"
-            : $"{length.Minutes} min";
+            ? string.Format(Strings.Duration_HoursMinutes, (int)length.TotalHours, length.Minutes)
+            : string.Format(Strings.Duration_Minutes, length.Minutes);
     }
 }
 
-public partial class LibraryViewModel(
-    LibraryDatabase database,
-    BookImporter importer,
-    BookFilePicker picker) : ObservableObject
+public partial class LibraryViewModel : ObservableObject
 {
+    private readonly LibraryDatabase _database;
+    private readonly BookImporter _importer;
+    private readonly BookFilePicker _picker;
+    private readonly DownloadQueue _downloads;
+    private readonly AlignmentQueue _alignment;
+
+    public LibraryViewModel(
+        LibraryDatabase database,
+        BookImporter importer,
+        BookFilePicker picker,
+        DownloadQueue downloads,
+        AlignmentQueue alignment)
+    {
+        _database = database;
+        _importer = importer;
+        _picker = picker;
+        _downloads = downloads;
+        _alignment = alignment;
+    }
+
+    /// <summary>
+    /// Listens for background work that changes what is on the shelf.
+    ///
+    /// The shelf used to reload only when it came forward, which was enough while everything that
+    /// changed it was something the user did on another page. It is not enough now: a download
+    /// finishes in a service, on its own schedule, and it may well finish with this very page open
+    /// — and then the book that just arrived is nowhere to be seen until the app is restarted.
+    ///
+    /// Alignment is here for the same reason. It does not add a book, but it changes the badge that
+    /// says whether one is aligned, and a badge that only updates on a restart is the same bug.
+    /// </summary>
+    public void Attach()
+    {
+        _downloads.Changed -= OnDownloadChanged;
+        _downloads.Changed += OnDownloadChanged;
+
+        _alignment.Changed -= OnAlignmentChanged;
+        _alignment.Changed += OnAlignmentChanged;
+    }
+
+    public void Detach()
+    {
+        _downloads.Changed -= OnDownloadChanged;
+        _alignment.Changed -= OnAlignmentChanged;
+    }
+
+    // Only when the work has actually ended. Both queues report progress continuously, and
+    // reloading the shelf on every tick would mean rebuilding every row several times a second.
+    private void OnDownloadChanged(object? sender, DownloadStatus status)
+    {
+        if (status.Phase == DownloadPhase.Finished) ReloadInBackground();
+    }
+
+    private void OnAlignmentChanged(object? sender, AlignmentStatus status)
+    {
+        if (status.Phase is AlignmentPhase.Finished or AlignmentPhase.Stopped) ReloadInBackground();
+    }
+
+    /// <summary>
+    /// Reloads without anyone waiting, because nobody can: these arrive from a service thread.
+    /// </summary>
+    private void ReloadInBackground() => MainThread.BeginInvokeOnMainThread(async () =>
+    {
+        try
+        {
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            // Not shown. The user did not ask for this reload and has nothing to do about it
+            // failing; the next time the page comes forward will try again.
+            AppLog.Error("refreshing the library after background work", ex);
+        }
+    });
+
     public ObservableCollection<BookCard> Books { get; } = [];
 
     [ObservableProperty]
@@ -98,23 +172,23 @@ public partial class LibraryViewModel(
     {
         Books.Clear();
 
-        foreach (var book in await database.GetBooksAsync())
-            Books.Add(new BookCard(book, await database.GetReadingStateAsync(book.Id)));
+        foreach (var book in await _database.GetBooksAsync())
+            Books.Add(new BookCard(book, await _database.GetReadingStateAsync(book.Id)));
 
         OnPropertyChanged(nameof(IsEmpty));
     }
 
     [RelayCommand]
     private Task ImportAudioAsync() => ImportAsync(
-        picker.PickAudioAsync(),
-        "Učitavam audioknjigu…",
-        (picked, progress, ct) => importer.ImportAudioAsync(picked, null, progress, ct));
+        _picker.PickAudioAsync(),
+        Strings.Progress_LoadingAudiobook,
+        (picked, progress, ct) => _importer.ImportAudioAsync(picked, null, progress, ct));
 
     [RelayCommand]
     private Task ImportEbookAsync() => ImportAsync(
-        picker.PickEbookAsync(),
-        "Čitam e-knjigu…",
-        (picked, progress, ct) => importer.ImportEbookAsync(picked, null, progress, ct));
+        _picker.PickEbookAsync(),
+        Strings.Progress_ReadingEbook,
+        (picked, progress, ct) => _importer.ImportEbookAsync(picked, null, progress, ct));
 
     private async Task ImportAsync(
         Task<PickedMedia?> pick,
@@ -149,7 +223,7 @@ public partial class LibraryViewModel(
         catch (Exception ex)
         {
             AppLog.Error($"import of '{picked.FileName}'", ex);
-            Error = $"Uvoz nije uspio: {ex.Message}";
+            Error = string.Format(Strings.Error_ImportFailed, ex.Message);
         }
         finally
         {
@@ -168,23 +242,27 @@ public partial class LibraryViewModel(
     {
         if (card is null) return;
 
-        var confirmed = await Shell.Current.DisplayAlertAsync(
-            "Obrisati knjigu?",
-            $"„{card.Title}” i njene datoteke bit će trajno obrisane.",
-            "Obriši",
-            "Odustani");
+        // Whichever file the book has of its own, so the confirmation can name what would go.
+        var file = await _importer.OwnFileAsync(card.Id, audio: true)
+                   ?? await _importer.OwnFileAsync(card.Id, audio: false);
 
-        if (!confirmed) return;
+        if (await BookViewModel.ConfirmDeletionAsync(
+                Strings.Dialog_DeleteBookTitle,
+                string.Format(Strings.Dialog_DeleteBookBody, card.Title),
+                file) is not { } choice)
+        {
+            return;
+        }
 
         try
         {
-            await importer.DeleteBookAsync(card.Id);
+            await _importer.DeleteBookAsync(card.Id, choice.AlsoFile);
             await LoadAsync();
         }
         catch (Exception ex)
         {
             // A failure here must not take the process down with it.
-            Error = $"Brisanje nije uspjelo: {ex.Message}";
+            Error = string.Format(Strings.Error_DeleteFailed, ex.Message);
         }
     }
 

@@ -142,9 +142,19 @@
         <Setter Property="CancelButtonColor" Value="{AppThemeBinding Light={StaticResource Accent}, Dark={StaticResource AccentDark}}" />
     </Style>
 
+    <!--
+        The knob is light in both themes, deliberately not theme-bound.
+
+        It used to take the surface colour, which in the dark theme is the colour of the card the
+        switch sits on — so the knob vanished into the card and all that showed was the amber track
+        behind it, a crescent that reads as a rendering fault rather than as a switch. A knob has to
+        contrast with two things at once: the track, amber when on and grey when off, and the card
+        around it. One light colour does that in both themes, which is also what every other switch
+        on the phone does.
+    -->
     <Style TargetType="Switch">
         <Setter Property="OnColor" Value="{AppThemeBinding Light={StaticResource Accent}, Dark={StaticResource AccentDark}}" />
-        <Setter Property="ThumbColor" Value="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource SurfaceDark}}" />
+        <Setter Property="ThumbColor" Value="{StaticResource Paper}" />
     </Style>
 
     <Style TargetType="CheckBox">

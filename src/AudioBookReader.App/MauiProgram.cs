@@ -22,6 +22,14 @@ public static class MauiProgram
 
 		AppPaths.EnsureCreated();
 
+		// First of all, so that everything after it is recorded. The system log is a shared ring
+		// buffer a few megabytes wide: alignment runs for hours, and a failure reported the next
+		// morning has long since scrolled out of it.
+		AppLog.File = AppPaths.Log;
+
+		// Before anything is built, because every label asks for its text as it is created.
+		new Language().Apply();
+
 		// Single instances: the database holds one connection, and the sync map store and model
 		// store are stateless wrappers over a directory. The foreground services resolve these
 		// through IPlatformApplication rather than being constructed with them, since Android
@@ -32,6 +40,8 @@ public static class MauiProgram
 		builder.Services.AddSingleton<BookTextExtractors>();
 		builder.Services.AddSingleton<LibraryService>();
 		builder.Services.AddSingleton<AlignmentQueue>();
+		builder.Services.AddSingleton<DownloadQueue>();
+		builder.Services.AddSingleton<TabReselect>();
 		builder.Services.AddSingleton<MediaReferences>();
 		builder.Services.AddSingleton<LiveSyncRunner>();
 		builder.Services.AddSingleton<BookImporter>();
@@ -39,6 +49,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<BookFilePicker>();
 		builder.Services.AddSingleton<ServerAccount>();
 		builder.Services.AddSingleton<DownloadFolder>();
+		builder.Services.AddSingleton<Language>();
 		builder.Services.AddSingleton<ServerConnection>();
 
 		// Playback outlives any page, so the controller is shared; pages and their view models are
@@ -60,6 +71,7 @@ public static class MauiProgram
 		builder.Services.AddTransient<ServerPage>();
 		builder.Services.AddTransient<ServerBookViewModel>();
 		builder.Services.AddTransient<ServerBookPage>();
+		builder.Services.AddTransient<DownloadDestinationPage>();
 
 #if DEBUG
 		builder.Logging.AddDebug();

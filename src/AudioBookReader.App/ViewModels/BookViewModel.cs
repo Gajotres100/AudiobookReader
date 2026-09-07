@@ -1,5 +1,7 @@
+using AudioBookReader.App.Resources.Strings;
 using System.Collections.ObjectModel;
 using AudioBookReader.App.Services;
+using AudioBookReader.App.Views;
 using AudioBookReader.Core.Alignment;
 using AudioBookReader.Core.Books;
 using AudioBookReader.Core.Data;
@@ -116,7 +118,7 @@ public partial class BookViewModel(
     public bool HasSleepTimer => SleepText.Length > 0;
 
     /// <summary>Shows the time left once a timer is armed, so its state is visible without opening the menu.</summary>
-    public string SleepButtonText => HasSleepTimer ? $"⏱ {SleepText}" : "⏱ Zaustavi nakon";
+    public string SleepButtonText => HasSleepTimer ? $"⏱ {SleepText}" : Strings.Player_SleepAfter;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
@@ -259,7 +261,7 @@ public partial class BookViewModel(
 
     /// <summary>What the button does, which is not the same thing in the two modes.</summary>
     public string RealignText =>
-        MeasuresWhileReading ? "Obriši izmjereno i kreni čisto" : "Poravnaj iznova od početka";
+        MeasuresWhileReading ? Strings.Align_ClearMeasured : Strings.Align_AgainFromStart;
 
     /// <summary>The chapter a resume would begin with, computed the same way the aligner does.</summary>
     [ObservableProperty]
@@ -289,30 +291,32 @@ public partial class BookViewModel(
                 // fifteen-second window, so passing through three of them claimed three chapters
                 // aligned while under a minute of the book had actually been heard.
                 var measured = MeasuredMs <= 0
-                    ? "Još ništa nije izmjereno."
-                    : $"Izmjereno {Format(MeasuredMs)} od {Format(_book?.DurationMs ?? 0)} knjige.";
+                    ? Strings.Align_NothingMeasured
+                    : string.Format(
+                        Strings.Align_MeasuredOf,
+                        Format(MeasuredMs),
+                        Format(_book?.DurationMs ?? 0));
 
-                return $"Poravnavanje u hodu: mjeri se dok čitaš — otvori „Čitaj” i pusti zvuk. {measured}";
+                return string.Format(Strings.Align_LiveSummary, measured);
             }
 
             if (HasStaleAlignment)
-                return "Ranije poravnanje napravljeno je starijom, manje preciznom metodom i bit će " +
-                       "izračunato ispočetka.";
+                return Strings.Align_Stale;
 
-            if (AlignedChapterCount == 0) return "Još nije poravnano.";
+            if (AlignedChapterCount == 0) return Strings.Align_NotAligned;
 
             if (AlignedChapterCount >= Chapters.Count)
-                return $"Poravnano u cijelosti ({Chapters.Count} poglavlja).";
+                return string.Format(Strings.Align_FullyAligned, Chapters.Count);
 
-            return $"Poravnano {AlignedChapterCount} od {Chapters.Count} poglavlja. " +
-                   $"Nastavak kreće od {ResumeFromChapter + 1}.";
+            return string.Format(Strings.Align_AlignedOf, AlignedChapterCount, Chapters.Count) +
+                   string.Format(Strings.Align_ResumeFrom, ResumeFromChapter + 1);
         }
     }
 
     public string StartAlignmentText =>
         AlignedChapterCount > 0 && AlignedChapterCount < Chapters.Count
-            ? "Nastavi poravnanje"
-            : "Pokreni poravnanje";
+            ? Strings.Align_Continue
+            : Strings.Align_Start;
 
     public ObservableCollection<ChapterRow> Chapters { get; } = [];
 
@@ -328,7 +332,8 @@ public partial class BookViewModel(
     [NotifyPropertyChangedFor(nameof(ChapterToggleText))]
     public partial bool ChaptersExpanded { get; set; }
 
-    public string ChapterToggleText => $"Poglavlja ({Chapters.Count})  {(ChaptersExpanded ? "▲" : "▼")}";
+    public string ChapterToggleText =>
+        string.Format(Strings.Chapter_Toggle, Chapters.Count, ChaptersExpanded ? "▲" : "▼");
 
     [RelayCommand]
     private void ToggleChapters() => ChaptersExpanded = !ChaptersExpanded;
@@ -357,8 +362,11 @@ public partial class BookViewModel(
 
     private static readonly int[] SleepMinutes = [5, 10, 15, 20, 30, 45, 60, 90];
 
-    private const string EndOfChapterChoice = "Do kraja poglavlja";
-    private const string CancelSleepChoice = "Isključi";
+    // Read once rather than declared const: a const is baked in at compile time, and these have to
+    // be able to come back in a different language.
+    private static string EndOfChapterChoice => Strings.Player_SleepEndOfChapter;
+
+    private static string CancelSleepChoice => Strings.Player_SleepOff;
 
     // ---- Lifecycle ----
 
@@ -381,7 +389,9 @@ public partial class BookViewModel(
         {
             Chapters.Add(new ChapterRow(
                 chapter,
-                string.IsNullOrWhiteSpace(chapter.Title) ? $"Poglavlje {chapter.Index + 1}" : chapter.Title,
+                string.IsNullOrWhiteSpace(chapter.Title)
+                    ? string.Format(Strings.Chapter_Numbered, chapter.Index + 1)
+                    : chapter.Title,
                 chapter.StartMs is { } startMs ? Format(startMs) : ""));
         }
 
@@ -431,7 +441,10 @@ public partial class BookViewModel(
 
         AppLog.Info($"loading book {BookId} at {startMs} ms, speed {speed}");
 
-        await playback.LoadAsync(BookId, _book!.AudioPath!, startMs, speed);
+        await playback.LoadAsync(
+            BookId, _book!.AudioPath!, startMs, speed,
+            title: Title, author: Author, coverPath: _book.CoverPath,
+            chapterStarts: ChapterStarts());
 
         PositionMs = startMs;
         DurationMs = _book.DurationMs;
@@ -545,6 +558,10 @@ public partial class BookViewModel(
     [RelayCommand]
     private void Forward() => playback.Nudge(10_000);
 
+    /// <summary>Where each chapter begins, for the controls outside the app to step between.</summary>
+    private long[] ChapterStarts() =>
+        [.. _chapters.Where(c => c.HasAudioRange).Select(c => c.StartMs ?? 0).Order()];
+
     [RelayCommand]
     private void PreviousChapter()
     {
@@ -612,36 +629,42 @@ public partial class BookViewModel(
     [RelayCommand]
     private Task ChooseSleepAsync() => GuardAsync(async () =>
     {
-        string[] options = [.. SleepMinutes.Select(m => $"{m} min"), EndOfChapterChoice];
+        var minuteOptions = SleepMinutes
+            .Select(m => string.Format(Strings.Player_SleepMinutes, m))
+            .ToArray();
+
+        string[] options = [.. minuteOptions, EndOfChapterChoice];
+
+        var cancel = Strings.Common_Cancel;
 
         var choice = await Shell.Current.DisplayActionSheetAsync(
-            "Zaustavi nakon",
-            "Odustani",
+            Strings.Player_SleepAfterTitle,
+            cancel,
             // Only offered while a timer is actually running.
             HasSleepTimer ? CancelSleepChoice : null,
             options);
 
-        switch (choice)
+        if (choice is null || choice == cancel) return;
+
+        if (choice == CancelSleepChoice)
         {
-            case null or "Odustani":
-                return;
-
-            case CancelSleepChoice:
-                playback.CancelSleep();
-                SleepText = "";
-                return;
-
-            // Stops at the end of what is being listened to — the option that fits an audiobook,
-            // where a fixed timer tends to cut off mid-scene.
-            case EndOfChapterChoice:
-                if (_currentChapter?.EndMs is { } end) playback.SleepAtPosition(end);
-                return;
-
-            default:
-                if (int.TryParse(choice.Split(' ')[0], out var minutes))
-                    playback.SleepAfter(TimeSpan.FromMinutes(minutes));
-                return;
+            playback.CancelSleep();
+            SleepText = "";
+            return;
         }
+
+        // Stops at the end of what is being listened to — the option that fits an audiobook, where
+        // a fixed timer tends to cut off mid-scene.
+        if (choice == EndOfChapterChoice)
+        {
+            if (_currentChapter?.EndMs is { } end) playback.SleepAtPosition(end);
+            return;
+        }
+
+        // Matched by where it sits in the list rather than by reading the number back out of it,
+        // so the wording of the option is free to change with the language.
+        var picked = Array.IndexOf(minuteOptions, choice);
+        if (picked >= 0) playback.SleepAfter(TimeSpan.FromMinutes(SleepMinutes[picked]));
     });
 
     // ---- Bookmarks ----
@@ -660,7 +683,7 @@ public partial class BookViewModel(
 
         if (existing.Count >= BookmarksViewModel.Limit)
         {
-            Error = $"Dosegnut je limit od {BookmarksViewModel.Limit} bookmarka za ovu knjigu.";
+            Error = string.Format(Strings.Bookmarks_LimitReachedBook, BookmarksViewModel.Limit);
             return;
         }
 
@@ -673,7 +696,9 @@ public partial class BookViewModel(
         });
 
         // A saved bookmark that says nothing looks like a button that does nothing.
-        BookmarkNote = HasAudio ? $"Spremljeno na {PositionText}" : "Spremljeno";
+        BookmarkNote = HasAudio
+            ? string.Format(Strings.Bookmarks_SavedAt, PositionText)
+            : Strings.Bookmarks_Saved;
         await Task.Delay(2500);
         BookmarkNote = "";
     });
@@ -702,12 +727,12 @@ public partial class BookViewModel(
 
     [RelayCommand]
     private Task AddAudioAsync() => AttachAsync(
-        picker.PickAudioAsync("Dodaj audioknjigu"),
+        picker.PickAudioAsync(Strings.Picker_AddAudiobook),
         (picked, progress, ct) => importer.ImportAudioAsync(picked, BookId, progress, ct));
 
     [RelayCommand]
     private Task AddEbookAsync() => AttachAsync(
-        picker.PickEbookAsync("Dodaj e-knjigu"),
+        picker.PickEbookAsync(Strings.Picker_AddEbook),
         (picked, progress, ct) => importer.ImportEbookAsync(picked, BookId, progress, ct));
 
     private async Task AttachAsync(
@@ -759,7 +784,7 @@ public partial class BookViewModel(
         catch (Exception ex)
         {
             AppLog.Error($"attach of '{picked.FileName}'", ex);
-            Error = $"Dodavanje nije uspjelo: {ex.Message}";
+            Error = string.Format(Strings.Error_AddFailed, ex.Message);
         }
         finally
         {
@@ -772,15 +797,20 @@ public partial class BookViewModel(
     [RelayCommand]
     private Task DeleteBookAsync() => GuardAsync(async () =>
     {
-        var confirmed = await Shell.Current.DisplayAlertAsync(
-            "Obrisati knjigu?",
-            $"„{Title}” i njene datoteke bit će trajno obrisane.",
-            "Obriši",
-            "Odustani");
+        // Either file will do to ask about: the switch covers the book, and a book with only
+        // one medium has only that one to offer.
+        var file = await importer.OwnFileAsync(BookId, audio: true)
+                   ?? await importer.OwnFileAsync(BookId, audio: false);
 
-        if (!confirmed) return;
+        if (await ConfirmDeletionAsync(
+                Strings.Dialog_DeleteBookTitle,
+                string.Format(Strings.Dialog_DeleteBookBody, Title),
+                file) is not { } choice)
+        {
+            return;
+        }
 
-        await importer.DeleteBookAsync(BookId);
+        await importer.DeleteBookAsync(BookId, choice.AlsoFile);
 
         // All the way to the library, not one page back. Deletion is reached from the details page,
         // which sits on top of a reader or a player still showing the book that no longer exists —
@@ -811,31 +841,59 @@ public partial class BookViewModel(
     [RelayCommand]
     private Task RemoveAudioAsync() => GuardAsync(async () =>
     {
-        if (!await ConfirmRemovalAsync("audioknjigu")) return;
+        if (await ConfirmRemovalAsync(Strings.Delete_RemoveAudioTitle, audio: true) is not { } choice)
+            return;
 
-        await importer.RemoveAudioAsync(BookId);
+        await importer.RemoveAudioAsync(BookId, choice.AlsoFile);
         await LoadAsync();
     });
 
     [RelayCommand]
     private Task RemoveEbookAsync() => GuardAsync(async () =>
     {
-        if (!await ConfirmRemovalAsync("e-knjigu")) return;
+        if (await ConfirmRemovalAsync(Strings.Delete_RemoveEbookTitle, audio: false) is not { } choice)
+            return;
 
-        await importer.RemoveEbookAsync(BookId);
+        await importer.RemoveEbookAsync(BookId, choice.AlsoFile);
         await LoadAsync();
     });
 
     /// <summary>
-    /// Removing a medium throws away its file, so it is confirmed. The message says what survives,
-    /// because the point of the feature is that the other half of the book does.
+    /// Removing a medium is confirmed, and the confirmation carries a second question: whether the
+    /// file itself should go as well.
+    ///
+    /// The message still says what survives, because the point of the feature is that the other
+    /// half of the book does — but until now the answer to "and the file?" was decided for the
+    /// user, and it was only ever one of the two things they might have meant.
     /// </summary>
-    private static Task<bool> ConfirmRemovalAsync(string what) =>
-        Shell.Current.DisplayAlertAsync(
-            $"Ukloniti {what}?",
-            $"Ostatak knjige ostaje. Vratiš li kasnije istu datoteku, poravnanje se neće ponavljati.",
-            "Ukloni",
-            "Odustani");
+    private async Task<DeleteChoice?> ConfirmRemovalAsync(string title, bool audio) =>
+        await ConfirmDeletionAsync(title, Strings.Dialog_RemoveBody, await importer.OwnFileAsync(BookId, audio));
+
+    /// <summary>
+    /// Asks whether to delete, and how far the deletion should reach.
+    ///
+    /// Two shapes, because there are two questions or one. When the book has a file of the user's
+    /// own there is a real second decision and it needs somewhere to live; when the only copy is
+    /// the app's, that copy goes either way and there is nothing to decide — so it stays the plain
+    /// alert it always was rather than a full page with one question on it and a screen of empty
+    /// space underneath.
+    /// </summary>
+    public static async Task<DeleteChoice?> ConfirmDeletionAsync(string title, string body, string? file)
+    {
+        if (file is null)
+        {
+            var yes = await Shell.Current.DisplayAlertAsync(
+                title, body, Strings.Common_Delete, Strings.Common_Cancel);
+
+            return yes ? new DeleteChoice(AlsoFile: false) : null;
+        }
+
+        var page = new DeleteConfirmPage(title, body, file);
+
+        await Shell.Current.Navigation.PushModalAsync(page);
+
+        return await page.Answer;
+    }
 
     // ---- Alignment ----
 
@@ -867,13 +925,11 @@ public partial class BookViewModel(
         var live = MeasuresWhileReading;
 
         var confirmed = await Shell.Current.DisplayAlertAsync(
-            live ? "Obrisati izmjereno?" : "Poravnati iznova?",
-            $"Dosadašnje poravnanje ({AlignedChapterCount} od {Chapters.Count} poglavlja) bit će obrisano" +
-            (live
-                ? ". Sve dalje mjeri se dok čitaš. Sama knjiga i tvoja pozicija ostaju."
-                : " i izračunato ispočetka. Sama knjiga i tvoja pozicija ostaju."),
-            live ? "Obriši" : "Poravnaj iznova",
-            "Odustani");
+            live ? Strings.Dialog_ClearMeasuredTitle : Strings.Dialog_RealignTitle,
+            string.Format(Strings.Dialog_RealignBody, AlignedChapterCount, Chapters.Count)
+            + (live ? Strings.Dialog_RealignLiveTail : Strings.Dialog_RealignAheadTail),
+            live ? Strings.Common_Delete : Strings.Dialog_RealignConfirm,
+            Strings.Common_Cancel);
 
         if (!confirmed) return;
 

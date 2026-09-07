@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+	<!--
+		The bottom bar, trimmed.
+
+		Shell draws it with Material's BottomNavigationView, which sizes itself from these
+		dimensions. Left alone it reserves a full icon slot plus generous label padding, and with
+		only two tabs the result is a tall band with the two words drifting apart in it — the app
+		took up more room saying where you are than showing it.
+
+		Overriding the library's own dimensions is how this is done: there is no MAUI property for
+		the height, and reaching into the view tree from a handler to set it would have to run again
+		on every rebuild of the shell, which happens on every change of language.
+	-->
+	<dimen name="design_bottom_navigation_height">52dp</dimen>
+	<dimen name="design_bottom_navigation_active_item_max_width">168dp</dimen>
+	<dimen name="design_bottom_navigation_item_max_width">168dp</dimen>
+
+	<!-- The label sizes stop growing on selection, so a tab does not shift as it is tapped. -->
+	<dimen name="design_bottom_navigation_text_size">11sp</dimen>
+	<dimen name="design_bottom_navigation_active_text_size">11sp</dimen>
+
+	<dimen name="design_bottom_navigation_icon_size">22dp</dimen>
+	<dimen name="design_bottom_navigation_margin">6dp</dimen>
+
+</resources>

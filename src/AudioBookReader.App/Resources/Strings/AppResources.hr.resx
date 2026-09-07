@@ -1,0 +1,819 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Every word the app says, in one place.
+
+    Add a language by copying this file to AppResources.<code>.resx and translating the values; the
+    keys and the accessor stay as they are. A key present here and missing there falls back to this
+    file rather than to an empty screen.
+  -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>Odustani</value>
+  </data>
+  <data name="Common_Delete" xml:space="preserve">
+    <value>Obriši</value>
+  </data>
+  <data name="Common_Close" xml:space="preserve">
+    <value>Zatvori</value>
+  </data>
+  <data name="Library_Title" xml:space="preserve">
+    <value>Knjige</value>
+  </data>
+  <data name="Library_Tab" xml:space="preserve">
+    <value>Knjige</value>
+  </data>
+  <data name="Library_EmptyTitle" xml:space="preserve">
+    <value>Polica je prazna</value>
+  </data>
+  <data name="Library_EmptyBody" xml:space="preserve">
+    <value>Dodaj audioknjigu 🎧, e-knjigu 📖, ili oboje. Kad dodaš oboje za isti naslov, tekst počne pratiti naraciju.</value>
+  </data>
+  <data name="Library_EmptyServer" xml:space="preserve">
+    <value>☁ dohvaća knjige s tvog Audiobookshelf servera.</value>
+  </data>
+  <data name="Player_Read" xml:space="preserve">
+    <value>Čitaj</value>
+  </data>
+  <data name="Details_AlignmentSection" xml:space="preserve">
+    <value>Poravnanje teksta i naracije</value>
+  </data>
+  <data name="Details_LiveAlignment" xml:space="preserve">
+    <value>Poravnavanje u hodu</value>
+  </data>
+  <data name="Details_AlignAhead" xml:space="preserve">
+    <value>Poravnaj cijelu knjigu unaprijed</value>
+  </data>
+  <data name="Details_StopAlignment" xml:space="preserve">
+    <value>Zaustavi poravnanje</value>
+  </data>
+  <data name="Details_FilesSection" xml:space="preserve">
+    <value>Datoteke</value>
+  </data>
+  <data name="Details_AddAudio" xml:space="preserve">
+    <value>Dodaj audioknjigu</value>
+  </data>
+  <data name="Details_RemoveAudio" xml:space="preserve">
+    <value>Ukloni audioknjigu</value>
+  </data>
+  <data name="Details_AddEbook" xml:space="preserve">
+    <value>Dodaj e-knjigu</value>
+  </data>
+  <data name="Details_RemoveEbook" xml:space="preserve">
+    <value>Ukloni e-knjigu</value>
+  </data>
+  <data name="Details_DeleteBook" xml:space="preserve">
+    <value>Obriši knjigu</value>
+  </data>
+  <data name="Reader_Chapters" xml:space="preserve">
+    <value>Poglavlja</value>
+  </data>
+  <data name="Bookmarks_Title" xml:space="preserve">
+    <value>Bookmarci</value>
+  </data>
+  <data name="Bookmarks_Empty" xml:space="preserve">
+    <value>Još nema bookmarka. Dugi pritisak na zastavicu ⚑ u playeru sprema mjesto na kojem si.</value>
+  </data>
+  <data name="Bookmarks_Add" xml:space="preserve">
+    <value>Dodaj bookmark ovdje</value>
+  </data>
+  <data name="Settings_Title" xml:space="preserve">
+    <value>Postavke</value>
+  </data>
+  <data name="Settings_LoadSection" xml:space="preserve">
+    <value>Opterećenje telefona</value>
+  </data>
+  <data name="Settings_LoadBody" xml:space="preserve">
+    <value>Poravnanje sluša samo desetinu snimke, pa i najsporija postavka završi knjigu puno prije nego je stigneš odslušati.</value>
+  </data>
+  <data name="Settings_WhenSection" xml:space="preserve">
+    <value>Kad smije raditi</value>
+  </data>
+  <data name="Settings_OnlyCharging" xml:space="preserve">
+    <value>Samo dok se puni</value>
+  </data>
+  <data name="Settings_OnlyScreenOff" xml:space="preserve">
+    <value>Samo dok je ekran ugašen</value>
+  </data>
+  <data name="Settings_AlignmentNote" xml:space="preserve">
+    <value>Poravnanje se samo pauzira i nastavlja — nikad ne gubi napredak. Uz to se samo usporava ako se telefon zagrije, bez obzira na odabrano.</value>
+  </data>
+  <data name="Settings_DiagnosticsSection" xml:space="preserve">
+    <value>Dijagnostika</value>
+  </data>
+  <data name="Settings_VerboseLog" xml:space="preserve">
+    <value>Detaljan zapis u log</value>
+  </data>
+  <data name="Settings_VerboseNote" xml:space="preserve">
+    <value>Uključi samo ako nešto treba dijagnosticirati — piše nekoliko puta u sekundi dok je knjiga otvorena.</value>
+  </data>
+  <data name="Settings_LanguageSection" xml:space="preserve">
+    <value>Jezik</value>
+  </data>
+  <data name="Settings_LanguageSystem" xml:space="preserve">
+    <value>Jezik telefona</value>
+  </data>
+  <data name="Settings_LanguageNote" xml:space="preserve">
+    <value>Aplikacija ponovo iscrta ekrane kad se jezik promijeni.</value>
+  </data>
+  <data name="Server_Title" xml:space="preserve">
+    <value>Audiobookshelf</value>
+  </data>
+  <data name="Server_Address" xml:space="preserve">
+    <value>Adresa servera, npr. 192.168.1.10:13378</value>
+  </data>
+  <data name="Server_UseToken" xml:space="preserve">
+    <value>Prijava tokenom umjesto lozinkom</value>
+  </data>
+  <data name="Server_Username" xml:space="preserve">
+    <value>Korisničko ime</value>
+  </data>
+  <data name="Server_Password" xml:space="preserve">
+    <value>Lozinka</value>
+  </data>
+  <data name="Server_RememberSignIn" xml:space="preserve">
+    <value>Zapamti prijavu</value>
+  </data>
+  <data name="Server_TokenPlaceholder" xml:space="preserve">
+    <value>API token sa stranice tvog računa</value>
+  </data>
+  <data name="Server_Connect" xml:space="preserve">
+    <value>Poveži se</value>
+  </data>
+  <data name="Server_SecurityNote" xml:space="preserve">
+    <value>Sve stoji u zaštićenom spremniku uređaja, uz ključ u sustavskom keystoreu. Bez „Zapamti prijavu” ostaješ prijavljen 30 dana od zadnjeg otvaranja aplikacije.</value>
+  </data>
+  <data name="Server_Disconnect" xml:space="preserve">
+    <value>Odspoji se</value>
+  </data>
+  <data name="ServerBook_OnServer" xml:space="preserve">
+    <value>Na serveru</value>
+  </data>
+  <data name="ServerBook_Download" xml:space="preserve">
+    <value>Preuzmi</value>
+  </data>
+  <data name="ServerBook_CancelDownload" xml:space="preserve">
+    <value>Prekini preuzimanje</value>
+  </data>
+  <data name="ServerBook_OpenBook" xml:space="preserve">
+    <value>Otvori knjigu</value>
+  </data>
+  <data name="Progress_LoadingAudiobook" xml:space="preserve">
+    <value>Učitavam audioknjigu…</value>
+  </data>
+  <data name="Progress_ReadingEbook" xml:space="preserve">
+    <value>Čitam e-knjigu…</value>
+  </data>
+  <data name="Progress_ReadingChapters" xml:space="preserve">
+    <value>Čitam poglavlja…</value>
+  </data>
+  <data name="Progress_ReadingText" xml:space="preserve">
+    <value>Čitam tekst…</value>
+  </data>
+  <data name="Progress_StartingAlignment" xml:space="preserve">
+    <value>Pokrećem poravnanje…</value>
+  </data>
+  <data name="Progress_Stopped" xml:space="preserve">
+    <value>Zaustavljeno — nastavit će odakle je stalo</value>
+  </data>
+  <data name="Chapter_Numbered" xml:space="preserve">
+    <value>Poglavlje {0}</value>
+  </data>
+  <data name="Chapter_Pick" xml:space="preserve">
+    <value>Poglavlje</value>
+  </data>
+  <data name="Duration_Label" xml:space="preserve">
+    <value>Trajanje {0}</value>
+  </data>
+  <data name="Player_SleepAfter" xml:space="preserve">
+    <value>⏱ Zaustavi nakon</value>
+  </data>
+  <data name="Player_SleepEndOfChapter" xml:space="preserve">
+    <value>Do kraja poglavlja</value>
+  </data>
+  <data name="Player_SleepOff" xml:space="preserve">
+    <value>Isključi</value>
+  </data>
+  <data name="Player_SleepMinutes" xml:space="preserve">
+    <value>{0} min</value>
+  </data>
+  <data name="Align_ClearMeasured" xml:space="preserve">
+    <value>Obriši izmjereno i kreni čisto</value>
+  </data>
+  <data name="Align_AgainFromStart" xml:space="preserve">
+    <value>Poravnaj iznova od početka</value>
+  </data>
+  <data name="Align_NothingMeasured" xml:space="preserve">
+    <value>Još ništa nije izmjereno.</value>
+  </data>
+  <data name="Align_LiveSummary" xml:space="preserve">
+    <value>Poravnavanje u hodu: mjeri se dok čitaš — otvori „Čitaj” i pusti zvuk. {0}</value>
+  </data>
+  <data name="Align_Stale" xml:space="preserve">
+    <value>Ranije poravnanje napravljeno je starijom, manje preciznom metodom i bit će izračunato ispočetka.</value>
+  </data>
+  <data name="Align_NotAligned" xml:space="preserve">
+    <value>Još nije poravnano.</value>
+  </data>
+  <data name="Align_ResumeFrom" xml:space="preserve">
+    <value>Nastavak kreće od {0}.</value>
+  </data>
+  <data name="Dialog_DeleteBookTitle" xml:space="preserve">
+    <value>Obrisati knjigu?</value>
+  </data>
+  <data name="Dialog_DeleteBookBody" xml:space="preserve">
+    <value>„{0}” i njene datoteke bit će trajno obrisane.</value>
+  </data>
+  <data name="Dialog_RemoveTitle" xml:space="preserve">
+    <value>Ukloniti {0}?</value>
+  </data>
+  <data name="Dialog_RemoveBody" xml:space="preserve">
+    <value>Ostatak knjige ostaje. Vratiš li kasnije istu datoteku, poravnanje se neće ponavljati.</value>
+  </data>
+  <data name="Dialog_Remove" xml:space="preserve">
+    <value>Ukloni</value>
+  </data>
+  <data name="Dialog_TheAudiobook" xml:space="preserve">
+    <value>audioknjigu</value>
+  </data>
+  <data name="Dialog_TheEbook" xml:space="preserve">
+    <value>e-knjigu</value>
+  </data>
+  <data name="Dialog_ClearMeasuredTitle" xml:space="preserve">
+    <value>Obrisati izmjereno?</value>
+  </data>
+  <data name="Dialog_RealignTitle" xml:space="preserve">
+    <value>Poravnati iznova?</value>
+  </data>
+  <data name="Dialog_RealignBody" xml:space="preserve">
+    <value>Dosadašnje poravnanje ({0} od {1} poglavlja) bit će obrisano</value>
+  </data>
+  <data name="Dialog_RealignLiveTail" xml:space="preserve">
+    <value>. Sve dalje mjeri se dok čitaš. Sama knjiga i tvoja pozicija ostaju.</value>
+  </data>
+  <data name="Dialog_RealignAheadTail" xml:space="preserve">
+    <value> i izračunato ispočetka. Sama knjiga i tvoja pozicija ostaju.</value>
+  </data>
+  <data name="Dialog_RealignConfirm" xml:space="preserve">
+    <value>Poravnaj iznova</value>
+  </data>
+  <data name="Dialog_DeleteBookmarkTitle" xml:space="preserve">
+    <value>Obrisati bookmark?</value>
+  </data>
+  <data name="Reader_WillFollow" xml:space="preserve">
+    <value>Tekst će pratiti naraciju kad poravnanje završi. Pokreni ga preko ☰.</value>
+  </data>
+  <data name="Reader_MeasuringHere" xml:space="preserve">
+    <value>Mjerim ovaj dio — tekst kreće za koji trenutak.</value>
+  </data>
+  <data name="Reader_PartNotAligned" xml:space="preserve">
+    <value>Ovaj dio knjige još nije poravnan.</value>
+  </data>
+  <data name="Reader_ChapterNotAligned" xml:space="preserve">
+    <value>Poglavlje {0} još nije poravnano — pokreni poravnanje na stranici knjige.</value>
+  </data>
+  <data name="Reader_UnmeasuredCanPlay" xml:space="preserve">
+    <value>Ovaj dio još nije izmjeren. Možeš pustiti zvuk, ali tekst ga zasad neće pratiti.</value>
+  </data>
+  <data name="Reader_AudioFailed" xml:space="preserve">
+    <value>Zvuk se ne može otvoriti ({0}). Provjeri datoteku knjige preko ☰.</value>
+  </data>
+  <data name="Reader_PreparingChapter" xml:space="preserve">
+    <value>Pripremam poglavlje…</value>
+  </data>
+  <data name="Reader_ThemeDim" xml:space="preserve">
+    <value>Prigušeno</value>
+  </data>
+  <data name="Reader_ThemeNight" xml:space="preserve">
+    <value>Noć</value>
+  </data>
+  <data name="Reader_ThemePaper" xml:space="preserve">
+    <value>Papir</value>
+  </data>
+  <data name="Reader_ThemeSepia" xml:space="preserve">
+    <value>Sepija</value>
+  </data>
+  <data name="Reader_ThemeLight" xml:space="preserve">
+    <value>Svijetlo</value>
+  </data>
+  <data name="Live_Stopped" xml:space="preserve">
+    <value>Poravnavanje u hodu je stalo — zatvori i otvori čitač da pokušam ponovo.</value>
+  </data>
+  <data name="Live_NoModel" xml:space="preserve">
+    <value>Model za prepoznavanje još nije preuzet.</value>
+  </data>
+  <data name="Live_NoModelHint" xml:space="preserve">
+    <value>Model za prepoznavanje još nije preuzet — pokreni poravnanje sa stranice knjige.</value>
+  </data>
+  <data name="Live_MeasuredAhead" xml:space="preserve">
+    <value>Poravnavam u hodu — izmjereno {0} s unaprijed</value>
+  </data>
+  <data name="Live_Working" xml:space="preserve">
+    <value>Poravnavam u hodu…</value>
+  </data>
+  <data name="Bookmarks_LimitReached" xml:space="preserve">
+    <value>Dosegnut je limit od {0} bookmarka. Obriši neki prije dodavanja novog.</value>
+  </data>
+  <data name="Bookmarks_NoPosition" xml:space="preserve">
+    <value>Nema pozicije za spremiti — pusti knjigu ili je otvori u čitaču.</value>
+  </data>
+  <data name="Import_NotAudio" xml:space="preserve">
+    <value>Ovo ne izgleda kao audio datoteka — nije pronađen zvučni zapis.</value>
+  </data>
+  <data name="Import_Unreadable" xml:space="preserve">
+    <value>'{0}' se ne može pročitati kao audioknjiga — ni oznake ni sam zapis.</value>
+  </data>
+  <data name="Server_EnterAddress" xml:space="preserve">
+    <value>Upiši adresu servera.</value>
+  </data>
+  <data name="Server_PasteToken" xml:space="preserve">
+    <value>Zalijepi token sa stranice svog računa na serveru.</value>
+  </data>
+  <data name="Server_Connecting" xml:space="preserve">
+    <value>Povezujem se…</value>
+  </data>
+  <data name="Server_Disconnected" xml:space="preserve">
+    <value>Odspojeno.</value>
+  </data>
+  <data name="Server_ReadingLibraries" xml:space="preserve">
+    <value>Čitam biblioteke…</value>
+  </data>
+  <data name="Server_ReadingBooks" xml:space="preserve">
+    <value>Čitam knjige…</value>
+  </data>
+  <data name="Server_ReadingBooksCount" xml:space="preserve">
+    <value>Čitam knjige… {0}</value>
+  </data>
+  <data name="Server_ReadingDetails" xml:space="preserve">
+    <value>Čitam podatke…</value>
+  </data>
+  <data name="Server_NoBookLibraries" xml:space="preserve">
+    <value>Na serveru nema biblioteke s knjigama.</value>
+  </data>
+  <data name="Server_LibraryEmpty" xml:space="preserve">
+    <value>Biblioteka „{0}” je prazna.</value>
+  </data>
+  <data name="Server_BooksInLibrary" xml:space="preserve">
+    <value>{0} knjiga u „{1}”.</value>
+  </data>
+  <data name="Server_SplitFiles" xml:space="preserve">
+    <value>{0} datoteka — još ne mogu složiti u jednu knjigu</value>
+  </data>
+  <data name="Server_SplitFilesLong" xml:space="preserve">
+    <value>Server drži zvuk razlomljen na {0} datoteka. Knjiga kod nas još može držati samo jednu, pa je ovu zasad ne mogu preuzeti.</value>
+  </data>
+  <data name="Server_NothingToDownload" xml:space="preserve">
+    <value>Ova stavka na serveru nema ni zvuka ni teksta.</value>
+  </data>
+  <data name="Server_HasBoth" xml:space="preserve">
+    <value>Audioknjiga i e-knjiga — tekst može pratiti naraciju.</value>
+  </data>
+  <data name="Server_AudioOnly" xml:space="preserve">
+    <value>Samo audioknjiga.</value>
+  </data>
+  <data name="Server_EbookOnly" xml:space="preserve">
+    <value>Samo e-knjiga.</value>
+  </data>
+  <data name="Server_DownloadingAudio" xml:space="preserve">
+    <value>Skidam zvuk — {0}</value>
+  </data>
+  <data name="Server_DownloadingText" xml:space="preserve">
+    <value>Skidam tekst — {0}</value>
+  </data>
+  <data name="Server_InLibraryNow" xml:space="preserve">
+    <value>Knjiga je u Knjigama.</value>
+  </data>
+  <data name="Server_DownloadCancelled" xml:space="preserve">
+    <value>Preuzimanje je prekinuto.</value>
+  </data>
+  <data name="Server_WhereToSave" xml:space="preserve">
+    <value>Gdje spremiti knjigu?</value>
+  </data>
+  <data name="Server_FolderNamed" xml:space="preserve">
+    <value>Mapa „{0}”</value>
+  </data>
+  <data name="Server_FolderAudiobooks" xml:space="preserve">
+    <value>Mapa Audiobooks</value>
+  </data>
+  <data name="Server_AppStorage" xml:space="preserve">
+    <value>Interna pohrana aplikacije</value>
+  </data>
+  <data name="Budget_ThriftyDetail" xml:space="preserve">
+    <value>Male jezgre, 25% vremena. Telefon se praktički ne primijeti.</value>
+  </data>
+  <data name="Budget_BalancedDetail" xml:space="preserve">
+    <value>Male jezgre, 50% vremena. Radi u pozadini dok normalno koristiš telefon.</value>
+  </data>
+  <data name="Budget_FastDetail" xml:space="preserve">
+    <value>Sve jezgre, bez pauza. Najbolje uz „samo dok puni” i ugašen ekran.</value>
+  </data>
+  <data name="Budget_EstimateHours" xml:space="preserve">
+    <value>~{0} h za 10-satnu knjigu</value>
+  </data>
+  <data name="Budget_EstimateMinutes" xml:space="preserve">
+    <value>~{0} min za 10-satnu knjigu</value>
+  </data>
+  <data name="Settings_NoBatteryLimit" xml:space="preserve">
+    <value>Bez ograničenja baterije</value>
+  </data>
+  <data name="Settings_PauseBelow" xml:space="preserve">
+    <value>Pauziraj ispod {0}% baterije</value>
+  </data>
+  <data name="Budget_Thrifty" xml:space="preserve">
+    <value>Štedljivo</value>
+  </data>
+  <data name="Budget_Balanced" xml:space="preserve">
+    <value>Uravnoteženo</value>
+  </data>
+  <data name="Budget_Fast" xml:space="preserve">
+    <value>Brzo</value>
+  </data>
+  <data name="Sync_Complete" xml:space="preserve">
+    <value>sinkronizirano</value>
+  </data>
+  <data name="Sync_Partial" xml:space="preserve">
+    <value>djelomično sinkronizirano</value>
+  </data>
+  <data name="Sync_InProgress" xml:space="preserve">
+    <value>poravnavanje u tijeku</value>
+  </data>
+  <data name="Sync_Pending" xml:space="preserve">
+    <value>čeka poravnanje</value>
+  </data>
+  <data name="Sync_Failed" xml:space="preserve">
+    <value>poravnanje nije uspjelo</value>
+  </data>
+  <data name="Gate_WaitingForCharger" xml:space="preserve">
+    <value>Čeka punjač</value>
+  </data>
+  <data name="Gate_WaitingForScreenOff" xml:space="preserve">
+    <value>Čeka da se ekran ugasi</value>
+  </data>
+  <data name="Folder_Unreadable" xml:space="preserve">
+    <value>Mapa za preuzimanje nije čitljiva.</value>
+  </data>
+  <data name="Folder_Gone" xml:space="preserve">
+    <value>Mapa za preuzimanje više ne postoji.</value>
+  </data>
+  <data name="Reader_CouldNotOpen" xml:space="preserve">
+    <value>Knjigu nije bilo moguće otvoriti.</value>
+  </data>
+  <data name="Progress_Finished" xml:space="preserve">
+    <value>Poravnanje gotovo</value>
+  </data>
+  <data name="Progress_DownloadingModel" xml:space="preserve">
+    <value>Skidanje modela…</value>
+  </data>
+  <data name="Progress_DownloadingModelPercent" xml:space="preserve">
+    <value>Skidanje modela… {0}%</value>
+  </data>
+  <data name="Progress_ChapterOf" xml:space="preserve">
+    <value>Poglavlje {0} od {1} — {2}</value>
+  </data>
+  <data name="Progress_WholeBook" xml:space="preserve">
+    <value>Poravnavam — {0}</value>
+  </data>
+  <data name="Progress_ThermalSlowed" xml:space="preserve">
+    <value> — usporeno zbog topline</value>
+  </data>
+  <data name="Notification_AlignChannel" xml:space="preserve">
+    <value>Poravnanje teksta</value>
+  </data>
+  <data name="Notification_AlignChannelBody" xml:space="preserve">
+    <value>Napredak uparivanja audioknjige s tekstom</value>
+  </data>
+  <data name="Notification_WholeBook" xml:space="preserve">
+    <value>Cijela knjiga {0} %</value>
+  </data>
+  <data name="Gate_BatteryBelow" xml:space="preserve">
+    <value>Baterija ispod {0}%</value>
+  </data>
+  <data name="Folder_NoSystemAccess" xml:space="preserve">
+    <value>Nema pristupa datotekama sustava.</value>
+  </data>
+  <data name="Folder_NotChosen" xml:space="preserve">
+    <value>Nije odabrana</value>
+  </data>
+  <data name="Folder_InternalStorage" xml:space="preserve">
+    <value>Interna pohrana</value>
+  </data>
+  <data name="Folder_NotChosenError" xml:space="preserve">
+    <value>Mapa za preuzimanje nije odabrana.</value>
+  </data>
+  <data name="Folder_CannotCreateFile" xml:space="preserve">
+    <value>Ne mogu napraviti „{0}” u odabranoj mapi.</value>
+  </data>
+  <data name="Folder_CannotWrite" xml:space="preserve">
+    <value>Ne mogu pisati u „{0}”.</value>
+  </data>
+  <data name="Folder_CannotCreateFolder" xml:space="preserve">
+    <value>Ne mogu napraviti mapu „{0}”.</value>
+  </data>
+  <data name="Import_CannotOpen" xml:space="preserve">
+    <value>Ne mogu otvoriti „{0}”.</value>
+  </data>
+  <data name="Picker_ChooseAudiobook" xml:space="preserve">
+    <value>Odaberi audioknjigu</value>
+  </data>
+  <data name="Picker_ChooseEbook" xml:space="preserve">
+    <value>Odaberi e-knjigu</value>
+  </data>
+  <data name="Picker_AddAudiobook" xml:space="preserve">
+    <value>Dodaj audioknjigu</value>
+  </data>
+  <data name="Picker_AddEbook" xml:space="preserve">
+    <value>Dodaj e-knjigu</value>
+  </data>
+  <data name="Progress_PreparingAlignment" xml:space="preserve">
+    <value>Pripremam za poravnanje…</value>
+  </data>
+  <data name="Import_NoText" xml:space="preserve">
+    <value>Iz ove datoteke nisam izvukao nikakav tekst.</value>
+  </data>
+  <data name="Progress_CopyingPercent" xml:space="preserve">
+    <value>Kopiram… {0}%</value>
+  </data>
+  <data name="Progress_CopyingMb" xml:space="preserve">
+    <value>Kopiram… {0} MB</value>
+  </data>
+  <data name="Error_ImportFailed" xml:space="preserve">
+    <value>Uvoz nije uspio: {0}</value>
+  </data>
+  <data name="Error_DeleteFailed" xml:space="preserve">
+    <value>Brisanje nije uspjelo: {0}</value>
+  </data>
+  <data name="Error_AddFailed" xml:space="preserve">
+    <value>Dodavanje nije uspjelo: {0}</value>
+  </data>
+  <data name="Align_MeasuredOf" xml:space="preserve">
+    <value>Izmjereno {0} od {1} knjige.</value>
+  </data>
+  <data name="Align_FullyAligned" xml:space="preserve">
+    <value>Poravnano u cijelosti ({0} poglavlja).</value>
+  </data>
+  <data name="Align_AlignedOf" xml:space="preserve">
+    <value>Poravnano {0} od {1} poglavlja. </value>
+  </data>
+  <data name="Align_Continue" xml:space="preserve">
+    <value>Nastavi poravnanje</value>
+  </data>
+  <data name="Align_Start" xml:space="preserve">
+    <value>Pokreni poravnanje</value>
+  </data>
+  <data name="Chapter_Toggle" xml:space="preserve">
+    <value>Poglavlja ({0})  {1}</value>
+  </data>
+  <data name="Player_SleepAfterTitle" xml:space="preserve">
+    <value>Zaustavi nakon</value>
+  </data>
+  <data name="Bookmarks_LimitReachedBook" xml:space="preserve">
+    <value>Dosegnut je limit od {0} bookmarka za ovu knjigu.</value>
+  </data>
+  <data name="Bookmarks_SavedAt" xml:space="preserve">
+    <value>Spremljeno na {0}</value>
+  </data>
+  <data name="Bookmarks_Saved" xml:space="preserve">
+    <value>Spremljeno</value>
+  </data>
+  <data name="Bookmarks_AtChar" xml:space="preserve">
+    <value>znak {0}</value>
+  </data>
+  <data name="Media_TextOnly" xml:space="preserve">
+    <value>Samo tekst</value>
+  </data>
+  <data name="Duration_HoursMinutes" xml:space="preserve">
+    <value>{0} h {1} min</value>
+  </data>
+  <data name="Duration_Minutes" xml:space="preserve">
+    <value>{0} min</value>
+  </data>
+  <data name="Reader_FollowOn" xml:space="preserve">
+    <value>Prati ✓</value>
+  </data>
+  <data name="Reader_Follow" xml:space="preserve">
+    <value>Prati</value>
+  </data>
+  <data name="Reader_Appearance" xml:space="preserve">
+    <value>Izgled stranice</value>
+  </data>
+  <data name="Reader_PageOf" xml:space="preserve">
+    <value>str. {0} / {1}</value>
+  </data>
+  <data name="Server_Cancelling" xml:space="preserve">
+    <value>Prekidam preuzimanje…</value>
+  </data>
+  <data name="Server_OneBook" xml:space="preserve">
+    <value>1 knjiga</value>
+  </data>
+  <data name="Server_BookCount" xml:space="preserve">
+    <value>{0} knjiga</value>
+  </data>
+  <data name="Server_RecentlyAdded" xml:space="preserve">
+    <value>Nedavno dodano</value>
+  </data>
+  <data name="Server_NoSeries" xml:space="preserve">
+    <value>Bez serije</value>
+  </data>
+  <data name="Chapter_Count" xml:space="preserve">
+    <value>{0} poglavlja</value>
+  </data>
+  <data name="Common_Stop" xml:space="preserve">
+    <value>Zaustavi</value>
+  </data>
+  <data name="Download_Preparing" xml:space="preserve">
+    <value>Pripremam…</value>
+  </data>
+  <data name="Notification_DownloadChannel" xml:space="preserve">
+    <value>Preuzimanja</value>
+  </data>
+  <data name="Notification_DownloadChannelBody" xml:space="preserve">
+    <value>Napredak preuzimanja knjiga sa servera</value>
+  </data>
+  <data name="Download_AlreadyRunning" xml:space="preserve">
+    <value>Već se preuzima druga knjiga. Pričekaj da završi.</value>
+  </data>
+  <data name="Destination_FolderTitle" xml:space="preserve">
+    <value>Mapa Audiobooks</value>
+  </data>
+  <data name="Destination_FolderBody" xml:space="preserve">
+    <value>Uz audioknjige koje već imaš na telefonu. Vide je druge aplikacije i računalo preko kabela, i ostaje ako makneš ovu aplikaciju.</value>
+  </data>
+  <data name="Destination_FolderChosen" xml:space="preserve">
+    <value>Sada: {0}</value>
+  </data>
+  <data name="Destination_FolderWillAsk" xml:space="preserve">
+    <value>Sustav će tražiti da potvrdiš mapu.</value>
+  </data>
+  <data name="Destination_AppTitle" xml:space="preserve">
+    <value>Interna pohrana aplikacije</value>
+  </data>
+  <data name="Destination_AppBody" xml:space="preserve">
+    <value>Vlastiti prostor aplikacije. Ništa drugo na telefonu je ne vidi, i briše se zajedno s aplikacijom.</value>
+  </data>
+  <data name="Destination_Layout" xml:space="preserve">
+    <value>Knjige se slažu u mapu autora, pa u mapu knjige.</value>
+  </data>
+  <data name="Help_Title" xml:space="preserve">
+    <value>Kako radi poravnanje</value>
+  </data>
+  <data name="Help_WhatSection" xml:space="preserve">
+    <value>Što radi</value>
+  </data>
+  <data name="Help_WhatBody" xml:space="preserve">
+    <value>Uparivanje audioknjige s tekstom znači naći, za svaku rečenicu, trenutak kad je izgovorena. Telefon to računa sam: sluša kratke uzorke i traži ono što je čuo u tekstu same knjige. Ništa se nikamo ne šalje.</value>
+  </data>
+  <data name="Help_WaysSection" xml:space="preserve">
+    <value>Dva puta do istog</value>
+  </data>
+  <data name="Help_LiveTitle" xml:space="preserve">
+    <value>U hodu</value>
+  </data>
+  <data name="Help_LiveBody" xml:space="preserve">
+    <value>Mjeri dio na kojem jesi, od mjesta gdje je naracija, dok je čitač otvoren. Nema čekanja — tekst počne pratiti za nekoliko sekundi — ali samo za ono što stvarno pročitaš.</value>
+  </data>
+  <data name="Help_AheadTitle" xml:space="preserve">
+    <value>Unaprijed</value>
+  </data>
+  <data name="Help_AheadBody" xml:space="preserve">
+    <value>Prolazi cijelu knjigu u pozadini da bude gotovo prije nego dođeš do tamo. Na njega se odnose postavke ispod.</value>
+  </data>
+  <data name="Help_PresetsSection" xml:space="preserve">
+    <value>Tri postavke</value>
+  </data>
+  <data name="Help_PresetThrifty" xml:space="preserve">
+    <value>Dvije niti na malim jezgrama, četvrtinu vremena. Praktički se ne primijeti — i daleko je najsporije.</value>
+  </data>
+  <data name="Help_PresetBalanced" xml:space="preserve">
+    <value>Četiri niti na malim jezgrama, pola vremena. Telefon ostaje gladak za sve ostalo dok radi.</value>
+  </data>
+  <data name="Help_PresetFast" xml:space="preserve">
+    <value>Sve jezgre, bez pauza. Nekoliko puta brže od druga dva, i telefon će se zagrijati.</value>
+  </data>
+  <data name="Help_SlowerSection" xml:space="preserve">
+    <value>Zašto zna biti sporije od procjene</value>
+  </data>
+  <data name="Help_SlowerHeat" xml:space="preserve">
+    <value>Toplina. Čim sustav javi da se telefon grije, aplikacija sama uspori — prvo na sedam desetina tempa, pa dalje, a na vrućem telefonu stane. To je namjerno: guranje kroz zagrijan telefon odradi isti posao upola sporije i drži ga vrućim.</value>
+  </data>
+  <data name="Help_SlowerCores" xml:space="preserve">
+    <value>Uspavan telefon. Posao se nastavlja i s ugašenim ekranom — aplikacija drži procesor budnim — ali Štedljivo i Uravnoteženo koriste isključivo male jezgre, a besposlen telefon ih vrti na najnižoj brzini. Zato u džepu znaju puzati, dok Brzo i dalje radi.</value>
+  </data>
+  <data name="Help_DoneSection" xml:space="preserve">
+    <value>Što stvarno dovrši knjigu</value>
+  </data>
+  <data name="Help_DoneCharging" xml:space="preserve">
+    <value>Brzo, uz „samo dok puni” i „samo dok je ekran ugašen”, preko noći. Za to služe ona dva prekidača u Postavkama.</value>
+  </data>
+  <data name="Help_DoneReading" xml:space="preserve">
+    <value>Ili uopće ne čekaj: otvori čitač i čitaj uz naraciju. Poravnanje u hodu mjeri točno dio na kojem jesi, a ostatak knjige neka završi kad stigne.</value>
+  </data>
+  <data name="Help_PausedSection" xml:space="preserve">
+    <value>Kad stane sam od sebe</value>
+  </data>
+  <data name="Help_PausedBody" xml:space="preserve">
+    <value>Notifikacija uvijek kaže zašto: čeka punjač, čeka da se ekran ugasi, ili je baterija ispod granice koju si postavio. Ništa se ne gubi — deset minuta bez punjača košta deset minuta, ne poglavlje.</value>
+  </data>
+  <data name="Delete_Title" xml:space="preserve">
+    <value>Brisanje</value>
+  </data>
+  <data name="Delete_AlsoFile" xml:space="preserve">
+    <value>Obriši i datoteku</value>
+  </data>
+  <data name="Delete_AlsoFileNote" xml:space="preserve">
+    <value>Miče je s telefona, ne samo iz ove biblioteke. Povratka nema.</value>
+  </data>
+  <data name="Delete_FileKept" xml:space="preserve">
+    <value>Knjige više nema u biblioteci. Datoteka je i dalje na telefonu.</value>
+  </data>
+  <data name="Delete_FileRefused" xml:space="preserve">
+    <value>Knjige više nema u biblioteci, ali datoteku nisam mogao obrisati — možda je istekla dozvola ili je datoteka premještena.</value>
+  </data>
+  <data name="Delete_RemoveAudioTitle" xml:space="preserve">
+    <value>Ukloniti audioknjigu?</value>
+  </data>
+  <data name="Delete_RemoveEbookTitle" xml:space="preserve">
+    <value>Ukloniti e-knjigu?</value>
+  </data>
+  <data name="Details_LiveAlignmentNote" xml:space="preserve">
+    <value>Mjeri dio koji čitaš, dok ga čitaš. Nema čekanja.</value>
+  </data>
+  <data name="Details_AlignAheadNote" xml:space="preserve">
+    <value>Prolazi cijelu knjigu u pozadini, da bude gotovo prije nego dođeš do tamo.</value>
+  </data>
+  <data name="Settings_RecognitionSection" xml:space="preserve">
+    <value>Točnost prepoznavanja</value>
+  </data>
+  <data name="Settings_RecognitionBody" xml:space="preserve">
+    <value>Koji model sluša knjigu. Bolji manje krivo čuje, pa se manje dijelova odbaci i prepusti procjeni — a upravo to drži tekst bliže glasu.</value>
+  </data>
+  <data name="Recognition_Tiny" xml:space="preserve">
+    <value>Standardno</value>
+  </data>
+  <data name="Recognition_TinyDetail" xml:space="preserve">
+    <value>Mali model, oko 31 MB. Ono što je aplikacija koristila dosad.</value>
+  </data>
+  <data name="Recognition_Base" xml:space="preserve">
+    <value>Točnije</value>
+  </data>
+  <data name="Recognition_BaseDetail" xml:space="preserve">
+    <value>Model jednu veličinu veći, oko 58 MB. Poravnanje traje otprilike tri puta dulje, a osjetno je bolji na jezicima koji nisu engleski. Skida se pri prvom poravnanju.</value>
+  </data>
+  <data name="Settings_WordTimes" xml:space="preserve">
+    <value>Mjeri vrijeme svake riječi</value>
+  </data>
+  <data name="Settings_WordTimesNote" xml:space="preserve">
+    <value>Pita model kad je koja riječ izgovorena umjesto da pretpostavi ravnomjeran tempo kroz nekoliko sekundi. Točnije svugdje gdje narator zastane usred rečenice. Isključi ako ti poravnanje postane sporije.</value>
+  </data>
+  <data name="Server_UnknownAuthor" xml:space="preserve">
+    <value>Nepoznat autor</value>
+  </data>
+</root>

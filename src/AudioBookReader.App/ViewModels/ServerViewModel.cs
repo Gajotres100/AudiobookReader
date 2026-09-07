@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 using System.Collections.ObjectModel;
 using AudioBookReader.App.Services;
 using AudioBookReader.Core.Servers;
@@ -36,7 +37,7 @@ public class ServerBookRow(ServerBook book, string coverUrl)
     /// commonest shape on a server and the one thing here that cannot be brought over yet.
     /// </summary>
     public string Note { get; } = book.AudioFileCount > 1
-        ? $"{book.AudioFileCount} datoteka — još ne mogu složiti u jednu knjigu"
+        ? string.Format(Strings.Server_SplitFiles, book.AudioFileCount)
         : book.DurationSeconds > 0
             ? $"{TimeSpan.FromSeconds(book.DurationSeconds):h\\:mm}"
             : "";
@@ -53,7 +54,9 @@ public class Shelf(string name, IReadOnlyList<ServerBookRow> books) : List<Serve
 {
     public string Name { get; } = name;
 
-    public string Summary { get; } = books.Count == 1 ? "1 knjiga" : $"{books.Count} knjiga";
+    public string Summary { get; } = books.Count == 1
+        ? Strings.Server_OneBook
+        : string.Format(Strings.Server_BookCount, books.Count);
 }
 
 public partial class ServerViewModel(ServerConnection server) : ObservableObject
@@ -136,14 +139,14 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
     [RelayCommand]
     private Task ConnectAsync() => GuardAsync(async () =>
     {
-        if (string.IsNullOrWhiteSpace(Url)) throw new InvalidOperationException("Upiši adresu servera.");
+        if (string.IsNullOrWhiteSpace(Url)) throw new InvalidOperationException(Strings.Server_EnterAddress);
 
-        Status = "Povezujem se…";
+        Status = Strings.Server_Connecting;
 
         if (UsesToken)
         {
             if (string.IsNullOrWhiteSpace(Token))
-                throw new InvalidOperationException("Zalijepi token sa stranice svog računa na serveru.");
+                throw new InvalidOperationException(Strings.Server_PasteToken);
 
             await server.ConnectWithTokenAsync(Url.Trim(), Token.Trim());
         }
@@ -174,13 +177,13 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         Shelves.Clear();
         Libraries.Clear();
 
-        Status = "Odspojeno.";
+        Status = Strings.Server_Disconnected;
     }
 
     [RelayCommand]
     private Task RefreshAsync() => GuardAsync(async () =>
     {
-        Status = "Čitam biblioteke…";
+        Status = Strings.Server_ReadingLibraries;
 
         Libraries.Clear();
         foreach (var library in await server.GetLibrariesAsync()) Libraries.Add(library);
@@ -189,7 +192,7 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
 
         if (Libraries.Count == 0)
         {
-            Status = "Na serveru nema biblioteke s knjigama.";
+            Status = Strings.Server_NoBookLibraries;
             return;
         }
 
@@ -212,9 +215,9 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         if (SelectedLibrary is not { } library) return;
 
         Shelves.Clear();
-        Status = "Čitam knjige…";
+        Status = Strings.Server_ReadingBooks;
 
-        var found = new Progress<int>(count => Status = $"Čitam knjige… {count}");
+        var found = new Progress<int>(count => Status = string.Format(Strings.Server_ReadingBooksCount, count));
         var books = await server.GetBooksAsync(library.Id, found);
 
         AppLog.Info($"server: {books.Count} books in '{library.Name}'");
@@ -222,8 +225,8 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         foreach (var shelf in Arrange(books)) Shelves.Add(shelf);
 
         Status = books.Count == 0
-            ? $"Biblioteka „{library.Name}” je prazna."
-            : $"{books.Count} knjiga u „{library.Name}”.";
+            ? string.Format(Strings.Server_LibraryEmpty, library.Name)
+            : string.Format(Strings.Server_BooksInLibrary, books.Count, library.Name);
     });
 
     private ServerBookRow Row(ServerBook book) => new(book, server.CoverUrl(book.Id));
@@ -245,7 +248,7 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
             .Select(Row)
             .ToList();
 
-        if (newest.Count > 0) yield return new Shelf("Nedavno dodano", newest);
+        if (newest.Count > 0) yield return new Shelf(Strings.Server_RecentlyAdded, newest);
 
         var series = books
             .Where(b => b.InSeries)
@@ -263,7 +266,7 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
 
         foreach (var shelf in series) yield return shelf;
 
-        if (loose.Count > 0) yield return new Shelf("Bez serije", loose);
+        if (loose.Count > 0) yield return new Shelf(Strings.Server_NoSeries, loose);
     }
 
     /// <summary>

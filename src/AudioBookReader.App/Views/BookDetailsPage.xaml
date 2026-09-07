@@ -3,6 +3,7 @@
     x:Class="AudioBookReader.App.Views.BookDetailsPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:BookViewModel"
     Shell.NavBarIsVisible="False"
@@ -67,41 +68,72 @@
                 <Border IsVisible="{Binding IsPaired}" Style="{StaticResource Card}">
                     <VerticalStackLayout Spacing="14">
 
-                        <Label Style="{StaticResource Section}" Text="Poravnanje teksta i naracije" />
-
-                        <!--  Two ways to the same thing, so they are a choice, not two settings.  -->
-                        <Grid
-                            ColumnDefinitions="*,Auto"
-                            RowDefinitions="Auto,Auto,Auto"
-                            RowSpacing="12">
-
+                        <!--  The heading, and the way to find out what any of it means.  -->
+                        <Grid ColumnDefinitions="*,Auto">
                             <Label
-                                Grid.Row="0"
                                 Grid.Column="0"
-                                Text="Poravnavanje u hodu"
+                                Style="{StaticResource Section}"
+                                Text="{x:Static s:Strings.Details_AlignmentSection}"
                                 VerticalOptions="Center" />
-                            <Switch
-                                Grid.Row="0"
-                                Grid.Column="1"
-                                IsToggled="{Binding MeasuresWhileReading}" />
 
-                            <BoxView
-                                Grid.Row="1"
-                                Grid.ColumnSpan="2"
-                                Style="{StaticResource Divider}" />
-
-                            <Label
-                                Grid.Row="2"
-                                Grid.Column="0"
-                                Text="Poravnaj cijelu knjigu unaprijed"
-                                VerticalOptions="Center" />
-                            <Switch
-                                Grid.Row="2"
+                            <Button
                                 Grid.Column="1"
-                                IsToggled="{Binding AlignsInAdvance}" />
+                                Clicked="OnAlignmentHelp"
+                                Style="{StaticResource Icon}"
+                                Text="?" />
                         </Grid>
 
-                        <Label Style="{StaticResource Muted}" Text="{Binding AlignmentSummary}" />
+                        <!--
+                            Two ways to the same thing, so they are a choice rather than two
+                            settings — but each one boxed on its own.
+
+                            They used to be two bare rows sharing one paragraph underneath, which
+                            left that paragraph belonging to neither: it described the first option
+                            while sitting under the second, and the alignment summary hung below
+                            both, describing something else again. Each option now carries its own
+                            line, inside its own outline, and the summary sits under the option it
+                            is actually about.
+                        -->
+                        <Border Style="{StaticResource Choice}">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <VerticalStackLayout Grid.Column="0" Spacing="3">
+                                    <Label
+                                        FontFamily="OpenSansSemibold"
+                                        Text="{x:Static s:Strings.Details_LiveAlignment}" />
+                                    <Label
+                                        Style="{StaticResource Muted}"
+                                        Text="{x:Static s:Strings.Details_LiveAlignmentNote}" />
+                                </VerticalStackLayout>
+
+                                <Switch
+                                    Grid.Column="1"
+                                    IsToggled="{Binding MeasuresWhileReading}"
+                                    VerticalOptions="Center" />
+                            </Grid>
+                        </Border>
+
+                        <Border Style="{StaticResource Choice}">
+                            <VerticalStackLayout Spacing="10">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="3">
+                                        <Label
+                                            FontFamily="OpenSansSemibold"
+                                            Text="{x:Static s:Strings.Details_AlignAhead}" />
+                                        <Label
+                                            Style="{StaticResource Muted}"
+                                            Text="{x:Static s:Strings.Details_AlignAheadNote}" />
+                                    </VerticalStackLayout>
+
+                                    <Switch
+                                        Grid.Column="1"
+                                        IsToggled="{Binding AlignsInAdvance}"
+                                        VerticalOptions="Center" />
+                                </Grid>
+
+                                <!--  Where this book has got to, under the option it describes.  -->
+                                <Label Style="{StaticResource Muted}" Text="{Binding AlignmentSummary}" />
+                            </VerticalStackLayout>
+                        </Border>
 
                         <!--  What is happening right now, when something is.  -->
                         <VerticalStackLayout IsVisible="{Binding IsAligning}" Spacing="10">
@@ -145,7 +177,7 @@
                             Command="{Binding StopAlignmentCommand}"
                             IsVisible="{Binding IsAligning}"
                             Style="{StaticResource Secondary}"
-                            Text="Zaustavi poravnanje" />
+                            Text="{x:Static s:Strings.Details_StopAlignment}" />
 
                         <Button
                             Command="{Binding RealignCommand}"
@@ -160,28 +192,28 @@
                 <Border Style="{StaticResource Card}">
                     <VerticalStackLayout Spacing="10">
 
-                        <Label Style="{StaticResource Section}" Text="Datoteke" />
+                        <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Details_FilesSection}" />
 
                         <Button
                             Command="{Binding AddAudioCommand}"
                             IsVisible="{Binding HasNoAudio}"
                             Style="{StaticResource Secondary}"
-                            Text="Dodaj audioknjigu" />
+                            Text="{x:Static s:Strings.Details_AddAudio}" />
                         <Button
                             Command="{Binding RemoveAudioCommand}"
                             IsVisible="{Binding CanRemoveAudio}"
                             Style="{StaticResource Secondary}"
-                            Text="Ukloni audioknjigu" />
+                            Text="{x:Static s:Strings.Details_RemoveAudio}" />
                         <Button
                             Command="{Binding AddEbookCommand}"
                             IsVisible="{Binding HasNoText}"
                             Style="{StaticResource Secondary}"
-                            Text="Dodaj e-knjigu" />
+                            Text="{x:Static s:Strings.Details_AddEbook}" />
                         <Button
                             Command="{Binding RemoveEbookCommand}"
                             IsVisible="{Binding CanRemoveText}"
                             Style="{StaticResource Secondary}"
-                            Text="Ukloni e-knjigu" />
+                            Text="{x:Static s:Strings.Details_RemoveEbook}" />
                     </VerticalStackLayout>
                 </Border>
 
@@ -190,7 +222,7 @@
                     Command="{Binding DeleteBookCommand}"
                     Margin="0,6,0,0"
                     Style="{StaticResource Destructive}"
-                    Text="Obriši knjigu" />
+                    Text="{x:Static s:Strings.Details_DeleteBook}" />
             </VerticalStackLayout>
         </ScrollView>
     </Grid>

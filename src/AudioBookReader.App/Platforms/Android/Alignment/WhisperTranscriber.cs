@@ -15,19 +15,35 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
     private readonly WhisperProcessor _processor;
     private readonly SemaphoreSlim _oneAtATime = new(1, 1);
     private readonly bool _backgroundPriority;
+    private readonly bool _wordTimestamps;
 
-    private WhisperTranscriber(WhisperFactory factory, WhisperProcessor processor, bool backgroundPriority)
+    private WhisperTranscriber(
+        WhisperFactory factory,
+        WhisperProcessor processor,
+        bool backgroundPriority,
+        bool wordTimestamps)
     {
         _factory = factory;
         _processor = processor;
         _backgroundPriority = backgroundPriority;
+        _wordTimestamps = wordTimestamps;
     }
 
     /// <param name="language">
     /// A language code, or "auto" to detect. Naming it is worth doing: detection is an extra pass
     /// over the audio for something the book already tells us.
     /// </param>
-    public static WhisperTranscriber Create(string modelPath, CpuBudget budget, string language = "auto")
+    /// <param name="wordTimestamps">
+    /// Ask the model when each word was spoken, instead of placing them by spreading the segment
+    /// evenly. This is post-processing over attention weights the decoder computes anyway, so it
+    /// should cost a few percent rather than a multiple — but it is marked experimental upstream
+    /// and has not been timed on every device, which is why it can be turned off.
+    /// </param>
+    public static WhisperTranscriber Create(
+        string modelPath,
+        CpuBudget budget,
+        string language = "auto",
+        bool wordTimestamps = true)
     {
         var factory = WhisperFactory.FromPath(modelPath);
 
@@ -41,14 +57,17 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
             // a text we already have.
             .WithGreedySamplingStrategy(greedy => greedy.WithBestOf(1));
 
+        if (wordTimestamps) builder = builder.WithTokenTimestamps();
+
         var threads = budget.ResolveThreads(Environment.ProcessorCount);
         builder = builder.WithThreads(threads);
 
         AppLog.Info(
-            $"whisper: preset '{budget.Name}', {threads} threads of {Environment.ProcessorCount} cores, " +
-            $"{(budget.BackgroundPriority ? "little cores" : "all cores")}, duty {budget.DutyCycle:P0}");
+            $"whisper: preset '{budget.Id}', {threads} threads of {Environment.ProcessorCount} cores, " +
+            $"{(budget.BackgroundPriority ? "little cores" : "all cores")}, duty {budget.DutyCycle:P0}, " +
+            $"{(wordTimestamps ? "word times" : "segment times")}, model '{System.IO.Path.GetFileName(modelPath)}'");
 
-        return new WhisperTranscriber(factory, builder.Build(), budget.BackgroundPriority);
+        return new WhisperTranscriber(factory, builder.Build(), budget.BackgroundPriority, wordTimestamps);
     }
 
     public async Task<Transcript> TranscribeAsync(
@@ -174,13 +193,63 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
         var segments = new List<TranscriptSegment>();
 
         await foreach (var segment in _processor.ProcessAsync(samples, ct))
+        {
+            var from = startMs + (long)segment.Start.TotalMilliseconds;
+            var to = startMs + (long)segment.End.TotalMilliseconds;
+
             segments.Add(new TranscriptSegment(
-                startMs + (long)segment.Start.TotalMilliseconds,
-                startMs + (long)segment.End.TotalMilliseconds,
-                segment.Text));
+                from,
+                to,
+                segment.Text,
+                _wordTimestamps ? WordsOf(segment, startMs, from, to) : null,
+                segment.Probability,
+                segment.NoSpeechProbability));
+        }
 
         return Transcript.FromSegments(segments);
     }
+
+    /// <summary>
+    /// The segment's words with the time each was spoken, or null if the times are not usable.
+    ///
+    /// Validated rather than trusted. Token times are only meaningful when token timestamps were
+    /// asked for, they are reported in a unit the binding does not describe, and a model that
+    /// wandered can report times outside the segment it just gave. Checking them against the
+    /// segment's own bounds catches all three at once, and failing that check costs nothing: the
+    /// caller falls back to spreading the segment evenly, which is what it did before.
+    /// </summary>
+    private static IReadOnlyList<TimedWord>? WordsOf(SegmentData segment, long startMs, long from, long to)
+    {
+        if (segment.Tokens is not { Length: > 0 } tokens) return null;
+
+        var spoken = new List<SpokenToken>(tokens.Length);
+
+        foreach (var token in tokens)
+        {
+            // whisper reports token times in hundredths of a second, the same unit it uses for
+            // segments. Relative to the buffer, so the probe's own start goes back on.
+            var at = startMs + token.Start * 10;
+
+            // A token outside the segment that produced it is not a timing, it is noise. One is
+            // enough to distrust the lot: they are only useful as a monotone run, and a run with a
+            // hole in it places words worse than an even spread does.
+            if (at < from - Tolerance || at > to + Tolerance) return null;
+
+            spoken.Add(new SpokenToken(token.Text ?? "", Math.Clamp(at, from, to)));
+        }
+
+        var words = TokenWords.Merge(spoken);
+
+        // Nothing survived merging: all control tokens, or all punctuation. Not a failure, but
+        // there is nothing here to time.
+        return words.Count > 0 ? words : null;
+    }
+
+    /// <summary>
+    /// How far outside its segment a token's time may land before the segment's times are refused.
+    /// Rounding between units accounts for a few milliseconds; a second means something is wrong.
+    /// </summary>
+    private const long Tolerance = 1_000;
 
     /// <summary>
     /// Drops the calling thread to background priority for the duration of one piece of work.

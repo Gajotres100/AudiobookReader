@@ -1,5 +1,7 @@
+using AudioBookReader.App.Resources.Strings;
 using AudioBookReader.App.Services;
 using AudioBookReader.Core.Data;
+using AudioBookReader.App.Views;
 using AudioBookReader.Core.Servers;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -14,11 +16,68 @@ namespace AudioBookReader.App.ViewModels;
 /// voice, and — the one that decides everything — whether the server keeps it as one file or forty.
 /// </summary>
 [QueryProperty(nameof(ItemId), "id")]
-public partial class ServerBookViewModel(
-    ServerConnection server,
-    LibraryDatabase database,
-    DownloadFolder folder) : ObservableObject
+public partial class ServerBookViewModel : ObservableObject
 {
+    private readonly ServerConnection _server;
+    private readonly LibraryDatabase _database;
+    private readonly DownloadQueue _downloads;
+
+    /// <summary>
+    /// Watches the download queue rather than owning the transfer.
+    ///
+    /// The download lives in a foreground service now, so it outlives this page — and this page
+    /// outlives nothing: leave it and come back and it is a new object. Subscribing means a page
+    /// reopened mid-download shows where the transfer got to instead of an idle Preuzmi button
+    /// over a book that is already half here.
+    /// </summary>
+    public ServerBookViewModel(
+        ServerConnection server,
+        LibraryDatabase database,
+        DownloadQueue downloads)
+    {
+        _server = server;
+        _database = database;
+        _downloads = downloads;
+
+    }
+
+    /// <summary>
+    /// Starts listening, and catches up on anything already under way.
+    ///
+    /// Called every time the page comes forward rather than once, because pushing the destination
+    /// chooser over it counts as going away — and a page that unsubscribed on its way to asking
+    /// where the book goes would hear nothing about the download it then started.
+    /// </summary>
+    public void Attach()
+    {
+        _downloads.Changed -= OnDownloadChanged;
+        _downloads.Changed += OnDownloadChanged;
+
+        if (_downloads.Status.ItemId == ItemId) Show(_downloads.Status);
+    }
+
+    /// <summary>Called by the page as it goes, so a page nobody can see stops holding the queue.</summary>
+    public void Detach() => _downloads.Changed -= OnDownloadChanged;
+
+    private void OnDownloadChanged(object? sender, DownloadStatus status)
+    {
+        // Another book's download is none of this page's business, except that it is the reason
+        // this one cannot start yet — which the button says on its own.
+        if (status.ItemId != ItemId) return;
+
+        MainThread.BeginInvokeOnMainThread(() => Show(status));
+    }
+
+    private void Show(DownloadStatus status)
+    {
+        IsDownloading = status.IsRunning;
+        Progress = status.Fraction;
+        Percent = status.Percent;
+        Status = status.Message;
+
+        if (status.BookId is { } id) BookId = id;
+    }
+
     public string ItemId { get; set; } = "";
 
     private ServerBookDetail? _detail;
@@ -71,6 +130,13 @@ public partial class ServerBookViewModel(
     [ObservableProperty]
     public partial double Progress { get; set; }
 
+    /// <summary>How far along, as a figure. A bar says whether it moves; this says how much is left.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPercent))]
+    public partial string Percent { get; set; } = "";
+
+    public bool HasPercent => Percent.Length > 0;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasStatus))]
     public partial string Status { get; set; } = "";
@@ -89,46 +155,50 @@ public partial class ServerBookViewModel(
         if (_detail is not null || string.IsNullOrEmpty(ItemId)) return;
 
         IsBusy = true;
-        Status = "Čitam podatke…";
+        Status = Strings.Server_ReadingDetails;
 
         try
         {
-            _detail = await server.GetBookAsync(ItemId);
+            _detail = await _server.GetBookAsync(ItemId);
 
             var book = _detail.Book;
 
             Title = book.Title;
             Author = book.Author ?? "";
-            CoverUrl = server.CoverUrl(book.Id);
+            CoverUrl = _server.CoverUrl(book.Id);
             Series = book.InSeries
                 ? string.IsNullOrEmpty(book.Sequence) ? book.Series! : $"{book.Series} #{book.Sequence}"
                 : "";
 
             Contents = Describe(book);
             Length = book.DurationSeconds > 0
-                ? $"Trajanje {TimeSpan.FromSeconds(book.DurationSeconds):h\\:mm\\:ss}"
+                ? string.Format(Strings.Duration_Label, TimeSpan.FromSeconds(book.DurationSeconds).ToString(@"h\:mm\:ss"))
                 : "";
 
-            Chapters = _detail.Chapters.Count > 0 ? $"{_detail.Chapters.Count} poglavlja" : "";
+            Chapters = _detail.Chapters.Count > 0
+                ? string.Format(Strings.Chapter_Count, _detail.Chapters.Count)
+                : "";
 
             // The one thing that decides whether this can be brought over at all, said here rather
             // than discovered by pressing a button that then refuses.
             Obstacle = _detail.AudioFiles.Count > 1
-                ? $"Server drži zvuk razlomljen na {_detail.AudioFiles.Count} datoteka. Knjiga kod nas " +
-                  "još može držati samo jednu, pa je ovu zasad ne mogu preuzeti."
+                ? string.Format(Strings.Server_SplitFilesLong, _detail.AudioFiles.Count)
                 : _detail.AudioFiles.Count == 0 && _detail.Ebook is null
-                    ? "Ova stavka na serveru nema ni zvuka ni teksta."
+                    ? Strings.Server_NothingToDownload
                     : "";
 
             CanDownload = Obstacle.Length == 0;
 
             // Already here? Then say so instead of offering to fetch it twice. Matched by title,
             // which is all the two sides share before a file has been downloaded and hashed.
-            BookId = (await database.GetBooksAsync())
+            BookId = (await _database.GetBooksAsync())
                 .FirstOrDefault(b => string.Equals(b.Title, book.Title, StringComparison.CurrentCultureIgnoreCase))
                 ?.Id;
 
-            Status = "";
+            // A download for this book may already be running — started here and then left, or
+            // still going from before this page existed. That outranks the empty line that means
+            // nothing is happening.
+            Show(_downloads.Status.ItemId == ItemId ? _downloads.Status : new DownloadStatus());
         }
         catch (Exception ex)
         {
@@ -143,19 +213,17 @@ public partial class ServerBookViewModel(
 
     private static string Describe(ServerBook book) => (book.HasAudio, book.HasEbook) switch
     {
-        (true, true) => "Audioknjiga i e-knjiga — tekst može pratiti naraciju.",
-        (true, false) => "Samo audioknjiga.",
-        (false, true) => "Samo e-knjiga.",
+        (true, true) => Strings.Server_HasBoth,
+        (true, false) => Strings.Server_AudioOnly,
+        (false, true) => Strings.Server_EbookOnly,
         _ => "",
     };
-
-    private CancellationTokenSource? _downloading;
 
     [RelayCommand]
     private void Cancel()
     {
-        _downloading?.Cancel();
-        Status = "Prekidam preuzimanje…";
+        _downloads.Stop();
+        Status = Strings.Server_Cancelling;
     }
 
     [RelayCommand]
@@ -163,44 +231,24 @@ public partial class ServerBookViewModel(
     {
         if (_detail is null || !CanDownload || IsDownloading) return;
 
-        if (await AgreeOnAFolderAsync() is not { } toAppStorage) return;
+        // One at a time. Two large transfers over one phone connection finish no sooner together
+        // than in turn, and a second foreground service would post a second permanent notification.
+        if (_downloads.Status.IsRunning)
+        {
+            Status = Strings.Download_AlreadyRunning;
+            return;
+        }
 
-        using var downloading = new CancellationTokenSource();
+        if (await AgreeOnADestinationAsync() is not { } toAppStorage) return;
 
-        _downloading = downloading;
         IsDownloading = true;
         Progress = 0;
+        Percent = "";
+        Status = Strings.Download_Preparing;
 
-        try
-        {
-            var progress = new Progress<ImportProgress>(p =>
-            {
-                Status = p.Message;
-                Progress = p.Fraction;
-            });
-
-            BookId = await server.ImportAsync(
-                _detail.Book, progress, downloading.Token, toAppStorage);
-
-            Status = "Knjiga je u Knjigama.";
-        }
-        catch (OperationCanceledException)
-        {
-            // Whatever was written is deleted by the code that was writing it, whichever way this
-            // ended, so there is nothing half-finished left behind.
-            Status = "Preuzimanje je prekinuto.";
-        }
-        catch (Exception ex)
-        {
-            AppLog.Error("downloading a book from the server", ex);
-            Status = ex.Message;
-        }
-        finally
-        {
-            _downloading = null;
-            IsDownloading = false;
-            Progress = 0;
-        }
+        // Handed to a service and forgotten. Everything from here arrives through the queue, which
+        // is what lets it carry on with this page closed and the screen locked.
+        _downloads.Start(ItemId, Title, toAppStorage);
     }
 
     /// <summary>
@@ -213,25 +261,21 @@ public partial class ServerBookViewModel(
     ///
     /// Asked here and nowhere else. The page used to offer a folder too, which made the same
     /// decision available twice with no way to tell which one had won.
+    ///
+    /// A page rather than an action sheet, because the difference between the two answers does not
+    /// fit on one line and is the whole point of asking.
     /// </summary>
     /// <returns>Whether to use app storage, or null when the download was called off.</returns>
-    private async Task<bool?> AgreeOnAFolderAsync()
+    private static async Task<bool?> AgreeOnADestinationAsync()
     {
-        var mine = folder.IsChosen ? $"Mapa „{folder.Describe()}”" : "Mapa Audiobooks";
-        const string appStorage = "Interna pohrana aplikacije";
+        var services = IPlatformApplication.Current?.Services;
+        if (services is null) return null;
 
-        var chosen = await Shell.Current.DisplayActionSheetAsync(
-            "Gdje spremiti knjigu?", "Odustani", null, mine, appStorage);
+        var page = services.GetRequiredService<DownloadDestinationPage>();
 
-        if (chosen is null || chosen == "Odustani") return null;
-        if (chosen == appStorage) return true;
+        await Shell.Current.Navigation.PushModalAsync(page);
 
-        // Already granted, so nothing to ask. Otherwise the picker opens at Audiobooks: the system
-        // will not hand over a folder without someone confirming it, but it will start them in the
-        // right place, which makes this one tap rather than a hunt.
-        if (folder.IsChosen) return false;
-
-        return await folder.ChooseAsync() is null ? null : false;
+        return await page.Answer;
     }
 
     [RelayCommand]

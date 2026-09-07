@@ -3,10 +3,11 @@
     x:Class="AudioBookReader.App.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:SettingsViewModel"
     Shell.NavBarIsVisible="False"
-    Title="Postavke">
+    Title="{x:Static s:Strings.Settings_Title}">
 
     <!--
         Settings, in cards.
@@ -22,18 +23,30 @@
             <Label
                 Margin="4,4,0,0"
                 Style="{StaticResource Display}"
-                Text="Postavke" />
+                Text="{x:Static s:Strings.Settings_Title}" />
 
             <!--  ======== How hard it may work the phone ========  -->
 
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="12">
 
-                    <Label Style="{StaticResource Section}" Text="Opterećenje telefona" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label
+                            Grid.Column="0"
+                            Style="{StaticResource Section}"
+                            Text="{x:Static s:Strings.Settings_LoadSection}"
+                            VerticalOptions="Center" />
+
+                        <Button
+                            Grid.Column="1"
+                            Clicked="OnAlignmentHelp"
+                            Style="{StaticResource Icon}"
+                            Text="?" />
+                    </Grid>
 
                     <Label
                         Style="{StaticResource Muted}"
-                        Text="Poravnanje sluša samo desetinu snimke, pa i najsporija postavka završi knjigu puno prije nego je stigneš odslušati." />
+                        Text="{x:Static s:Strings.Settings_LoadBody}" />
 
                     <CollectionView
                         x:Name="BudgetList"
@@ -76,12 +89,12 @@
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="14">
 
-                    <Label Style="{StaticResource Section}" Text="Kad smije raditi" />
+                    <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Settings_WhenSection}" />
 
                     <Grid ColumnDefinitions="*,Auto">
                         <Label
                             Grid.Column="0"
-                            Text="Samo dok se puni"
+                            Text="{x:Static s:Strings.Settings_OnlyCharging}"
                             VerticalOptions="Center" />
                         <Switch Grid.Column="1" IsToggled="{Binding ChargingOnly}" />
                     </Grid>
@@ -91,7 +104,7 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <Label
                             Grid.Column="0"
-                            Text="Samo dok je ekran ugašen"
+                            Text="{x:Static s:Strings.Settings_OnlyScreenOff}"
                             VerticalOptions="Center" />
                         <Switch Grid.Column="1" IsToggled="{Binding ScreenOffOnly}" />
                     </Grid>
@@ -108,7 +121,81 @@
 
                     <Label
                         Style="{StaticResource Muted}"
-                        Text="Poravnanje se samo pauzira i nastavlja — nikad ne gubi napredak. Uz to se samo usporava ako se telefon zagrije, bez obzira na odabrano." />
+                        Text="{x:Static s:Strings.Settings_AlignmentNote}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!--  ======== How accurately it listens ========  -->
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+
+                    <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Settings_RecognitionSection}" />
+
+                    <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Settings_RecognitionBody}" />
+
+                    <CollectionView
+                        x:Name="RecognitionList"
+                        ItemsSource="{Binding Recognitions}"
+                        SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RecognitionOption">
+                                <Grid
+                                    Padding="0,10"
+                                    ColumnDefinitions="26,*"
+                                    ColumnSpacing="6">
+
+                                    <Grid.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnRecognitionTapped" />
+                                    </Grid.GestureRecognizers>
+
+                                    <Label
+                                        Grid.Column="0"
+                                        FontSize="16"
+                                        IsVisible="{Binding IsSelected}"
+                                        Text="✓"
+                                        TextColor="{AppThemeBinding Light={StaticResource Accent},
+                                                                    Dark={StaticResource AccentDark}}"
+                                        VerticalOptions="Center" />
+
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label FontFamily="OpenSansSemibold" Text="{Binding Name}" />
+                                        <Label Style="{StaticResource Muted}" Text="{Binding Detail}" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <BoxView Style="{StaticResource Divider}" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label
+                            Grid.Column="0"
+                            Text="{x:Static s:Strings.Settings_WordTimes}"
+                            VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding WordTimestamps}" />
+                    </Grid>
+
+                    <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Settings_WordTimesNote}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!--  ======== Language ========  -->
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="10">
+
+                    <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Settings_LanguageSection}" />
+
+                    <Picker
+                        ItemDisplayBinding="{Binding Name}"
+                        ItemsSource="{Binding Languages}"
+                        SelectedItem="{Binding SelectedLanguage}" />
+
+                    <Label
+                        Style="{StaticResource Muted}"
+                        Text="{x:Static s:Strings.Settings_LanguageNote}" />
                 </VerticalStackLayout>
             </Border>
 
@@ -117,19 +204,19 @@
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="10">
 
-                    <Label Style="{StaticResource Section}" Text="Dijagnostika" />
+                    <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Settings_DiagnosticsSection}" />
 
                     <Grid ColumnDefinitions="*,Auto">
                         <Label
                             Grid.Column="0"
-                            Text="Detaljan zapis u log"
+                            Text="{x:Static s:Strings.Settings_VerboseLog}"
                             VerticalOptions="Center" />
                         <Switch Grid.Column="1" IsToggled="{Binding VerboseLog}" />
                     </Grid>
 
                     <Label
                         Style="{StaticResource Muted}"
-                        Text="Uključi samo ako nešto treba dijagnosticirati — piše nekoliko puta u sekundi dok je knjiga otvorena." />
+                        Text="{x:Static s:Strings.Settings_VerboseNote}" />
                 </VerticalStackLayout>
             </Border>
         </VerticalStackLayout>

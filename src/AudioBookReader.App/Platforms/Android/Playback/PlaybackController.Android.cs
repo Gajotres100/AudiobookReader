@@ -44,8 +44,15 @@ public partial class PlaybackController
         return Service is not null;
     }
 
-    private partial void LoadCore(string audioPath, long startMs, float speed) =>
-        Service?.Load(audioPath, startMs, speed);
+    private partial void LoadCore(
+        string audioPath,
+        long startMs,
+        float speed,
+        string? title,
+        string? author,
+        string? coverPath,
+        long[]? chapterStarts) =>
+        Service?.Load(audioPath, startMs, speed, title, author, coverPath, chapterStarts);
 
     public partial void Play() => Service?.Play();
     public partial void Pause() => Service?.Pause();

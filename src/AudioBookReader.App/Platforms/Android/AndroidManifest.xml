@@ -46,5 +46,9 @@
 			android:exported="false"
 			android:foregroundServiceType="dataSync" />
 
+		<!-- DownloadService, which fetches a book from a server, is declared by its own [Service]
+		     attribute: the generated element already carries exported=false and the dataSync type,
+		     and a hand-written one here would name a class that does not exist under that name. -->
+
 	</application>
 </manifest>

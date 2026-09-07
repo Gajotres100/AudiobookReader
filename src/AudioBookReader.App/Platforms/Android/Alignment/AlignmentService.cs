@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -45,8 +46,10 @@ public class AlignmentService : Service
             return StartCommandResult.NotSticky;
         }
 
+        _bookId = bookId;
+
         CreateNotificationChannel();
-        StartForeground(NotificationId, BuildNotification("Priprema…", 0));
+        StartForeground(NotificationId, BuildNotification(Strings.Download_Preparing, 0));
 
         _cancellation = new CancellationTokenSource();
 
@@ -84,7 +87,7 @@ public class AlignmentService : Service
             var preferences = services.GetRequiredService<AlignmentSettingsStore>();
             var budget = preferences.Budget;
 
-            var modelPath = await EnsureModelAsync(models, queue, bookId, ct);
+            var modelPath = await EnsureModelAsync(models, preferences, queue, bookId, ct);
 
             var chapterCount = (await database.GetChaptersAsync(bookId)).Count;
 
@@ -93,7 +96,7 @@ public class AlignmentService : Service
             var book = await database.GetBookAsync(bookId);
 
             await using var transcriber = WhisperTranscriber.Create(
-                modelPath, budget, book?.Language ?? "auto");
+                modelPath, budget, book?.Language ?? "auto", preferences.WordTimestamps);
 
             // Layered deliberately: the duty cycle paces the work, thermal readings can lower it,
             // and the gate holds everything back while the user's conditions are unmet.
@@ -109,12 +112,12 @@ public class AlignmentService : Service
 
             await aligner.AlignAsync(bookId, progress, ct);
 
-            queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.Finished, "Poravnanje gotovo", 1));
+            queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.Finished, Strings.Progress_Finished, 1));
         }
         // Qualified because Android.OS declares a type of the same name.
         catch (System.OperationCanceledException)
         {
-            queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.Stopped, "Zaustavljeno — nastavit će odakle je stalo"));
+            queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.Stopped, Strings.Progress_Stopped));
         }
         catch (Exception ex)
         {
@@ -134,14 +137,15 @@ public class AlignmentService : Service
 
     private async Task<string> EnsureModelAsync(
         WhisperModelStore models,
+        AlignmentSettingsStore preferences,
         AlignmentQueue? queue,
         int bookId,
         CancellationToken ct)
     {
-        var model = WhisperModelStore.Tiny;
+        var model = preferences.Model;
         if (models.IsDownloaded(model)) return models.PathFor(model);
 
-        queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.DownloadingModel, "Skidanje modela…"));
+        queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.DownloadingModel, Strings.Progress_DownloadingModel));
 
         // Reported per whole percent rather than per chunk. The download hands back progress every
         // 80 KB, which for a 32 MB model is some four hundred updates — each one marshalled to the
@@ -155,7 +159,7 @@ public class AlignmentService : Service
             if (percent == lastPercent) return;
             lastPercent = percent;
 
-            var message = $"Skidanje modela… {percent}%";
+            var message = string.Format(Strings.Progress_DownloadingModelPercent, percent);
             queue?.Report(new AlignmentStatus(bookId, AlignmentPhase.DownloadingModel, message, fraction));
             Notify(message, percent);
         });
@@ -182,11 +186,19 @@ public class AlignmentService : Service
             : 0;
 
         // The user needs to know why nothing is moving, or a paused run reads as a broken one.
+        // "Chapter 1 of 1" says nothing. A book whose audio carries no chapter marks is one
+        // chapter from end to end, and naming it only makes the line look stuck.
         var message = gate.BlockedReason
-            ?? $"Poglavlje {progress.ChapterIndex + 1} od {chapterCount} — {withinChapter:P0}";
+            ?? (chapterCount <= 1
+                ? string.Format(Strings.Progress_WholeBook, withinChapter.ToString("P0"))
+                : string.Format(
+                    Strings.Progress_ChapterOf,
+                    progress.ChapterIndex + 1,
+                    chapterCount,
+                    withinChapter.ToString("P0")));
 
         if (gate.BlockedReason is null && thermal.Status >= ThermalStatus.Moderate)
-            message += " — usporeno zbog topline";
+            message += Strings.Progress_ThermalSlowed;
 
         queue?.Report(new AlignmentStatus(
             bookId, AlignmentPhase.Aligning, message, fraction,
@@ -207,16 +219,37 @@ public class AlignmentService : Service
 
         // Low importance: this is a progress report the user can glance at, not something worth
         // a sound or a heads-up banner while they are listening to a book.
-        var channel = new NotificationChannel(ChannelId, "Poravnanje teksta", NotificationImportance.Low)
+        var channel = new NotificationChannel(ChannelId, Strings.Notification_AlignChannel, NotificationImportance.Low)
         {
-            Description = "Napredak uparivanja audioknjige s tekstom",
+            Description = Strings.Notification_AlignChannelBody,
         };
 
         manager.CreateNotificationChannel(channel);
     }
 
+    /// <summary>Which book this run is about, so tapping the notification can open it.</summary>
+    private int _bookId = -1;
+
     private Notification BuildNotification(string message, int chapterPercent, int bookPercent = -1)
     {
+        // Tapping opens the book this is about, not just the app.
+        //
+        // A progress notification that leads nowhere makes the user hunt for the book it is
+        // describing — and the page it belongs on is the one with the alignment switches, which is
+        // where anyone tapping a progress bar is trying to get to.
+        var open = new Intent(this, typeof(MainActivity))
+            .SetAction(Intent.ActionView)
+            .AddFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop)
+            .PutExtra(MainActivity.ExtraShowBook, _bookId);
+
+        var show = PendingIntent.GetActivity(
+            this,
+            // A request code of its own, or this would share the stop action's slot and one would
+            // overwrite the other.
+            1,
+            open,
+            PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
+
         var stop = PendingIntent.GetService(
             this,
             0,
@@ -224,7 +257,7 @@ public class AlignmentService : Service
             PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
 
         var builder = new Notification.Builder(this, ChannelId)
-            .SetContentTitle("Poravnanje teksta")
+            .SetContentTitle(Strings.Notification_AlignChannel)
             .SetContentText(message)
             // Not the download glyph: nothing is being fetched, and a download icon on a job that
             // runs for the better part of an hour invites the user to wonder what is being sent.
@@ -232,12 +265,13 @@ public class AlignmentService : Service
             .SetProgress(100, chapterPercent, indeterminate: chapterPercent <= 0)
             .SetOngoing(true)
             .SetOnlyAlertOnce(true)
-            .AddAction(new Notification.Action.Builder(null, "Zaustavi", stop).Build());
+            .SetContentIntent(show)
+            .AddAction(new Notification.Action.Builder(null, Strings.Common_Stop, stop).Build());
 
         // A notification carries one bar and no more, so the book-wide figure is written out
         // instead. Two drawn bars would need a custom layout, and those are restyled by every
         // manufacturer's shade until they look like nothing else on the phone.
-        if (bookPercent >= 0) builder.SetSubText($"Cijela knjiga {bookPercent} %");
+        if (bookPercent >= 0) builder.SetSubText(string.Format(Strings.Notification_WholeBook, bookPercent));
 
         return builder.Build();
     }

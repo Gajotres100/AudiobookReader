@@ -13,9 +13,18 @@ public partial class ServerBookPage : ContentPage
         BindingContext = _viewModel = viewModel;
     }
 
+    /// <summary>Lets go of the download queue, which outlives this page by design.</summary>
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _viewModel.Detach();
+    }
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        _viewModel.Attach();
 
         try
         {

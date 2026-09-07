@@ -79,7 +79,11 @@ public class AudiobookshelfClientTests
 
         var failure = await Assert.ThrowsAsync<ServerException>(() => client.SignInAsync("a", "b"));
 
-        Assert.Contains("Je li adresa točna", failure.Message);
+        // Compared against the resource rather than a phrase typed here, so the test keeps its
+        // meaning in whatever language the run happens to be in.
+        Assert.Equal(
+            string.Format(CoreStrings.Server_NotAudiobookshelf, "http://books.local:13378"),
+            failure.Message);
     }
 
     [Fact]
@@ -94,7 +98,9 @@ public class AudiobookshelfClientTests
 
         var silent = await Assert.ThrowsAsync<ServerException>(() => unreachable.SignInAsync("a", "b"));
         Assert.False(silent.NeedsSignIn);
-        Assert.Contains("Ne mogu doći do servera", silent.Message);
+        Assert.Equal(
+            string.Format(CoreStrings.Server_Unreachable, "http://books.local:13378"),
+            silent.Message);
     }
 
     [Fact]

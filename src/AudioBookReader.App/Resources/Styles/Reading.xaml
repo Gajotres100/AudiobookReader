@@ -128,6 +128,20 @@
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Placeholder}, Dark={StaticResource PlaceholderDark}}" />
     </Style>
 
+    <!--
+        One option inside a card: a thinner, quieter outline than the card's own.
+
+        A card groups a subject; this groups a single decision within it, which is what a row with
+        a switch needs once there are two of them and each carries its own explanation.
+    -->
+    <Style x:Key="Choice" TargetType="Border">
+        <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource Paper}, Dark={StaticResource PaperDark}}" />
+        <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Line}, Dark={StaticResource LineDark}}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 12" />
+        <Setter Property="Padding" Value="14,12" />
+    </Style>
+
     <Style x:Key="Divider" TargetType="BoxView">
         <Setter Property="Color" Value="{AppThemeBinding Light={StaticResource Line}, Dark={StaticResource LineDark}}" />
         <Setter Property="HeightRequest" Value="1" />

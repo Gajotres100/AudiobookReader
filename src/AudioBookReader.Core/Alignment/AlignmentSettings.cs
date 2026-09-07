@@ -78,6 +78,21 @@ public record AlignmentSettings
     public int MaximumSearchRadiusTokens { get; init; } = 12_000;
 
     /// <summary>
+    /// How many probes may fail at the widest radius before the whole book is searched.
+    ///
+    /// The widening radius recovers from drift, but it cannot recover from being in the wrong place
+    /// entirely — and that happens: an ebook whose text runs in a different order from the audio,
+    /// a collection whose foreword sits in the middle of the file, a chapter list that disagrees
+    /// with the recording. Measured on a real pair, the narration began at character 260,000 while
+    /// the aligner was predicting 88,000; twelve thousand tokens of radius could never reach it, so
+    /// every probe in an hour and a half of work missed and the book aligned to nothing.
+    ///
+    /// Three, because at the widest radius a miss already means the estimate is badly wrong, and
+    /// searching everything is cheap next to the probes being thrown away.
+    /// </summary>
+    public int MissesBeforeSearchingEverywhere { get; init; } = 3;
+
+    /// <summary>
     /// Weight given to the newest observed narration rate when updating the running estimate.
     /// Smoothing keeps one bad probe from throwing off every prediction that follows.
     /// </summary>

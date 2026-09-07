@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!--
+    A shelf of spines, not another open book.
+
+    The launcher icon is already an open book, and a tab that repeats it reads as the same thing
+    twice. Three spines say "everything you own" where an open book says "the one you are reading",
+    which is the distinction the tab is actually drawing.
+
+    Solid shapes only: Android tints a tab icon with a single colour, so anything relying on stroke
+    weight or two tones disappears the moment the tab is selected.
+  -->
+  <rect x="3" y="5" width="4" height="14" rx="1" fill="#000000"/>
+  <rect x="8.5" y="5" width="4" height="14" rx="1" fill="#000000"/>
+  <path d="M15.6 5.9l3.6 1.0a1 1 0 0 1 .7 1.2l-2.9 10.3a1 1 0 0 1-1.2.7l-3.6-1.0z" fill="#000000"/>
+</svg>

@@ -39,4 +39,17 @@ public partial class BookDetailsPage : ContentPage
         base.OnDisappearing();
         _viewModel.Dispose();
     }
+
+    /// <summary>Opens the page that explains what alignment is doing and why it can be slow.</summary>
+    private async void OnAlignmentHelp(object? sender, EventArgs e)
+    {
+        try
+        {
+            await Navigation.PushModalAsync(new AlignmentHelpPage());
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("opening the alignment help", ex);
+        }
+    }
 }

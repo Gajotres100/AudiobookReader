@@ -90,6 +90,27 @@ public partial class MediaReferences
     /// identity hash samples three places in the file, and the tag reader jumps around looking for
     /// chapter marks. A plain input stream from a provider is forward-only.
     /// </summary>
+    public partial bool TryDelete(string location)
+    {
+        if (!IsReference(location)) return false;
+
+        try
+        {
+            // The provider decides. A document from a tree the user granted is deletable; one from
+            // a cloud provider that only streams may not be, and saying so is better than pretending.
+            var deleted = global::Android.Provider.DocumentsContract.DeleteDocument(
+                Context.ContentResolver!, AndroidUri.Parse(location)!);
+
+            AppLog.Info($"reference: delete {(deleted ? "succeeded" : "refused")} for {location}");
+            return deleted;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Info($"reference: delete failed for {location} ({ex.GetType().Name}: {ex.Message})");
+            return false;
+        }
+    }
+
     public partial Stream OpenRead(string location)
     {
         if (!IsReference(location)) return File.OpenRead(location);

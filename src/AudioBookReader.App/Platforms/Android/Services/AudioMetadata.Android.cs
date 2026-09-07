@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 using Android.Media;
 using AudioBookReader.Core.Audio;
 using AudioBookReader.Core.Models;
@@ -30,7 +31,7 @@ public static partial class AudioMetadata
                 var context = global::Android.App.Application.Context;
 
                 descriptor = context.ContentResolver?.OpenFileDescriptor(AndroidUri.Parse(location)!, "r")
-                             ?? throw new IOException($"Ne mogu otvoriti '{location}'.");
+                             ?? throw new IOException(string.Format(Strings.Import_CannotOpen, location));
 
                 retriever.SetDataSource(descriptor.FileDescriptor);
             }

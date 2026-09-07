@@ -7,10 +7,20 @@ public partial class LibraryPage : ContentPage
 {
     private readonly LibraryViewModel _viewModel;
 
-    public LibraryPage(LibraryViewModel viewModel)
+    private readonly TabReselect _taps;
+
+    public LibraryPage(LibraryViewModel viewModel, TabReselect taps)
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
+        _taps = taps;
+    }
+
+    /// <summary>Lets go of the background queues, which outlive this page.</summary>
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _viewModel.Detach();
     }
 
     /// <summary>
@@ -21,6 +31,12 @@ public partial class LibraryPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        // Here rather than at startup: the bottom bar is rebuilt whenever the shell is, which
+        // happens on every change of language, and this is the first page shown afterwards.
+        _taps.Watch();
+
+        _viewModel.Attach();
 
         // An exception out of an async void override kills the process, and this one is reached
         // before the user can do anything about whatever went wrong.

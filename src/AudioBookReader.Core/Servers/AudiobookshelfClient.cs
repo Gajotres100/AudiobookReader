@@ -93,7 +93,7 @@ public class AudiobookshelfClient(HttpClient http)
     {
         var trimmed = (baseUrl ?? "").Trim().TrimEnd('/');
 
-        if (trimmed.Length == 0) throw new ArgumentException("Adresa servera je prazna.", nameof(baseUrl));
+        if (trimmed.Length == 0) throw new ArgumentException(CoreStrings.Server_EmptyAddress, nameof(baseUrl));
 
         if (!trimmed.Contains("://", StringComparison.Ordinal)) trimmed = "http://" + trimmed;
 
@@ -127,7 +127,7 @@ public class AudiobookshelfClient(HttpClient http)
         var login = await ReadAsync(response, ServerJsonContext.Default.LoginResponse, ct);
 
         return Adopt(login?.User)
-               ?? throw new ServerException("Prijava je prošla, ali server nije vratio token.");
+               ?? throw new ServerException(CoreStrings.Server_NoToken);
     }
 
     /// <summary>
@@ -236,7 +236,7 @@ public class AudiobookshelfClient(HttpClient http)
         var item = await ReadAsync(response, ServerJsonContext.Default.WireItem, ct);
 
         if (item is null || Describe(item) is not { } book)
-            throw new ServerException("Server je vratio stavku koju ne razumijem.");
+            throw new ServerException(CoreStrings.Server_UnknownItem);
 
         var media = item.Media;
 
@@ -337,7 +337,7 @@ public class AudiobookshelfClient(HttpClient http)
 
         return new ServerBook(
             item.Id,
-            media?.Metadata?.Title ?? "(bez naslova)",
+            media?.Metadata?.Title ?? CoreStrings.Server_Untitled,
             media?.Metadata?.AuthorName,
             media?.NumAudioFiles ?? media?.AudioFiles?.Count ?? 0,
             media?.EbookFormat ?? media?.EbookFileFormat,
@@ -348,7 +348,7 @@ public class AudiobookshelfClient(HttpClient http)
     }
 
     private string Url(string path) =>
-        (_baseUrl ?? throw new ServerException("Server nije podešen.")) + path;
+        (_baseUrl ?? throw new ServerException(CoreStrings.Server_NotConfigured)) + path;
 
     private Task<HttpResponseMessage> GetAsync(string path, CancellationToken ct) =>
         SendAsync(() => new HttpRequestMessage(HttpMethod.Get, Url(path)), authenticated: true, ct);
@@ -365,7 +365,7 @@ public class AudiobookshelfClient(HttpClient http)
 
         if (authenticated)
         {
-            if (_token is null) throw new ServerException("Nisi prijavljen na server.", HttpStatusCode.Unauthorized);
+            if (_token is null) throw new ServerException(CoreStrings.Server_NotSignedIn, HttpStatusCode.Unauthorized);
 
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _token);
         }
@@ -379,11 +379,13 @@ public class AudiobookshelfClient(HttpClient http)
         catch (HttpRequestException ex)
         {
             // The distinction the user needs: nothing answered, as opposed to something answering no.
-            throw new ServerException($"Ne mogu doći do servera ({_baseUrl}).", null, ex);
+            throw new ServerException(
+                string.Format(CoreStrings.Server_Unreachable, _baseUrl), null, ex);
         }
         catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
         {
-            throw new ServerException($"Server ({_baseUrl}) ne odgovara.", null, ex);
+            throw new ServerException(
+                string.Format(CoreStrings.Server_NoAnswer, _baseUrl), null, ex);
         }
 
         if (response.IsSuccessStatusCode || response.StatusCode == tolerate) return response;
@@ -398,7 +400,7 @@ public class AudiobookshelfClient(HttpClient http)
                 return await SendAsync(build, authenticated, ct, tolerate, completion, mayRefresh: false);
 
             throw new ServerException(
-                "Prijava na server više ne vrijedi.", HttpStatusCode.Unauthorized);
+                CoreStrings.Server_SignInExpired, HttpStatusCode.Unauthorized);
         }
 
         response.Dispose();
@@ -406,10 +408,10 @@ public class AudiobookshelfClient(HttpClient http)
         throw new ServerException(
             response.StatusCode switch
             {
-                HttpStatusCode.Unauthorized => "Prijava na server više ne vrijedi.",
-                HttpStatusCode.Forbidden => "Ovaj račun nema pristup tome na serveru.",
-                HttpStatusCode.NotFound => "Server ne zna za to.",
-                _ => $"Server je odgovorio {(int)response.StatusCode}.",
+                HttpStatusCode.Unauthorized => CoreStrings.Server_SignInExpired,
+                HttpStatusCode.Forbidden => CoreStrings.Server_Forbidden,
+                HttpStatusCode.NotFound => CoreStrings.Server_NotFound,
+                _ => string.Format(CoreStrings.Server_Replied, (int)response.StatusCode),
             },
             response.StatusCode);
     }
@@ -430,7 +432,7 @@ public class AudiobookshelfClient(HttpClient http)
                 // Almost always a login page or a proxy's error page rather than the API: the URL
                 // points at something, just not at Audiobookshelf.
                 throw new ServerException(
-                    $"Odgovor s {_baseUrl} nije ono što Audiobookshelf vraća. Je li adresa točna?",
+                    string.Format(CoreStrings.Server_NotAudiobookshelf, _baseUrl),
                     response.StatusCode, ex);
             }
         }

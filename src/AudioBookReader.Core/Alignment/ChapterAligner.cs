@@ -36,15 +36,34 @@ public class ChapterAligner(
     private double _floor;
     private double _ceiling;
 
+    /// <summary>How many probes may pass before what has been found is handed back to be saved.</summary>
+    private const int CheckpointEvery = 20;
+
+    /// <param name="resumeFrom">
+    /// What a previous run already measured in this chapter. Its anchors are kept and the probes
+    /// they cover are skipped, so continuing a chapter costs only the part that is missing.
+    /// </param>
+    /// <param name="checkpoint">
+    /// Called every so often with the anchors so far, for the caller to persist.
+    ///
+    /// This exists because a chapter is not always a small unit of work. An MP3 with no chapter
+    /// marks is one chapter covering the whole book, and saving only at the end meant a seven-hour
+    /// chapter wrote nothing at all until it finished — so stopping it, or the phone stopping it,
+    /// threw away every probe. Hours of work with nothing to show is not a slow feature, it is a
+    /// broken one.
+    /// </param>
     public async Task<ChapterSyncMap> AlignAsync(
         ChapterAlignmentRequest request,
         IProgress<AlignmentProgress>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        ChapterSyncMap? resumeFrom = null,
+        Func<ChapterSyncMap, Task>? checkpoint = null)
     {
         var probes = ProbePlanner.Plan(request.AudioStartMs, request.AudioEndMs, _settings);
         if (probes.Count == 0) return new ChapterSyncMap { ChapterIndex = request.ChapterIndex };
 
-        var anchors = new List<Anchor>();
+        // Everything a previous run measured here, kept rather than repeated.
+        var anchors = resumeFrom is null ? [] : new List<Anchor>(resumeFrom.Anchors);
 
         // The chapter's own boundaries are weak anchors: they hold the ends of the interpolation
         // down when probing finds nothing there, but any real match that disagrees will displace
@@ -67,11 +86,24 @@ public class ChapterAligner(
         // run find its place again.
         var radius = _settings.SearchRadiusTokens;
 
+        // Misses in a row once the radius can grow no further, which is the signal that the run is
+        // not drifting but lost.
+        var blindMisses = 0;
+
         for (var i = 0; i < probes.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
 
             var probe = probes[i];
+
+            // Already heard, by a run that was interrupted before it could finish. Re-transcribing
+            // it would cost the same as the first time and tell us what we already know.
+            if (resumeFrom is not null
+                && resumeFrom.IsMeasuredAt(probe.StartMs, _settings.ProbeIntervalMs, _settings.MinConfidence))
+            {
+                progress?.Report(new AlignmentProgress(request.ChapterIndex, i + 1, probes.Count, matches));
+                continue;
+            }
 
             // Once the chapter's opening is pinned there is nothing left for the remaining run-in
             // probes to find, and transcribing them would be pure waste. Still reported, though:
@@ -119,17 +151,56 @@ public class ChapterAligner(
                         reach,
                         _settings.MinConfidence);
 
+                    // Nothing near where it was expected, and the search has already grown as wide
+                    // as it may. Look at the whole book rather than keep missing: the position is
+                    // not drifting, it is somewhere else entirely, and no amount of widening
+                    // within the cap will reach it.
+                    //
+                    // Only for the first phrase of a probe, and only after several such failures,
+                    // so a book that is merely difficult does not pay for this on every phrase.
+                    if (found is null
+                        && located == 0
+                        && blindMisses >= _settings.MissesBeforeSearchingEverywhere)
+                    {
+                        found = TranscriptMatcher.MatchNear(
+                            book,
+                            [.. phrase.Words.Select(w => w.Value)],
+                            book.Count / 2,
+                            book.Count,
+                            _settings.MinConfidence);
+
+                        if (found is not null)
+                        {
+                            log?.Invoke(
+                                $"ch{request.ChapterIndex} probe@{probe.StartMs}ms: found by searching the " +
+                                $"whole book at char {found.Value.CharOffset}, expected {expected} " +
+                                $"— the text does not run in the order the audio does");
+
+                            // The rate was learned from a prediction that was wrong about where the
+                            // book even was. Start it again from the chapter's own proportions.
+                            charsPerMs = EstimateInitialRate(request);
+                            lastAccepted = null;
+                        }
+                    }
+
                     if (found is null) continue;
+
+                    // Two things have to agree for an anchor to be trusted: that the words line
+                    // up with the book, and that they were heard properly in the first place.
+                    // Only the first was being weighed, so a garbled segment that happened to
+                    // match well carried the same weight as a clean one — and the map's own
+                    // tie-breaker had nothing to break the tie with.
+                    var confidence = found.Value.Confidence * Math.Clamp(phrase.Probability, 0f, 1f);
 
                     var opening = new Anchor(
                         phrase.Words[found.Value.TranscriptStart].AtMs,
                         found.Value.CharOffset,
-                        found.Value.Confidence);
+                        confidence);
 
                     var closing = new Anchor(
                         phrase.Words[found.Value.TranscriptEnd].AtMs,
                         found.Value.EndCharOffset,
-                        found.Value.Confidence);
+                        confidence);
 
                     anchors.Add(opening);
 
@@ -145,9 +216,14 @@ public class ChapterAligner(
                 {
                     matches++;
                     radius = _settings.SearchRadiusTokens;
+                    blindMisses = 0;
                 }
                 else
                 {
+                    // Counted only once the radius is already at its cap; before that a miss means
+                    // the window was too small, which widening is about to fix on its own.
+                    if (radius >= _settings.MaximumSearchRadiusTokens) blindMisses++;
+
                     log?.Invoke(
                         $"ch{request.ChapterIndex} probe@{probe.StartMs}ms: {words.Count} words in " +
                         $"{transcript.Phrases.Count} phrases, none matched within {radius} of char " +
@@ -165,6 +241,11 @@ public class ChapterAligner(
             }
 
             progress?.Report(new AlignmentProgress(request.ChapterIndex, i + 1, probes.Count, matches));
+
+            // Handed over periodically rather than only at the end, so an interrupted chapter
+            // keeps what it heard. Cheap next to a probe, and only when there is something new.
+            if (checkpoint is not null && i % CheckpointEvery == CheckpointEvery - 1 && anchors.Count > 2)
+                await checkpoint(ChapterSyncMap.FromAnchors(request.ChapterIndex, anchors));
 
             await _throttle.ThrottleAsync(ct);
         }

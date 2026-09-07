@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 using System.Text;
 using AudioBookReader.App.Services;
 using AudioBookReader.Core.Books;
@@ -52,7 +53,7 @@ public partial class ReaderViewModel(
     /// itself. Silently doing nothing is the worst of the options here — it looks broken.
     /// </summary>
     public string FollowHint =>
-        "Tekst će pratiti naraciju kad poravnanje završi. Pokreni ga preko ☰.";
+        Strings.Reader_WillFollow;
 
     /// <summary>
     /// The general hint, shown only when nothing more specific is being said.
@@ -86,7 +87,7 @@ public partial class ReaderViewModel(
     [NotifyPropertyChangedFor(nameof(FollowLabel))]
     public partial bool IsFollowing { get; set; }
 
-    public string FollowLabel => IsFollowing ? "Prati ✓" : "Prati";
+    public string FollowLabel => IsFollowing ? Strings.Reader_FollowOn : Strings.Reader_Follow;
 
     /// <summary>
     /// Playback control lives in the reader too.
@@ -145,7 +146,10 @@ public partial class ReaderViewModel(
         if (playback.BookId != BookId)
         {
             var state = await database.GetReadingStateAsync(BookId);
-            await playback.LoadAsync(BookId, audioPath, state?.AudioPositionMs ?? 0, state?.Speed ?? 1f);
+            await playback.LoadAsync(
+                BookId, audioPath, state?.AudioPositionMs ?? 0, state?.Speed ?? 1f,
+                title: _book.Title, author: _book.Author, coverPath: _book.CoverPath,
+                chapterStarts: ChapterStarts());
         }
 
         playback.TogglePlayPause();
@@ -168,11 +172,11 @@ public partial class ReaderViewModel(
     [
         // Papir is the app's own page, to the character: opening the reader should feel like
         // turning into the book rather than like arriving somewhere else.
-        new("Papir", "#FBF8F2", "#241F1A", "rgba(178, 106, 0, 0.22)"),
-        new("Sepija", "#EFE0C6", "#4A3A26", "rgba(168, 112, 0, 0.26)"),
-        new("Svijetlo", "#FDFDFB", "#1B1B1F", "rgba(196, 148, 0, 0.30)"),
-        new("Prigušeno", "#1C212B", "#E9E4DA", "rgba(232, 169, 69, 0.20)"),
-        new("Noć", "#0B0D11", "#A9A39A", "rgba(232, 169, 69, 0.16)"),
+        new(Strings.Reader_ThemePaper, "#FBF8F2", "#241F1A", "rgba(178, 106, 0, 0.22)"),
+        new(Strings.Reader_ThemeSepia, "#EFE0C6", "#4A3A26", "rgba(168, 112, 0, 0.26)"),
+        new(Strings.Reader_ThemeLight, "#FDFDFB", "#1B1B1F", "rgba(196, 148, 0, 0.30)"),
+        new(Strings.Reader_ThemeDim, "#1C212B", "#E9E4DA", "rgba(232, 169, 69, 0.20)"),
+        new(Strings.Reader_ThemeNight, "#0B0D11", "#A9A39A", "rgba(232, 169, 69, 0.16)"),
     ];
 
     /// <summary>
@@ -201,7 +205,7 @@ public partial class ReaderViewModel(
 
     [RelayCommand]
     private Task ChooseThemeAsync() => PickAsync(
-        "Izgled stranice",
+        Strings.Reader_Appearance,
         [.. Themes.Select(t => t.Name)],
         index =>
         {
@@ -211,7 +215,7 @@ public partial class ReaderViewModel(
 
     private async Task PickAsync(string title, string[] options, Action<int> chosen)
     {
-        var choice = await Shell.Current.DisplayActionSheetAsync(title, "Odustani", null, options);
+        var choice = await Shell.Current.DisplayActionSheetAsync(title, Strings.Common_Cancel, null, options);
 
         var index = Array.IndexOf(options, choice);
         if (index < 0) return;
@@ -279,6 +283,17 @@ public partial class ReaderViewModel(
     /// </summary>
     private List<Chapter> _readerChapters = [];
 
+    /// <summary>
+    /// Where each chapter begins in the audio, for the controls outside the app.
+    ///
+    /// From the library's chapters, not the reader's: the reader's come from the ebook and carry
+    /// text ranges, while these are the ones with times in them.
+    /// </summary>
+    private long[] ChapterStarts() =>
+        _libraryChapters is null
+            ? []
+            : [.. _libraryChapters.Where(c => c.HasAudioRange).Select(c => c.StartMs ?? 0).Order()];
+
     /// <summary>Which document of the book is on screen.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DocumentLabel))]
@@ -311,7 +326,7 @@ public partial class ReaderViewModel(
         {
             if (_text is null) return "";
 
-            var pages = PageCount > 1 ? $"str. {PageNumber} / {PageCount}" : "";
+            var pages = PageCount > 1 ? string.Format(Strings.Reader_PageOf, PageNumber, PageCount) : "";
             var chapter = CurrentChapterTitle;
 
             return (chapter, pages) switch
@@ -441,7 +456,10 @@ public partial class ReaderViewModel(
                 && _book.AudioPath is { } audio)
             {
                 var listening = await database.GetReadingStateAsync(BookId);
-                await playback.LoadAsync(BookId, audio, listening?.AudioPositionMs ?? 0, listening?.Speed ?? 1f);
+                await playback.LoadAsync(
+                    BookId, audio, listening?.AudioPositionMs ?? 0, listening?.Speed ?? 1f,
+                    title: _book.Title, author: _book.Author, coverPath: _book.CoverPath,
+                    chapterStarts: ChapterStarts());
             }
 
             if (CanFollow)
@@ -582,7 +600,8 @@ public partial class ReaderViewModel(
         // Numbered so that chapters sharing a title stay distinguishable in the list.
         var labels = _readerChapters.Select((c, i) => $"{i + 1}. {c.Title}").ToArray();
 
-        var choice = await Shell.Current.DisplayActionSheetAsync("Poglavlje", "Odustani", null, labels);
+        var choice = await Shell.Current.DisplayActionSheetAsync(
+            Strings.Chapter_Pick, Strings.Common_Cancel, null, labels);
         var index = Array.IndexOf(labels, choice);
         if (index < 0) return;
 
@@ -716,7 +735,7 @@ public partial class ReaderViewModel(
     private async Task SettleSeekAsync(bool resume, CancellationToken ct)
     {
         IsWaitingToSpeak = true;
-        FollowStatus = "Pripremam poglavlje…";
+        FollowStatus = Strings.Reader_PreparingChapter;
 
         try
         {
@@ -745,7 +764,7 @@ public partial class ReaderViewModel(
     private async Task HoldUntilMeasuredAsync(int targetChar, bool resume, CancellationToken ct)
     {
         IsWaitingToSpeak = true;
-        FollowStatus = "Pripremam poglavlje…";
+        FollowStatus = Strings.Reader_PreparingChapter;
 
         var corrections = 0;
 
@@ -820,7 +839,7 @@ public partial class ReaderViewModel(
         // implied.
         AppLog.Info($"reader: gave up placing char {targetChar} after {corrections} corrections");
 
-        FollowStatus = "Ovaj dio još nije izmjeren. Možeš pustiti zvuk, ali tekst ga zasad neće pratiti.";
+        FollowStatus = Strings.Reader_UnmeasuredCanPlay;
         return;
 
         void Settle()
@@ -1063,7 +1082,7 @@ public partial class ReaderViewModel(
         // A player that has failed says nothing on its own: the button responds, the glyph does not
         // change, and no sound comes out. Say which of the two it is.
         if (playback.LastError is { } failure)
-            FollowStatus = $"Zvuk se ne može otvoriti ({failure}). Provjeri datoteku knjige preko ☰.";
+            FollowStatus = string.Format(Strings.Reader_AudioFailed, failure);
 
         // Playback outlives pages and can be on a different book entirely. Following it then would
         // walk this book's text to another book's playhead.
@@ -1092,10 +1111,10 @@ public partial class ReaderViewModel(
             var chapter = _sync.ChapterAt(at);
 
             FollowStatus = MeasuresWhileReading
-                ? "Mjerim ovaj dio — tekst kreće za koji trenutak."
+                ? Strings.Reader_MeasuringHere
                 : chapter is null
-                    ? "Ovaj dio knjige još nije poravnan."
-                    : $"Poglavlje {chapter.Index + 1} još nije poravnano — pokreni poravnanje na stranici knjige.";
+                    ? Strings.Reader_PartNotAligned
+                    : string.Format(Strings.Reader_ChapterNotAligned, chapter.Index + 1);
 
             // Once a second at most, so it does not drown the log.
             if (DateTime.UtcNow - _lastMiss > TimeSpan.FromSeconds(5))

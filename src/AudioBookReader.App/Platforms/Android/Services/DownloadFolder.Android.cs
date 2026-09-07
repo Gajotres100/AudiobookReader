@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 using Android.Provider;
 using AndroidUri = Android.Net.Uri;
 
@@ -7,7 +8,7 @@ public partial class DownloadFolder
 {
     private static Android.Content.ContentResolver Resolver =>
         global::Android.App.Application.Context.ContentResolver
-        ?? throw new InvalidOperationException("Nema pristupa datotekama sustava.");
+        ?? throw new InvalidOperationException(Strings.Folder_NoSystemAccess);
 
     /// <summary>
     /// Where the picker opens when the user has not chosen anything yet.
@@ -44,13 +45,13 @@ public partial class DownloadFolder
     /// </summary>
     public partial string Describe()
     {
-        if (Location is not { Length: > 0 } location) return "Nije odabrana";
+        if (Location is not { Length: > 0 } location) return Strings.Folder_NotChosen;
 
         var decoded = AndroidUri.Decode(location) ?? location;
         var colon = decoded.LastIndexOf(':');
 
         var path = colon >= 0 ? decoded[(colon + 1)..] : decoded;
-        return string.IsNullOrWhiteSpace(path) ? "Interna pohrana" : path;
+        return string.IsNullOrWhiteSpace(path) ? Strings.Folder_InternalStorage : path;
     }
 
     public partial async Task<(Stream Stream, string Location)> CreateAsync(
@@ -58,14 +59,14 @@ public partial class DownloadFolder
         string fileName)
     {
         if (Location is not { Length: > 0 } location)
-            throw new InvalidOperationException("Mapa za preuzimanje nije odabrana.");
+            throw new InvalidOperationException(Strings.Folder_NotChosenError);
 
         var tree = AndroidUri.Parse(location)
-                   ?? throw new InvalidOperationException("Mapa za preuzimanje nije čitljiva.");
+                   ?? throw new InvalidOperationException(Strings.Folder_Unreadable);
 
         var directory = DocumentsContract.BuildDocumentUriUsingTree(
                             tree, DocumentsContract.GetTreeDocumentId(tree))
-                        ?? throw new InvalidOperationException("Mapa za preuzimanje više ne postoji.");
+                        ?? throw new InvalidOperationException(Strings.Folder_Gone);
 
         // Author, then title, the way a shelf is arranged and the way every other audiobook tool
         // lays them out on disk.
@@ -76,10 +77,10 @@ public partial class DownloadFolder
         // recognises one, and for .m4b it does not — which is how a book ends up named "book.mp4".
         var file = FindChild(tree, directory, fileName)
                    ?? DocumentsContract.CreateDocument(Resolver, directory, "application/octet-stream", fileName)
-                   ?? throw new IOException($"Ne mogu napraviti '{fileName}' u odabranoj mapi.");
+                   ?? throw new IOException(string.Format(Strings.Folder_CannotCreateFile, fileName));
 
         var stream = Resolver.OpenOutputStream(file, "wt")
-                     ?? throw new IOException($"Ne mogu pisati u '{fileName}'.");
+                     ?? throw new IOException(string.Format(Strings.Folder_CannotWrite, fileName));
 
         return await Task.FromResult<(Stream, string)>((stream, file.ToString()!));
     }
@@ -96,7 +97,7 @@ public partial class DownloadFolder
         if (FindChild(tree, parent, name) is { } existing) return existing;
 
         return DocumentsContract.CreateDocument(Resolver, parent, DocumentsContract.Document.MimeTypeDir, name)
-               ?? throw new IOException($"Ne mogu napraviti mapu '{name}'.");
+               ?? throw new IOException(string.Format(Strings.Folder_CannotCreateFolder, name));
     }
 
     /// <summary>A child of this folder with that name, or null.</summary>

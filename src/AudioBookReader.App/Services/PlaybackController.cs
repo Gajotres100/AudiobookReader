@@ -61,13 +61,34 @@ public partial class PlaybackController
 
     public partial void CancelSleep();
 
-    private partial void LoadCore(string audioPath, long startMs, float speed);
+    private partial void LoadCore(
+        string audioPath,
+        long startMs,
+        float speed,
+        string? title,
+        string? author,
+        string? coverPath,
+        long[]? chapterStarts);
 
-    public async Task<bool> LoadAsync(int bookId, string audioPath, long startMs, float speed, CancellationToken ct = default)
+    /// <param name="title">
+    /// What the book is called, for the lock screen and the notification shade. Passed down rather
+    /// than looked up here: the player has no database, and a set of controls with no name on them
+    /// is what an audiobook app must not look like.
+    /// </param>
+    public async Task<bool> LoadAsync(
+        int bookId,
+        string audioPath,
+        long startMs,
+        float speed,
+        CancellationToken ct = default,
+        string? title = null,
+        string? author = null,
+        string? coverPath = null,
+        long[]? chapterStarts = null)
     {
         if (!await ConnectAsync(ct)) return false;
 
-        LoadCore(audioPath, startMs, speed);
+        LoadCore(audioPath, startMs, speed, title, author, coverPath, chapterStarts);
         _bookId = bookId;
         return true;
     }

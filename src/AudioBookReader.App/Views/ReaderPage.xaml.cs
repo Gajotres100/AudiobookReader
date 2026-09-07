@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 using System.Globalization;
 using AudioBookReader.App.Services;
 using AudioBookReader.App.ViewModels;
@@ -120,7 +121,7 @@ public partial class ReaderPage : ContentPage
         catch (Exception ex)
         {
             AppLog.Error("opening the reader", ex);
-            _viewModel.FollowStatus = "Knjigu nije bilo moguće otvoriti.";
+            _viewModel.FollowStatus = Strings.Reader_CouldNotOpen;
         }
     }
 

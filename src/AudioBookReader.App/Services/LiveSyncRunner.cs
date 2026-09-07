@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 using AudioBookReader.Core.Alignment;
 using AudioBookReader.Core.Books;
 using AudioBookReader.Core.Data;
@@ -159,8 +160,8 @@ public partial class LiveSyncRunner(
             await Task.Delay(TimeSpan.FromSeconds(5), ct);
         }
 
-        Report("Poravnavanje u hodu je stalo — zatvori i otvori čitač da pokušam ponovo.");
-        Fail("Poravnavanje u hodu je stalo — zatvori i otvori čitač da pokušam ponovo.");
+        Report(Strings.Live_Stopped);
+        Fail(Strings.Live_Stopped);
     }
 
     /// <returns>True when the run finished on its own terms rather than failing.</returns>
@@ -174,8 +175,8 @@ public partial class LiveSyncRunner(
             var transcriber = await CreateTranscriberAsync(settings.Budget, book.Language, ct);
             if (transcriber is null)
             {
-                Report("Model za prepoznavanje još nije preuzet.");
-                Fail("Model za prepoznavanje još nije preuzet — pokreni poravnanje sa stranice knjige.");
+                Report(Strings.Live_NoModel);
+                Fail(Strings.Live_NoModelHint);
                 return true;
             }
 
@@ -201,7 +202,9 @@ public partial class LiveSyncRunner(
                 var progress = new Progress<LiveAlignmentProgress>(p =>
                 {
                     var ahead = Math.Max(0, p.AtMs - playback.PositionMs) / 1000;
-                    Report(ahead > 0 ? $"Poravnavam u hodu — izmjereno {ahead} s unaprijed" : "Poravnavam u hodu…");
+                    Report(ahead > 0
+                        ? string.Format(Strings.Live_MeasuredAhead, ahead)
+                        : Strings.Live_Working);
                 });
 
                 // Copied synchronously, on the aligner's own thread, while it is between windows

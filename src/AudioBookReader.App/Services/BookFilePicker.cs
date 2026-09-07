@@ -1,3 +1,5 @@
+using AudioBookReader.App.Resources.Strings;
+
 namespace AudioBookReader.App.Services;
 
 /// <summary>A chosen file: where it is, and what it is called.</summary>
@@ -25,9 +27,11 @@ public record PickedMedia(string Location, string FileName);
 /// </summary>
 public partial class BookFilePicker
 {
-    public Task<PickedMedia?> PickAudioAsync(string prompt = "Odaberi audioknjigu") => PickAsync(prompt);
+    public Task<PickedMedia?> PickAudioAsync(string? prompt = null) =>
+        PickAsync(prompt ?? Strings.Picker_ChooseAudiobook);
 
-    public Task<PickedMedia?> PickEbookAsync(string prompt = "Odaberi e-knjigu") => PickAsync(prompt);
+    public Task<PickedMedia?> PickEbookAsync(string? prompt = null) =>
+        PickAsync(prompt ?? Strings.Picker_ChooseEbook);
 
     private partial Task<PickedMedia?> PickAsync(string prompt);
 }

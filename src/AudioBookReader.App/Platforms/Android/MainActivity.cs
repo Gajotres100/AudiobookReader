@@ -2,6 +2,7 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
+using AudioBookReader.App.Services;
 using AndroidUri = Android.Net.Uri;
 
 namespace AudioBookReader.App;
@@ -9,6 +10,9 @@ namespace AudioBookReader.App;
 [Activity(Theme = "@style/Maui.SplashTheme", MainLauncher = true, LaunchMode = LaunchMode.SingleTop, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
 public class MainActivity : MauiAppCompatActivity
 {
+    /// <summary>Set by the alignment notification, to say which book it was reporting on.</summary>
+    public const string ExtraShowBook = "showBook";
+
     private const int PickDocumentRequest = 0x_B0_0C;
     private const int PickFolderRequest = 0x_B0_0D;
 
@@ -86,6 +90,58 @@ public class MainActivity : MauiAppCompatActivity
 
         activity.StartActivityForResult(intent, PickFolderRequest);
         return _pending.Task;
+    }
+
+    protected override void OnCreate(Bundle? savedInstanceState)
+    {
+        base.OnCreate(savedInstanceState);
+        Show(Intent);
+    }
+
+    /// <summary>
+    /// Arrives when the app is already running, which is the usual case: the notification is only
+    /// there while alignment runs, and alignment usually runs because someone just started it.
+    /// </summary>
+    protected override void OnNewIntent(Intent? intent)
+    {
+        base.OnNewIntent(intent);
+
+        Intent = intent;
+        Show(intent);
+    }
+
+    /// <summary>
+    /// Opens the book the intent names, once there is a shell to open it in.
+    ///
+    /// Posted rather than called: OnCreate runs before MAUI has built anything, so navigating here
+    /// would be navigating a shell that does not exist yet.
+    /// </summary>
+    private static void Show(Intent? intent)
+    {
+        var bookId = intent?.GetIntExtra(ExtraShowBook, -1) ?? -1;
+        if (bookId < 0) return;
+
+        // Cleared so that a rotation, or the activity being rebuilt, does not reopen the book
+        // every time from an intent that has already been acted on.
+        intent!.RemoveExtra(ExtraShowBook);
+
+        Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            try
+            {
+                // A short wait for the shell on a cold start. Nothing to hook: the app is built
+                // after the activity, and there is no event for "the shell exists now".
+                for (var i = 0; Shell.Current is null && i < 40; i++) await Task.Delay(100);
+
+                if (Shell.Current is null) return;
+
+                await Shell.Current.GoToAsync($"details?id={bookId}");
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("opening the book from its notification", ex);
+            }
+        });
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)

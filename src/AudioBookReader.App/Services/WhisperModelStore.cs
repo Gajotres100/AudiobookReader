@@ -27,6 +27,27 @@ public class WhisperModelStore(string directory, HttpClient? http = null)
         Url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny-q5_1.bin",
         ApproximateBytes: 32_600_000);
 
+    /// <summary>
+    /// The next size up, for anyone who would rather wait than re-read a line.
+    ///
+    /// Roughly three times the work of <see cref="Tiny"/> and noticeably better at hearing what
+    /// was actually said — most of all in languages other than English, where the small model
+    /// mishears enough that whole probes are thrown away for not matching. Every discarded probe
+    /// is a stretch of book left to interpolation, so recognition quality buys precision and not
+    /// just a tidier transcript.
+    ///
+    /// Offered rather than imposed. It is a real cost on a long book, and the choice belongs to
+    /// whoever is waiting for it.
+    /// </summary>
+    public static readonly WhisperModel Base = new(
+        Name: "Base (multilingual)",
+        FileName: "ggml-base-q5_1.bin",
+        Url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q5_1.bin",
+        ApproximateBytes: 57_800_000);
+
+    /// <summary>The models by their stored id, so a preference survives a change of wording.</summary>
+    public static WhisperModel ById(string id) => id == "base" ? Base : Tiny;
+
     private readonly HttpClient _http = http ?? new HttpClient();
 
     public string PathFor(WhisperModel model) => Path.Combine(directory, model.FileName);

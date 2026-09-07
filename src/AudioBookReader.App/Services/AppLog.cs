@@ -13,15 +13,56 @@ public static class AppLog
 
     public static void Error(string what, Exception ex)
     {
-        Console.WriteLine($"{Tag} {what} FAILED: {ex.GetType().Name}: {ex.Message}");
+        Write($"{what} FAILED: {ex.GetType().Name}: {ex.Message}");
 
         for (var inner = ex.InnerException; inner is not null; inner = inner.InnerException)
-            Console.WriteLine($"{Tag}   caused by {inner.GetType().Name}: {inner.Message}");
+            Write($"  caused by {inner.GetType().Name}: {inner.Message}");
 
-        Console.WriteLine($"{Tag} {ex.StackTrace}");
+        Write(ex.StackTrace ?? "");
     }
 
-    public static void Info(string message) => Console.WriteLine($"{Tag} {message}");
+    public static void Info(string message) => Write(message);
+
+    // ---- Keeping it ----
+    //
+    // The system log is a ring buffer a few megabytes wide, shared with every app on the phone. A
+    // problem reported the next morning has usually scrolled out of it — which is exactly what
+    // happened the first time an alignment failed and there was nothing left to read. Alignment
+    // runs for hours; its evidence has to outlive a buffer measured in minutes.
+
+    private static readonly object Pen = new();
+
+    /// <summary>Where the log is written. Set once at startup; nothing is kept before that.</summary>
+    public static string? File { get; set; }
+
+    /// <summary>Rolled at a megabyte, keeping one previous file. Small enough to pull over a cable.</summary>
+    private const long RollAt = 1024 * 1024;
+
+    private static void Write(string message)
+    {
+        var line = $"{Tag} {message}";
+        Console.WriteLine(line);
+
+        if (File is not { Length: > 0 } path) return;
+
+        // Never the reason something failed. A log that throws while reporting a failure loses the
+        // failure and adds one of its own.
+        try
+        {
+            lock (Pen)
+            {
+                if (System.IO.File.Exists(path) && new FileInfo(path).Length > RollAt)
+                    System.IO.File.Move(path, path + ".old", overwrite: true);
+
+                System.IO.File.AppendAllText(
+                    path, $"{DateTime.Now:MM-dd HH:mm:ss} {line}{Environment.NewLine}");
+            }
+        }
+        catch (Exception)
+        {
+            // Nothing to do and nowhere to say it.
+        }
+    }
 
     /// <summary>
     /// Detail worth having only while chasing something specific.

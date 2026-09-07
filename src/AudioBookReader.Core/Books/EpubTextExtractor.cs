@@ -85,7 +85,7 @@ public class EpubTextExtractor : IBookTextExtractor
         if (marks.Count == 0)
         {
             marks = documents
-                .Select((d, i) => (Title: $"Section {i + 1}", Offset: d.TextStart))
+                .Select((d, i) => (Title: string.Format(CoreStrings.Section_Numbered, i + 1), Offset: d.TextStart))
                 .ToList();
         }
 
@@ -94,7 +94,9 @@ public class EpubTextExtractor : IBookTextExtractor
         return [.. marks.Select((mark, i) => new Chapter
         {
             Index = i,
-            Title = string.IsNullOrWhiteSpace(mark.Title) ? $"Chapter {i + 1}" : mark.Title.Trim(),
+            Title = string.IsNullOrWhiteSpace(mark.Title)
+                    ? string.Format(CoreStrings.Chapter_Numbered, i + 1)
+                    : mark.Title.Trim(),
             // Anything before the first entry — cover, title page, dedication — belongs to the
             // first chapter rather than to nothing.
             TextStart = i == 0 ? 0 : mark.Offset,

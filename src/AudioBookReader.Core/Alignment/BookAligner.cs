@@ -45,7 +45,14 @@ public class BookAligner(
         var map = await LoadOrCreateMapAsync(book);
         var aligner = new ChapterAligner(tokenized, transcriber, _settings, throttle, log);
 
-        var first = map.FirstChapterNeedingWork(chapters.Count, _settings.BoundaryConfidence);
+        // Two answers, and the earlier one wins.
+        //
+        // The map says which chapters hold a measurement, which used to be the same question as
+        // which are finished — it no longer is, because a long chapter now saves what it has found
+        // part of the way through. A chapter with some anchors in it may still be half done, and
+        // only the book's own record says which chapters actually ran to the end.
+        var fromMap = map.FirstChapterNeedingWork(chapters.Count, _settings.BoundaryConfidence);
+        var first = Math.Min(fromMap, Math.Max(book.AlignedThroughChapter + 1, 0));
 
         log?.Invoke($"book {bookId}: {textLength:N0} chars of text, {chapters.Count} chapters, starting at {first}");
 
@@ -79,7 +86,15 @@ public class BookAligner(
                         chapter.TextStart ?? cursor,
                         chapter.TextEnd ?? estimatedEnd),
                     progress,
-                    ct);
+                    ct,
+                    map.ForChapter(chapter.Index),
+                    // Saved as it goes. The chapter is not finished, so AlignedThroughChapter is
+                    // deliberately left alone: this only makes sure the work survives.
+                    async partial =>
+                    {
+                        map.SetChapter(partial);
+                        await syncMaps.SaveAsync(bookId, map);
+                    });
 
                 map.SetChapter(chapterMap);
 

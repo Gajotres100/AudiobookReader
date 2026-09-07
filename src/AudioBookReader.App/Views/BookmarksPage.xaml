@@ -4,10 +4,11 @@
     x:Class="AudioBookReader.App.Views.BookmarksPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
     xmlns:vm="clr-namespace:AudioBookReader.App.ViewModels"
     x:DataType="vm:BookmarksViewModel"
     Shell.NavBarIsVisible="False"
-    Title="Bookmarci">
+    Title="{x:Static s:Strings.Bookmarks_Title}">
 
     <!--
         Places kept in one book.
@@ -20,7 +21,7 @@
 
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
             <VerticalStackLayout Grid.Column="0" Spacing="2">
-                <Label Style="{StaticResource Section}" Text="Bookmarci" />
+                <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Bookmarks_Title}" />
                 <Label
                     LineBreakMode="TailTruncation"
                     Style="{StaticResource Heading}"
@@ -46,7 +47,7 @@
             HorizontalTextAlignment="Center"
             IsVisible="{Binding HasNone}"
             Style="{StaticResource Muted}"
-            Text="Još nema bookmarka. Dugi pritisak na zastavicu ⚑ u playeru sprema mjesto na kojem si."
+            Text="{x:Static s:Strings.Bookmarks_Empty}"
             VerticalOptions="Center" />
 
         <CollectionView
@@ -107,7 +108,7 @@
                 Grid.Column="0"
                 Command="{Binding AddCommand}"
                 Style="{StaticResource Secondary}"
-                Text="Dodaj bookmark ovdje" />
+                Text="{x:Static s:Strings.Bookmarks_Add}" />
 
             <Label
                 Grid.Column="1"

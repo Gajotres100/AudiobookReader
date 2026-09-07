@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 using AudioBookReader.Core.Audio;
 using AudioBookReader.Core.Books;
 using AudioBookReader.Core.Data;
@@ -56,7 +57,7 @@ public class BookImporter(
 
         try
         {
-            progress?.Report(new ImportProgress("Čitam poglavlja…", 1));
+            progress?.Report(new ImportProgress(Strings.Progress_ReadingChapters, 1));
 
             var info = await ProbeAsync(location, picked.FileName, referenced, ct);
 
@@ -64,7 +65,7 @@ public class BookImporter(
             // A file with no readable duration is not something that can be played, whatever it is
             // called — this is what stops a stray .nfo or cover image becoming a broken entry.
             if (info.DurationMs <= 0)
-                throw new NotSupportedException("Ovo ne izgleda kao audio datoteka — nije pronađen zvučni zapis.");
+                throw new NotSupportedException(Strings.Import_NotAudio);
 
             var hash = await HashAsync(location, ct);
 
@@ -114,7 +115,7 @@ public class BookImporter(
 
             return await AudioMetadata.ReadAsync(location, fileName)
                    ?? throw new NotSupportedException(
-                       $"'{fileName}' se ne može pročitati kao audioknjiga — ni oznake ni sam zapis.", ex);
+                       string.Format(Strings.Import_Unreadable, fileName), ex);
         }
     }
 
@@ -146,7 +147,7 @@ public class BookImporter(
         var book = await database.GetBookAsync(bookId);
         if (book?.AudioPath is not { } location || !references.IsReference(location)) return book;
 
-        progress?.Report(new ImportProgress("Pripremam za poravnanje…", 0));
+        progress?.Report(new ImportProgress(Strings.Progress_PreparingAlignment, 0));
 
         var name = Path.GetFileName(location.TrimEnd('/'));
         if (string.IsNullOrWhiteSpace(name) || !Path.HasExtension(name)) name = $"{book.Title}.m4b";
@@ -181,12 +182,12 @@ public class BookImporter(
 
         try
         {
-            progress?.Report(new ImportProgress("Čitam tekst…", 1));
+            progress?.Report(new ImportProgress(Strings.Progress_ReadingText, 1));
 
             var extracted = await extractors.ExtractAsync(path, ct);
 
             if (extracted.Text.PlainText.Length == 0)
-                throw new NotSupportedException("Iz ove datoteke nisam izvukao nikakav tekst.");
+                throw new NotSupportedException(Strings.Import_NoText);
 
             var hash = await ContentHash.ComputeAsync(path, ct);
 
@@ -210,6 +211,33 @@ public class BookImporter(
         }
     }
 
+    /// <summary>
+    /// Where a book's own file sits, for a confirmation to name — or null when there is nothing to
+    /// offer, because the only copy is the app's and that goes with the entry regardless.
+    /// </summary>
+    public async Task<string?> OwnFileAsync(int bookId, bool audio)
+    {
+        var book = await database.GetBookAsync(bookId);
+        var path = audio ? book?.AudioPath : book?.EbookPath;
+
+        return path is not null && references.IsReference(path) ? Readable(path) : null;
+    }
+
+    /// <summary>
+    /// A content URI as something a person can check against what they see in a file manager.
+    ///
+    /// The document id is the readable half — "primary:Audiobooks/Gwynne/Hunger/book.m4b" — and it
+    /// is percent-encoded inside the URI. Decoding it is enough; making it prettier than that would
+    /// mean guessing at the provider's conventions.
+    /// </summary>
+    private static string Readable(string location)
+    {
+        var id = location.Split('/').LastOrDefault() ?? location;
+        var decoded = Uri.UnescapeDataString(id);
+
+        return decoded.Contains(':') ? decoded[(decoded.IndexOf(':') + 1)..] : decoded;
+    }
+
     private static void TryDelete(string path)
     {
         try
@@ -225,7 +253,14 @@ public class BookImporter(
     /// <summary>
     /// Removes a medium and deletes the file it used, unless another book still points at it.
     /// </summary>
-    public async Task<Book> RemoveAudioAsync(int bookId, CancellationToken ct = default)
+    /// <param name="alsoReferenced">
+    /// Delete the user's own file as well, not only a copy the app made. Asked for explicitly and
+    /// never assumed: the file may be the only one they have.
+    /// </param>
+    public async Task<Book> RemoveAudioAsync(
+        int bookId,
+        bool alsoReferenced = false,
+        CancellationToken ct = default)
     {
         var before = await database.GetBookAsync(bookId);
 
@@ -263,12 +298,15 @@ public class BookImporter(
         }
     }
 
-    public async Task<Book> RemoveEbookAsync(int bookId, CancellationToken ct = default)
+    public async Task<Book> RemoveEbookAsync(
+        int bookId,
+        bool alsoReferenced = false,
+        CancellationToken ct = default)
     {
         var before = await database.GetBookAsync(bookId);
         var book = await library.DetachTextAsync(bookId);
 
-        if (before?.EbookPath is { } path) await DeleteIfUnusedAsync(path);
+        if (before?.EbookPath is { } path) await DeleteIfUnusedAsync(path, alsoReferenced);
         return book;
     }
 
@@ -278,7 +316,10 @@ public class BookImporter(
     /// Needed as much for mistakes as for tidying: an import that produced something wrong has to
     /// be undoable, or the library fills with entries the user cannot get rid of.
     /// </summary>
-    public async Task DeleteBookAsync(int bookId, CancellationToken ct = default)
+    public async Task DeleteBookAsync(
+        int bookId,
+        bool alsoReferenced = false,
+        CancellationToken ct = default)
     {
         var book = await database.GetBookAsync(bookId);
 
@@ -288,7 +329,7 @@ public class BookImporter(
         if (book is null) return;
 
         foreach (var path in new[] { book.AudioPath, book.EbookPath })
-            if (path is not null) await DeleteIfUnusedAsync(path);
+            if (path is not null) await DeleteIfUnusedAsync(path, alsoReferenced);
 
         // Covers are written per import and shared with nothing.
         if (book.CoverPath is { } cover
@@ -299,17 +340,20 @@ public class BookImporter(
         }
     }
 
-    private async Task DeleteIfUnusedAsync(string path)
+    private async Task DeleteIfUnusedAsync(string path, bool alsoReferenced = false)
     {
         // The same file could have been imported into two library entries; deleting it out from
-        // under the other one would break a book the user did not touch.
+        // under the other one would break a book the user did not touch. This one outranks the
+        // choice: it is not a preference, it is another book.
         if (await database.FindBookByMediaPathAsync(path) is not null) return;
 
         // A referenced file is the user's own, sitting wherever they keep it. Removing it from the
-        // library gives back the permission and nothing else — deleting someone's audiobook because
-        // they tidied their library would be unforgivable.
+        // library gives back the permission and nothing else — unless the user has said, at the
+        // moment of deleting and about this book, that the file should go too.
         if (references.IsReference(path))
         {
+            if (alsoReferenced) references.TryDelete(path);
+
             references.Release(path);
             return;
         }
@@ -362,7 +406,7 @@ public class BookImporter(
                     if (percent == lastPercent) continue;
 
                     lastPercent = percent;
-                    progress?.Report(new ImportProgress($"Kopiram… {percent}%", copied / (double)total));
+                    progress?.Report(new ImportProgress(string.Format(Strings.Progress_CopyingPercent, percent), copied / (double)total));
                 }
                 else
                 {
@@ -371,7 +415,7 @@ public class BookImporter(
                     if (megabytes == lastMegabytes) continue;
 
                     lastMegabytes = megabytes;
-                    progress?.Report(new ImportProgress($"Kopiram… {megabytes} MB", 0));
+                    progress?.Report(new ImportProgress(string.Format(Strings.Progress_CopyingMb, megabytes), 0));
                 }
             }
         }

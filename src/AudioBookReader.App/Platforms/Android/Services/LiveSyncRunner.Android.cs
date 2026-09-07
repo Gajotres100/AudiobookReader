@@ -20,13 +20,27 @@ public partial class LiveSyncRunner
     {
         var services = IPlatformApplication.Current?.Services;
         var models = services?.GetService<WhisperModelStore>();
+        var preferences = services?.GetService<AlignmentSettingsStore>();
 
-        var model = WhisperModelStore.Tiny;
-        if (models is null || !models.IsDownloaded(model)) return null;
+        if (models is null) return null;
+
+        // The chosen model when it is here, otherwise whichever one is — falling back rather than
+        // refusing. Someone who has asked for the better model but not yet downloaded it should
+        // still get a read-along from the model they already have, not silence.
+        var model = Downloaded(models, preferences?.Model ?? WhisperModelStore.Tiny)
+            ?? Downloaded(models, WhisperModelStore.Tiny)
+            ?? Downloaded(models, WhisperModelStore.Base);
+
+        if (model is null) return null;
+
+        var wordTimes = preferences?.WordTimestamps ?? true;
 
         return await Task.Run(
-            () => WhisperTranscriber.Create(models.PathFor(model), budget, language ?? "auto"), ct);
+            () => WhisperTranscriber.Create(models.PathFor(model), budget, language ?? "auto", wordTimes), ct);
     }
+
+    private static WhisperModel? Downloaded(WhisperModelStore models, WhisperModel model) =>
+        models.IsDownloaded(model) ? model : null;
 
     /// <summary>
     /// Paced by temperature alone, not by the preset's duty cycle.
