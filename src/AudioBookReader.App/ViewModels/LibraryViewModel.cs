@@ -286,4 +286,17 @@ public partial class LibraryViewModel : ObservableObject
         { HasText: true } => Shell.Current.GoToAsync($"reader?id={card.Id}"),
         _ => Shell.Current.GoToAsync($"book?id={card.Id}"),
     };
+
+    /// <summary>
+    /// There is nothing to buy. The app is free and always will be — this exists purely because a
+    /// $ icon sitting next to three real import buttons is funnier than not having one.
+    /// </summary>
+    [RelayCommand]
+    private static async Task PremiumAsync()
+    {
+        var yes = await Shell.Current.DisplayAlertAsync(
+            Strings.Premium_ConfirmTitle, Strings.Premium_ConfirmBody, Strings.Common_Yes, Strings.Common_No);
+
+        if (yes) await Shell.Current.Navigation.PushModalAsync(new PremiumPage());
+    }
 }

@@ -25,7 +25,7 @@
         <Grid
             Grid.Row="0"
             Padding="20,16,12,8"
-            ColumnDefinitions="*,Auto,Auto,Auto">
+            ColumnDefinitions="*,Auto,Auto,Auto,Auto">
 
             <Label
                 Grid.Column="0"
@@ -50,6 +50,17 @@
                 Command="{Binding OpenServerCommand}"
                 Style="{StaticResource Icon}"
                 Text="☁" />
+
+            <!--
+                Not a real purchase — the app is free and always will be. This exists because a $
+                icon next to three real import actions is a joke worth having, not because there is
+                anything behind it to buy.
+            -->
+            <Button
+                Grid.Column="4"
+                Command="{Binding PremiumCommand}"
+                Style="{StaticResource Icon}"
+                Text="$" />
         </Grid>
 
         <!--  Importing a whole audiobook takes time; without a number it reads as a hang.  -->

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="AudioBookReader.App.Views.PremiumPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
+    Shell.NavBarIsVisible="False">
+
+    <!--
+        The reward for pressing the joke $ button. There was never anything to unlock — the app is
+        free and always will be — so the punchline is finding out you already had it.
+    -->
+
+    <Grid RowDefinitions="*,Auto" Padding="24">
+        <VerticalStackLayout
+            Grid.Row="0"
+            HorizontalOptions="Center"
+            Spacing="14"
+            VerticalOptions="Center">
+
+            <Label
+                FontSize="52"
+                HorizontalOptions="Center"
+                Text="🎉" />
+
+            <Label
+                FontFamily="OpenSansSemibold"
+                FontSize="24"
+                HorizontalTextAlignment="Center"
+                Text="{x:Static s:Strings.Premium_Title}"
+                TextColor="{AppThemeBinding Light={StaticResource Accent},
+                                             Dark={StaticResource AccentDark}}" />
+
+            <Label
+                FontSize="16"
+                HorizontalTextAlignment="Center"
+                Text="{x:Static s:Strings.Premium_Body}" />
+
+            <Label
+                FontFamily="OpenSansSemibold"
+                FontSize="18"
+                HorizontalTextAlignment="Center"
+                Text="{x:Static s:Strings.Premium_Tagline}" />
+
+            <!--
+                No emoji for a bare moustache exists — the closest, 🥸, comes with a whole
+                disguise face attached, which is the opposite of what this wants. Drawn instead as
+                two mirrored halves of the same curl, which is also what keeps them symmetric.
+            -->
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="0">
+                <Path
+                    Aspect="Uniform"
+                    Data="M0,22 C10,10 40,2 65,6 C85,9 95,20 88,30 C82,38 68,36 68,26 C68,20 45,18 20,24 C12,26 4,26 0,22 Z"
+                    Fill="{AppThemeBinding Light={StaticResource Ink},
+                                            Dark={StaticResource InkDark}}"
+                    HeightRequest="34"
+                    ScaleX="-1"
+                    WidthRequest="76" />
+                <Path
+                    Aspect="Uniform"
+                    Data="M0,22 C10,10 40,2 65,6 C85,9 95,20 88,30 C82,38 68,36 68,26 C68,20 45,18 20,24 C12,26 4,26 0,22 Z"
+                    Fill="{AppThemeBinding Light={StaticResource Ink},
+                                            Dark={StaticResource InkDark}}"
+                    HeightRequest="34"
+                    WidthRequest="76" />
+            </HorizontalStackLayout>
+
+            <!--
+                Both thumbs read as the same right hand doubled, which looks odd held up "at" the
+                viewer rather than side by side. Mirroring the left one turns it into what a left
+                hand's thumbs-up actually looks like, so the pair faces forward the way two hands
+                really would.
+            -->
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="4">
+                <Label FontSize="40" ScaleX="-1" Text="👍" />
+                <Label FontSize="40" Text="👍" />
+            </HorizontalStackLayout>
+        </VerticalStackLayout>
+
+        <Button
+            Grid.Row="1"
+            Clicked="OnClose"
+            Style="{StaticResource Secondary}"
+            Text="{x:Static s:Strings.Common_Close}" />
+    </Grid>
+</ContentPage>
