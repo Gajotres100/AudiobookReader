@@ -25,6 +25,17 @@
 	     to the user's whole filesystem — which Play restricts heavily and would demand a
 	     justification for. -->
 
+	<!-- Lets the reader's word-translate chooser actually see translator apps on the device.
+	     Android 11+ hides other apps' intent filters unless the declaring app names them here —
+	     without this, the chooser for a long-pressed word would show nothing to choose from even
+	     with Google Translate installed. -->
+	<queries>
+		<intent>
+			<action android:name="android.intent.action.PROCESS_TEXT" />
+			<data android:mimeType="text/plain" />
+		</intent>
+	</queries>
+
 	<application
 		android:allowBackup="true"
 		android:networkSecurityConfig="@xml/network_security_config"

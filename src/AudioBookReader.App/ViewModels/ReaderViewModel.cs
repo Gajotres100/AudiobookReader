@@ -140,20 +140,30 @@ public partial class ReaderViewModel(
     [RelayCommand]
     private async Task TogglePlayAsync()
     {
-        if (_book?.AudioPath is not { } audioPath) return;
-
-        // The reader can be opened without the book page having loaded anything.
-        if (playback.BookId != BookId)
-        {
-            var state = await database.GetReadingStateAsync(BookId);
-            await playback.LoadAsync(
-                BookId, audioPath, state?.AudioPositionMs ?? 0, state?.Speed ?? 1f,
-                title: _book.Title, author: _book.Author, coverPath: _book.CoverPath,
-                chapterStarts: ChapterStarts());
-        }
+        if (!await EnsurePlaybackLoadedAsync()) return;
 
         playback.TogglePlayPause();
         IsPlaying = playback.IsPlaying;
+    }
+
+    /// <summary>
+    /// Makes sure the player is holding this book before anything asks it to seek or play.
+    ///
+    /// The reader can be opened, and text can be tapped or held, without the player ever having
+    /// been told which book it is — nothing forces that to happen first. Without this, double
+    /// tapping a sentence in a book that had never been played did nothing: the seek went to
+    /// whichever book the player happened to be holding, or nowhere at all if it was holding none.
+    /// </summary>
+    private async Task<bool> EnsurePlaybackLoadedAsync()
+    {
+        if (playback.BookId == BookId) return true;
+        if (_book?.AudioPath is not { } audioPath) return false;
+
+        var state = await database.GetReadingStateAsync(BookId);
+        return await playback.LoadAsync(
+            BookId, audioPath, state?.AudioPositionMs ?? 0, state?.Speed ?? 1f,
+            title: _book.Title, author: _book.Author, coverPath: _book.CoverPath,
+            chapterStarts: ChapterStarts());
     }
 
     // ---- Appearance ----
@@ -520,7 +530,12 @@ public partial class ReaderViewModel(
         // those are usually the same place, and when they are not it is the page in front of the
         // reader that is right — opening chapter one and pressing play should read chapter one, not
         // resume halfway through it because that is where a previous session ended.
-        if (!playback.IsPlaying) await TakeNarrationToAsync(offset);
+        //
+        // Not blocking Play while this settles: nothing has played yet, so nothing is playing FOR
+        // the correction loop to protect — it used to hold Play disabled for up to forty-five
+        // seconds on a book nobody had listened to a second of yet, which could only ever time out,
+        // since live measuring has nothing to have found near a passage that has never been heard.
+        if (!playback.IsPlaying) await TakeNarrationToAsync(offset, blockPlayWhileCorrecting: false);
 
         if (_text!.SentenceAt(offset) is { } sentence)
         {
@@ -645,7 +660,17 @@ public partial class ReaderViewModel(
     /// few seconds and then starting cleanly is the kinder trade, and it is only taken when it buys
     /// something: a book aligned in advance has nothing to wait for.
     /// </summary>
-    private async Task TakeNarrationToAsync(int textStart)
+    /// <param name="blockPlayWhileCorrecting">
+    /// Whether Play should stay disabled while this waits to correct the position.
+    ///
+    /// True for a jump made while there is a real chance something is already measured nearby —
+    /// mid-listening, moving between chapters. False for placing the very first position of a
+    /// session, before anything has ever played: there is nothing yet for live measuring to have
+    /// found in a book nobody has listened to, so the wait can only ever time out, and disabling
+    /// Play for the better part of a minute over a book someone has only just opened to read is
+    /// exactly the dead button this feature exists to avoid.
+    /// </param>
+    private async Task TakeNarrationToAsync(int textStart, bool blockPlayWhileCorrecting = true)
     {
         // Deliberately not conditional on IsFollowing. That is only true once a map exists, and a
         // book measured live has none until the first window lands — so on exactly the book this
@@ -653,7 +678,7 @@ public partial class ReaderViewModel(
         // chapter left behind. Telling the narration where the reader went is also how measuring
         // learns which passage to work on, so it has to happen before there is anything to follow.
         if (_book?.HasAudio != true) return;
-        if (playback.BookId != BookId) return;
+        if (!await EnsurePlaybackLoadedAsync()) return;
 
         // Anything still waiting is waiting for the wrong chapter now.
         StopHolding();
@@ -697,7 +722,7 @@ public partial class ReaderViewModel(
         var holding = new CancellationTokenSource();
         _holding = holding;
 
-        await HoldUntilMeasuredAsync(textStart, resume: wasPlaying, holding.Token);
+        await HoldUntilMeasuredAsync(textStart, resume: wasPlaying, blockPlayWhileCorrecting, holding.Token);
     }
 
     /// <summary>How far off the target the voice may start, in milliseconds. About one sentence.</summary>
@@ -761,9 +786,9 @@ public partial class ReaderViewModel(
         if (resume) playback.Play();
     }
 
-    private async Task HoldUntilMeasuredAsync(int targetChar, bool resume, CancellationToken ct)
+    private async Task HoldUntilMeasuredAsync(int targetChar, bool resume, bool blockPlay, CancellationToken ct)
     {
-        IsWaitingToSpeak = true;
+        if (blockPlay) IsWaitingToSpeak = true;
         FollowStatus = Strings.Reader_PreparingChapter;
 
         var corrections = 0;
@@ -831,7 +856,7 @@ public partial class ReaderViewModel(
         }
         finally
         {
-            IsWaitingToSpeak = false;
+            if (blockPlay) IsWaitingToSpeak = false;
         }
 
         // Waited and nothing came. Rather than start a voice the page cannot follow behind the
@@ -844,7 +869,7 @@ public partial class ReaderViewModel(
 
         void Settle()
         {
-            IsWaitingToSpeak = false;
+            if (blockPlay) IsWaitingToSpeak = false;
             FollowStatus = "";
 
             // Only resumes what was already running. A jump made while paused leaves it paused —
@@ -1176,6 +1201,20 @@ public partial class ReaderViewModel(
         _lastSentence = sentenceIndex;
         HighlightRequested?.Invoke(this, sentenceIndex);
 
+        _ = SafelyAsync("placing the narration by hand", () => SeekNarrationToSentenceAsync(sentenceIndex));
+    }
+
+    /// <summary>
+    /// The fast path used to call <see cref="PlaybackController.SeekTo"/> directly, on the
+    /// assumption that a book with a map is a book the player already holds — true once someone
+    /// has pressed play, and never true for a double tap that is the very first thing done with
+    /// the book. The player then either seeked whatever book it happened to be holding, or did
+    /// nothing at all if it was holding none, which is what looked like the gesture being ignored.
+    /// </summary>
+    private async Task SeekNarrationToSentenceAsync(int sentenceIndex)
+    {
+        if (!await EnsurePlaybackLoadedAsync()) return;
+
         if (_sync?.AudioPositionAtSentence(sentenceIndex) is { } at)
         {
             playback.SeekTo(at);
@@ -1186,8 +1225,7 @@ public partial class ReaderViewModel(
         if (_text is null || sentenceIndex < 0 || sentenceIndex >= _text.Sentences.Count) return;
 
         var start = _text.Sentences[sentenceIndex].Start;
-
-        _ = SafelyAsync("placing the narration by hand", () => TakeNarrationToAsync(start));
+        await TakeNarrationToAsync(start);
     }
 
     /// <summary>Runs work started by a gesture, so a failure lands in the log instead of the process.</summary>
@@ -1453,15 +1491,39 @@ public partial class ReaderViewModel(
               // Gestures are handled here rather than by a recognizer around the WebView, because
               // the web view consumes its own touches and a recognizer outside it never sees them.
               //
-              // A plain tap shows and hides the controls; jumping the narration to a sentence is a
-              // press and hold. That way round because tapping is what a hand resting on a phone
-              // does by accident, and having that throw the audio somewhere else is far worse than
-              // having it show a toolbar.
+              // Four gestures share the same finger: a single tap shows and hides the controls; a
+              // double tap jumps the narration to the sentence under it; a press and hold looks up
+              // the single word under it; a sideways swipe turns the page. Single and double tap
+              // cannot both fire the instant a finger lifts -- the first tap has to wait a moment
+              // to see whether a second one is coming, which is the one place this reads slower
+              // than a plain tap handler would.
               var startX = 0, startY = 0, swiped = false, holdTimer = 0, held = false;
+              var lastTapAt = 0, lastTapX = 0, lastTapY = 0, tapTimer = 0;
+              var DOUBLE_TAP_MS = 300, TAP_SLOP = 30;
 
               function cancelHold() {
                 clearTimeout(holdTimer);
                 holdTimer = 0;
+              }
+
+              // The word under a point, independent of language: Croatian's diacritic letters are
+              // letters to this regex exactly as plain a-z are. caretRangeFromPoint finds the exact
+              // text node the finger is over regardless of what formatting wraps it, which a
+              // data-idx span cannot -- that marks a whole sentence, not the word inside it.
+              function wordAtPoint(x, y) {
+                if (!document.caretRangeFromPoint) return null;
+
+                var range = document.caretRangeFromPoint(x, y);
+                if (!range || range.startContainer.nodeType !== 3) return null;
+
+                var text = range.startContainer.textContent;
+                var isWordChar = function (ch) { return ch && /[\p{L}\p{N}'\u2019-]/u.test(ch); };
+
+                var start = range.startOffset, end = range.startOffset;
+                while (start > 0 && isWordChar(text[start - 1])) start--;
+                while (end < text.length && isWordChar(text[end])) end++;
+
+                return start < end ? text.slice(start, end) : null;
               }
 
               document.addEventListener('touchstart', function (e) {
@@ -1472,18 +1534,12 @@ public partial class ReaderViewModel(
 
                 if (e.touches.length !== 1) { cancelHold(); return; }
 
-                var span = e.target.closest ? e.target.closest('[data-idx]') : null;
-                if (!span) return;
-
-                var idx = span.getAttribute('data-idx');
-
                 holdTimer = setTimeout(function () {
                   held = true;
                   holdTimer = 0;
 
-                  // Confirms the press landed, since the audio may take a moment to find the place.
-                  highlight(parseInt(idx, 10));
-                  location.href = 'abr://seek/' + idx;
+                  var word = wordAtPoint(startX, startY);
+                  if (word) location.href = 'abr://translate/' + encodeURIComponent(word);
                 }, 450);
               }, { passive: true });
 
@@ -1518,7 +1574,35 @@ public partial class ReaderViewModel(
                 if (swiped) { swiped = false; return; }
                 if (held) { held = false; return; }
 
-                location.href = 'abr://tap';
+                var now = Date.now();
+                var isDoubleTap = tapTimer !== 0
+                  && (now - lastTapAt) < DOUBLE_TAP_MS
+                  && Math.abs(e.clientX - lastTapX) < TAP_SLOP
+                  && Math.abs(e.clientY - lastTapY) < TAP_SLOP;
+
+                if (isDoubleTap) {
+                  clearTimeout(tapTimer);
+                  tapTimer = 0;
+
+                  var span = e.target.closest ? e.target.closest('[data-idx]') : null;
+                  if (span) {
+                    var idx = span.getAttribute('data-idx');
+                    highlight(parseInt(idx, 10));
+                    location.href = 'abr://seek/' + idx;
+                  }
+                  return;
+                }
+
+                // Not yet a double tap -- remembered, and given one interval to be joined by a
+                // second before it counts as a plain tap on its own.
+                lastTapAt = now;
+                lastTapX = e.clientX;
+                lastTapY = e.clientY;
+
+                tapTimer = setTimeout(function () {
+                  tapTimer = 0;
+                  location.href = 'abr://tap';
+                }, DOUBLE_TAP_MS);
               });
 
               // Restyles a page already on screen, keeping the reader on the passage they were

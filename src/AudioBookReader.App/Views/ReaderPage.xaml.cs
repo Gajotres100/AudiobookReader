@@ -28,12 +28,17 @@ public partial class ReaderPage : ContentPage
     /// <summary>A plain tap on the page, which shows and hides the controls.</summary>
     private const string TapUrl = "abr://tap";
 
-    private readonly ReaderViewModel _viewModel;
+    /// <summary>A press and hold on a single word, carrying it URL-encoded.</summary>
+    private const string TranslateScheme = "abr://translate/";
 
-    public ReaderPage(ReaderViewModel viewModel)
+    private readonly ReaderViewModel _viewModel;
+    private readonly WordTranslator _translator;
+
+    public ReaderPage(ReaderViewModel viewModel, WordTranslator translator)
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
+        _translator = translator;
     }
 
     /// <summary>
@@ -228,13 +233,21 @@ public partial class ReaderPage : ContentPage
             return;
         }
 
-        if (!e.Url.StartsWith(SeekScheme, StringComparison.OrdinalIgnoreCase)) return;
+        if (e.Url.StartsWith(SeekScheme, StringComparison.OrdinalIgnoreCase))
+        {
+            e.Cancel = true;
+
+            var value = e.Url[SeekScheme.Length..].TrimEnd('/');
+            if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sentenceIndex))
+                _viewModel.OnSentenceTapped(sentenceIndex);
+
+            return;
+        }
+
+        if (!e.Url.StartsWith(TranslateScheme, StringComparison.OrdinalIgnoreCase)) return;
 
         e.Cancel = true;
-
-        var value = e.Url[SeekScheme.Length..].TrimEnd('/');
-        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sentenceIndex))
-            _viewModel.OnSentenceTapped(sentenceIndex);
+        _translator.Translate(Uri.UnescapeDataString(e.Url[TranslateScheme.Length..].TrimEnd('/')));
     }
 
     /// <summary>
