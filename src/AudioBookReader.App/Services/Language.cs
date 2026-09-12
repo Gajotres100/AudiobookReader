@@ -63,7 +63,17 @@ public class Language
 
         // The whole shell, not the current page: the tabs, their titles and every page behind them
         // were all built in the old language.
-        if (Application.Current?.Windows.FirstOrDefault() is { } window) window.Page = new AppShell();
+        //
+        // Deferred rather than assigned right here: this setter is reached from the language
+        // Picker's own selection-changed callback, which is still unwinding on the native side of
+        // the very AppShell this is about to tear down. Replacing Window.Page while that callback
+        // is still on the stack raced the old ShellSectionRenderer's fragments against the new
+        // Shell's, and crashed with a NullReferenceException in OnCreateView. Posting it to the next
+        // dispatcher cycle lets the picker's own callback finish and hand control back to Android
+        // first, so the teardown starts from a clean stack instead of the middle of one.
+        var window = Application.Current?.Windows.FirstOrDefault();
+        if (window is not null)
+            Application.Current!.Dispatcher.Dispatch(() => window.Page = new AppShell());
 
         return true;
     }

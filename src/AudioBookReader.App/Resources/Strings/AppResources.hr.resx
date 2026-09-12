@@ -57,6 +57,9 @@
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="App_Name" xml:space="preserve">
+    <value>Čitko</value>
+  </data>
   <data name="Common_Cancel" xml:space="preserve">
     <value>Odustani</value>
   </data>
@@ -65,6 +68,12 @@
   </data>
   <data name="Common_Close" xml:space="preserve">
     <value>Zatvori</value>
+  </data>
+  <data name="Common_Yes" xml:space="preserve">
+    <value>Da</value>
+  </data>
+  <data name="Common_No" xml:space="preserve">
+    <value>Ne</value>
   </data>
   <data name="Library_Title" xml:space="preserve">
     <value>Knjige</value>
@@ -734,6 +743,21 @@
   </data>
   <data name="Help_PresetChangeNote" xml:space="preserve">
     <value>Promjena preseta vrijedi tek nakon što zaustaviš i ponovo pokreneš poravnanje — ne mijenja run koji već traje.</value>
+  </data>
+  <data name="Premium_ConfirmTitle" xml:space="preserve">
+    <value>Aktivirati Premium Pro Plus?</value>
+  </data>
+  <data name="Premium_ConfirmBody" xml:space="preserve">
+    <value>Ekskluzivne pogodnosti te čekaju.</value>
+  </data>
+  <data name="Premium_Title" xml:space="preserve">
+    <value>Već imaš Premium Pro Plus!</value>
+  </data>
+  <data name="Premium_Body" xml:space="preserve">
+    <value>Zato što je sve u ovoj aplikaciji besplatno. Uvijek je bilo, uvijek će biti.</value>
+  </data>
+  <data name="Premium_Tagline" xml:space="preserve">
+    <value>Jagshemash! Great success!</value>
   </data>
   <data name="Help_SlowerSection" xml:space="preserve">
     <value>Zašto zna biti sporije od procjene</value>

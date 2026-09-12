@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!--
+    The launcher label. Deliberately not a translation of the other one — Croatian and English
+    carry different names on purpose (see values-hr/strings.xml) — and this is the file Android
+    falls back to for every locale that isn't Croatian.
+  -->
+  <string name="app_name">Syncbook</string>
+</resources>

@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
     xmlns:views="clr-namespace:AudioBookReader.App.Views"
-    Title="AudioBook Reader">
+    Title="{x:Static s:Strings.App_Name}">
 
     <!--
         Icons as well as words.

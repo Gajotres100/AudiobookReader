@@ -57,6 +57,9 @@
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="App_Name" xml:space="preserve">
+    <value>Syncbook</value>
+  </data>
   <data name="Common_Cancel" xml:space="preserve">
     <value>Cancel</value>
     <comment>Dismissing a sheet or dialog.</comment>
@@ -66,6 +69,12 @@
   </data>
   <data name="Common_Close" xml:space="preserve">
     <value>Close</value>
+  </data>
+  <data name="Common_Yes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="Common_No" xml:space="preserve">
+    <value>No</value>
   </data>
   <data name="Library_Title" xml:space="preserve">
     <value>Books</value>
@@ -790,6 +799,21 @@
   </data>
   <data name="Help_PresetChangeNote" xml:space="preserve">
     <value>Switching presets only takes effect after you stop and restart alignment — it does not change a run already under way.</value>
+  </data>
+  <data name="Premium_ConfirmTitle" xml:space="preserve">
+    <value>Activate Premium Pro Plus?</value>
+  </data>
+  <data name="Premium_ConfirmBody" xml:space="preserve">
+    <value>Exclusive perks await.</value>
+  </data>
+  <data name="Premium_Title" xml:space="preserve">
+    <value>You already have Premium Pro Plus!</value>
+  </data>
+  <data name="Premium_Body" xml:space="preserve">
+    <value>Because everything in this app is free. Always was, always will be.</value>
+  </data>
+  <data name="Premium_Tagline" xml:space="preserve">
+    <value>Jagshemash! Great success!</value>
   </data>
   <data name="Help_SlowerSection" xml:space="preserve">
     <value>Why it can be slower than the estimate</value>

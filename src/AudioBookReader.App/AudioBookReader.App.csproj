@@ -15,7 +15,11 @@
 
 		<MauiXamlInflator>SourceGen</MauiXamlInflator>
 
-		<ApplicationTitle>AudioBook Reader</ApplicationTitle>
+		<!-- English base name. The Android launcher label overrides this per phone locale via
+		     Platforms/Android/Resources/values{-hr}/strings.xml, since Croatian and English
+		     deliberately carry different names (Čitko / Syncbook) rather than one translated
+		     the other way. -->
+		<ApplicationTitle>Syncbook</ApplicationTitle>
 		<ApplicationId>com.gajotres.audiobookreader</ApplicationId>
 
 		<ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>

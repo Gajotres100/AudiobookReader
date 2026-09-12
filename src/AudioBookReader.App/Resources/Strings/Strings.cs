@@ -22,12 +22,20 @@ public static class Strings
     /// <summary>One string by name, for the few callers that choose their key at runtime.</summary>
     public static string Get(string key) => Resources.GetString(key, CultureInfo.CurrentUICulture) ?? key;
 
+    /// <summary>The app's own name, shown wherever it names itself rather than the OS-level
+    /// launcher label (which follows the phone's locale independently — see
+    /// Platforms/Android/Resources/values{-hr}/strings.xml).</summary>
+    public static string App_Name => Get(nameof(App_Name));
     /// <summary>Dismissing a sheet or dialog.</summary>
     public static string Common_Cancel => Get(nameof(Common_Cancel));
     /// <summary>Delete</summary>
     public static string Common_Delete => Get(nameof(Common_Delete));
     /// <summary>Close</summary>
     public static string Common_Close => Get(nameof(Common_Close));
+    /// <summary>Yes</summary>
+    public static string Common_Yes => Get(nameof(Common_Yes));
+    /// <summary>No</summary>
+    public static string Common_No => Get(nameof(Common_No));
     /// <summary>The shelf: the first screen.</summary>
     public static string Library_Title => Get(nameof(Library_Title));
     /// <summary>Tab bar label.</summary>
@@ -474,6 +482,16 @@ public static class Strings
     public static string Help_PresetFast => Get(nameof(Help_PresetFast));
     /// <summary>Switching presets only takes effect after you stop and restart alignment — it does not change a run…</summary>
     public static string Help_PresetChangeNote => Get(nameof(Help_PresetChangeNote));
+    /// <summary>Activate Premium Pro Plus?</summary>
+    public static string Premium_ConfirmTitle => Get(nameof(Premium_ConfirmTitle));
+    /// <summary>Exclusive perks await.</summary>
+    public static string Premium_ConfirmBody => Get(nameof(Premium_ConfirmBody));
+    /// <summary>You already have Premium Pro Plus!</summary>
+    public static string Premium_Title => Get(nameof(Premium_Title));
+    /// <summary>Because everything in this app is free. Always was, always will be.</summary>
+    public static string Premium_Body => Get(nameof(Premium_Body));
+    /// <summary>Jagshemash! Great success!</summary>
+    public static string Premium_Tagline => Get(nameof(Premium_Tagline));
     /// <summary>Why it can be slower than the estimate</summary>
     public static string Help_SlowerSection => Get(nameof(Help_SlowerSection));
     /// <summary>Heat. The moment the system reports the phone warming, the app eases off on its own — first t…</summary>

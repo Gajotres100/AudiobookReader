@@ -23,6 +23,12 @@ public partial class TabReselect
         var bar = Find(root);
         if (bar is null || ReferenceEquals(bar, _bar)) return;
 
+        // The shell is rebuilt on every language change, which means a new bar every time. Without
+        // this, the old one — and everything its own subscription chain keeps reachable — was never
+        // let go, so a session that switched languages a few times left that many dead bars pinned
+        // in memory for no reason.
+        if (_bar is not null) _bar.ItemReselected -= OnReselected;
+
         _bar = bar;
         bar.ItemReselected += OnReselected;
     }
