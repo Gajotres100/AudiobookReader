@@ -338,7 +338,7 @@ public class AudiobookshelfClient(HttpClient http)
         return new ServerBook(
             item.Id,
             media?.Metadata?.Title ?? CoreStrings.Server_Untitled,
-            media?.Metadata?.AuthorName,
+            media?.Metadata?.Author,
             media?.NumAudioFiles ?? media?.AudioFiles?.Count ?? 0,
             media?.EbookFormat ?? media?.EbookFileFormat,
             media?.Duration ?? 0,

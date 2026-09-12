@@ -126,10 +126,36 @@ internal record WireMedia(
     [property: JsonPropertyName("ebookFile")] WireLibraryFile? EbookFile,
     [property: JsonPropertyName("chapters")] List<WireChapter>? Chapters);
 
+/// <param name="AuthorName">
+/// The authors as one string. Present in the short form the library listing returns.
+/// </param>
+/// <param name="Authors">
+/// The authors one by one. This is what a single item returns when asked for in full, and the
+/// short field is then absent — which is why the shelf showed an author and the book's own page
+/// did not, and why a downloaded book landed in a folder called "Unknown author". Reading both
+/// costs nothing and stops the answer depending on which call it came from.
+/// </param>
 internal record WireMetadata(
     [property: JsonPropertyName("title")] string? Title,
     [property: JsonPropertyName("authorName")] string? AuthorName,
-    [property: JsonPropertyName("seriesName")] string? SeriesName);
+    [property: JsonPropertyName("seriesName")] string? SeriesName,
+    [property: JsonPropertyName("authors")] List<WireAuthor>? Authors = null)
+{
+    /// <summary>The authors, however this particular reply chose to say them.</summary>
+    public string? Author => string.IsNullOrWhiteSpace(AuthorName)
+        ? Join(Authors?.Select(a => a.Name))
+        : AuthorName;
+
+    private static string? Join(IEnumerable<string?>? names)
+    {
+        var kept = names?.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+        return kept is { Count: > 0 } ? string.Join(", ", kept) : null;
+    }
+}
+
+internal record WireAuthor(
+    [property: JsonPropertyName("id")] string? Id,
+    [property: JsonPropertyName("name")] string? Name);
 
 internal record WireAudioFile(
     [property: JsonPropertyName("ino")] string? Ino,

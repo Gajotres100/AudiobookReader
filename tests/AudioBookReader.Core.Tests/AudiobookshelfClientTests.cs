@@ -104,6 +104,45 @@ public class AudiobookshelfClientTests
     }
 
     [Fact]
+    public async Task ReadsTheAuthorFromTheShortFormTheShelfReturns()
+    {
+        var (client, _) = Connected(_ => Json("""
+            {"results":[{"id":"a","media":{"metadata":{"title":"T","authorName":"Ed McDonald"}}}]}
+            """));
+
+        var books = await client.GetBooksAsync("lib");
+
+        Assert.Equal("Ed McDonald", Assert.Single(books).Author);
+    }
+
+    [Fact]
+    public async Task ReadsTheAuthorFromTheLongFormOneBookReturns()
+    {
+        // Asked for in full, the server names the authors one by one and leaves authorName out —
+        // which is why a book's own page showed no author and a download landed under
+        // "Unknown author" while the shelf beside it had the name all along.
+        var (client, _) = Connected(_ => Json("""
+            {"id":"a","media":{"metadata":{"title":"T","authors":[{"id":"1","name":"John Gwynne"}]}}}
+            """));
+
+        var detail = await client.GetBookAsync("a");
+
+        Assert.Equal("John Gwynne", detail.Book.Author);
+    }
+
+    [Fact]
+    public async Task JoinsSeveralAuthors()
+    {
+        var (client, _) = Connected(_ => Json("""
+            {"id":"a","media":{"metadata":{"title":"T","authors":[{"name":"One"},{"name":"Two"}]}}}
+            """));
+
+        var detail = await client.GetBookAsync("a");
+
+        Assert.Equal("One, Two", detail.Book.Author);
+    }
+
+    [Fact]
     public async Task SendsTheTokenOnEveryRequestThatNeedsIt()
     {
         var (client, handler) = Connected(_ => Json("""{"libraries":[]}"""));
