@@ -16,7 +16,7 @@
 		<MauiXamlInflator>SourceGen</MauiXamlInflator>
 
 		<ApplicationTitle>AudioBook Reader</ApplicationTitle>
-		<ApplicationId>com.ngaic.audiobookreader</ApplicationId>
+		<ApplicationId>com.gajotres.audiobookreader</ApplicationId>
 
 		<ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>

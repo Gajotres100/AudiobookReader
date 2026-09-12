@@ -22,8 +22,8 @@ namespace AudioBookReader.App.Platforms.Android.Services;
 [Service(Exported = false, ForegroundServiceType = global::Android.Content.PM.ForegroundService.TypeDataSync)]
 public class DownloadService : Service
 {
-    public const string ActionStart = "com.ngaic.audiobookreader.DOWNLOAD_START";
-    public const string ActionStop = "com.ngaic.audiobookreader.DOWNLOAD_STOP";
+    public const string ActionStart = "com.gajotres.audiobookreader.DOWNLOAD_START";
+    public const string ActionStop = "com.gajotres.audiobookreader.DOWNLOAD_STOP";
     public const string ExtraItemId = "itemId";
     public const string ExtraTitle = "title";
     public const string ExtraAppStorage = "appStorage";

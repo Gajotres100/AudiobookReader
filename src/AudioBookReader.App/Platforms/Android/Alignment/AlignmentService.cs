@@ -19,8 +19,8 @@ namespace AudioBookReader.App.Platforms.Android.Alignment;
 [Service(Exported = false, ForegroundServiceType = global::Android.Content.PM.ForegroundService.TypeDataSync)]
 public class AlignmentService : Service
 {
-    public const string ActionStart = "com.ngaic.audiobookreader.ALIGN_START";
-    public const string ActionStop = "com.ngaic.audiobookreader.ALIGN_STOP";
+    public const string ActionStart = "com.gajotres.audiobookreader.ALIGN_START";
+    public const string ActionStop = "com.gajotres.audiobookreader.ALIGN_STOP";
     public const string ExtraBookId = "bookId";
 
     private const string ChannelId = "alignment";
