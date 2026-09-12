@@ -506,6 +506,14 @@ public static class Strings
     public static string Delete_RemoveAudioTitle => Get(nameof(Delete_RemoveAudioTitle));
     /// <summary>Remove the ebook?</summary>
     public static string Delete_RemoveEbookTitle => Get(nameof(Delete_RemoveEbookTitle));
+    /// <summary>Delete the alignment</summary>
+    public static string Align_Clear => Get(nameof(Align_Clear));
+    /// <summary>Delete the alignment?</summary>
+    public static string Dialog_ClearTitle => Get(nameof(Dialog_ClearTitle));
+    /// <summary>Everything measured so far ({0} of {1} chapters) goes. The book and your place in it stay, an…</summary>
+    public static string Dialog_ClearBody => Get(nameof(Dialog_ClearBody));
+    /// <summary>Title of the app chooser for translating a word.</summary>
+    public static string Reader_TranslateChooser => Get(nameof(Reader_TranslateChooser));
     /// <summary>Measures the passage you are reading, while you read it. Nothing to wait for.</summary>
     public static string Details_LiveAlignmentNote => Get(nameof(Details_LiveAlignmentNote));
     /// <summary>Works through the whole book in the background, so it is ready before you get there.</summary>

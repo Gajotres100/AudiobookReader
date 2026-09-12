@@ -839,6 +839,19 @@
   <data name="Delete_RemoveEbookTitle" xml:space="preserve">
     <value>Remove the ebook?</value>
   </data>
+  <data name="Align_Clear" xml:space="preserve">
+    <value>Delete the alignment</value>
+  </data>
+  <data name="Dialog_ClearTitle" xml:space="preserve">
+    <value>Delete the alignment?</value>
+  </data>
+  <data name="Dialog_ClearBody" xml:space="preserve">
+    <value>Everything measured so far ({0} of {1} chapters) goes. The book and your place in it stay, and nothing starts on its own afterwards.</value>
+  </data>
+  <data name="Reader_TranslateChooser" xml:space="preserve">
+    <value>Translate with</value>
+    <comment>Title of the app chooser for translating a word.</comment>
+  </data>
   <data name="Details_LiveAlignmentNote" xml:space="preserve">
     <value>Measures the passage you are reading, while you read it. Nothing to wait for.</value>
   </data>

@@ -185,22 +185,23 @@ public class ChapterAligner(
 
                     if (found is null) continue;
 
-                    // Two things have to agree for an anchor to be trusted: that the words line
-                    // up with the book, and that they were heard properly in the first place.
-                    // Only the first was being weighed, so a garbled segment that happened to
-                    // match well carried the same weight as a clean one — and the map's own
-                    // tie-breaker had nothing to break the tie with.
-                    var confidence = found.Value.Confidence * Math.Clamp(phrase.Probability, 0f, 1f);
-
+                    // Weighting this by the recognizer's own segment probability was tried and
+                    // reverted: WhisperTranscriber never calls .WithProbabilities(), so
+                    // phrase.Probability is always 0 in practice, which zeroed every real anchor's
+                    // confidence. FromAnchors then picks the run with the highest confidence SUM,
+                    // so a chapter of forty real anchors at 0 lost to the two boundary guesses at
+                    // 0.2 each — every whole-book run kept nothing but its own starting guesses.
+                    // If recognizer confidence is worth using later, it needs its own field on
+                    // Anchor and .WithProbabilities() actually turned on, not a multiply here.
                     var opening = new Anchor(
                         phrase.Words[found.Value.TranscriptStart].AtMs,
                         found.Value.CharOffset,
-                        confidence);
+                        found.Value.Confidence);
 
                     var closing = new Anchor(
                         phrase.Words[found.Value.TranscriptEnd].AtMs,
                         found.Value.EndCharOffset,
-                        confidence);
+                        found.Value.Confidence);
 
                     anchors.Add(opening);
 

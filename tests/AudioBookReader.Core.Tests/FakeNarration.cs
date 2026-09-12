@@ -96,7 +96,12 @@ public sealed class FakeNarration(
             var heard = Text[CharAt(from)..CharAt(to)];
             if (heard.Length == 0) continue;
 
-            segments.Add(new TranscriptSegment(from, to, noise > 0 ? Corrupt(heard) : heard));
+            // WhisperTranscriber never calls .WithProbabilities(), so every real segment's
+            // Probability is 0 in production. Reporting the record's own default of 1 here would
+            // have hidden the regression where ChapterAligner multiplied confidence by this field
+            // and silently zeroed out every real anchor a whole-book run ever produced.
+            segments.Add(new TranscriptSegment(
+                from, to, noise > 0 ? Corrupt(heard) : heard, Probability: 0f));
         }
 
         return Task.FromResult(Transcript.FromSegments(segments));

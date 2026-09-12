@@ -64,7 +64,7 @@ public partial class BookViewModel(
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanStartAlignment))]
-    [NotifyPropertyChangedFor(nameof(CanRealign))]
+    [NotifyPropertyChangedFor(nameof(CanClearAlignment))]
     public partial bool IsPaired { get; set; }
 
     public bool HasNoAudio => !HasAudio;
@@ -183,7 +183,7 @@ public partial class BookViewModel(
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanStartAlignment))]
     [NotifyPropertyChangedFor(nameof(IsIdleWithMessage))]
-    [NotifyPropertyChangedFor(nameof(CanRealign))]
+    [NotifyPropertyChangedFor(nameof(CanClearAlignment))]
     public partial bool IsAligning { get; set; }
 
     /// <summary>
@@ -195,8 +195,8 @@ public partial class BookViewModel(
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanStartAlignment))]
-    [NotifyPropertyChangedFor(nameof(CanRealign))]
-    [NotifyPropertyChangedFor(nameof(RealignText))]
+    [NotifyPropertyChangedFor(nameof(CanClearAlignment))]
+    [NotifyPropertyChangedFor(nameof(ClearAlignmentText))]
     [NotifyPropertyChangedFor(nameof(AlignmentSummary))]
     public partial bool MeasuresWhileReading { get; set; }
 
@@ -239,13 +239,13 @@ public partial class BookViewModel(
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AlignmentSummary))]
     [NotifyPropertyChangedFor(nameof(StartAlignmentText))]
-    [NotifyPropertyChangedFor(nameof(CanRealign))]
+    [NotifyPropertyChangedFor(nameof(CanClearAlignment))]
     public partial int AlignedChapterCount { get; set; }
 
     /// <summary>How much audio has genuinely been measured, which is what live measuring produces.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AlignmentSummary))]
-    [NotifyPropertyChangedFor(nameof(CanRealign))]
+    [NotifyPropertyChangedFor(nameof(CanClearAlignment))]
     public partial long MeasuredMs { get; set; }
 
     /// <summary>Only worth offering once there is something to discard.</summary>
@@ -257,11 +257,17 @@ public partial class BookViewModel(
     /// clean, and starting clean is exactly what you need when you are trying to find out whether
     /// the live measuring works at all.
     /// </summary>
-    public bool CanRealign => IsPaired && !IsAligning && (AlignedChapterCount > 0 || MeasuredMs > 0);
+    /// <summary>
+    /// Always offered for a paired book, running or not, measured or not.
+    ///
+    /// It used to hide itself while a run was active and while nothing had been measured yet —
+    /// which meant the one moment someone most wants to bail out of a bad alignment, mid-run, was
+    /// exactly when the button to do it was gone. Clicking it now stops whatever is running first.
+    /// </summary>
+    public bool CanClearAlignment => IsPaired;
 
     /// <summary>What the button does, which is not the same thing in the two modes.</summary>
-    public string RealignText =>
-        MeasuresWhileReading ? Strings.Align_ClearMeasured : Strings.Align_AgainFromStart;
+    public string ClearAlignmentText => Strings.Align_Clear;
 
     /// <summary>The chapter a resume would begin with, computed the same way the aligner does.</summary>
     [ObservableProperty]
@@ -405,7 +411,7 @@ public partial class BookViewModel(
         _switchingMode = false;
 
         OnPropertyChanged(nameof(CanStartAlignment));
-        OnPropertyChanged(nameof(CanRealign));
+        OnPropertyChanged(nameof(CanClearAlignment));
 
         await RefreshAlignmentProgressAsync();
 
@@ -522,7 +528,20 @@ public partial class BookViewModel(
     /// <summary>
     /// Keeps the chapter-derived state in step with playback: the heading, the chapter-relative
     /// scrubber, and which row in the list is lit up.
+    ///
+    /// Run from these two hooks rather than only from the explicit calls elsewhere, so there is
+    /// never a window where PositionMs or DurationMs has already moved but the chapter has not
+    /// caught up to it. That window used to be real: StartPlaybackAsync set PositionMs, then
+    /// DurationMs to the whole book's length, and only on the next line called this — and setting
+    /// DurationMs fires its own PropertyChanged for Progress on the way, computed against the
+    /// still-null current chapter, which is the book-wide ratio rather than the chapter's. The
+    /// generated setters call these automatically, on every assignment, so the correction is never
+    /// more than one step behind rather than a whole statement behind.
     /// </summary>
+    partial void OnPositionMsChanged(long value) => UpdateChapterTitle();
+
+    partial void OnDurationMsChanged(long value) => UpdateChapterTitle();
+
     private void UpdateChapterTitle()
     {
         var chapter = CurrentChapter();
@@ -920,34 +939,34 @@ public partial class BookViewModel(
     /// and an early chapter aligned from a poor estimate stays wrong forever otherwise.
     /// </summary>
     [RelayCommand]
-    private Task RealignAsync() => GuardAsync(async () =>
+    private Task ClearAlignmentAsync() => GuardAsync(async () =>
     {
-        var live = MeasuresWhileReading;
-
         var confirmed = await Shell.Current.DisplayAlertAsync(
-            live ? Strings.Dialog_ClearMeasuredTitle : Strings.Dialog_RealignTitle,
-            string.Format(Strings.Dialog_RealignBody, AlignedChapterCount, Chapters.Count)
-            + (live ? Strings.Dialog_RealignLiveTail : Strings.Dialog_RealignAheadTail),
-            live ? Strings.Common_Delete : Strings.Dialog_RealignConfirm,
+            Strings.Dialog_ClearTitle,
+            string.Format(Strings.Dialog_ClearBody, AlignedChapterCount, Chapters.Count),
+            Strings.Common_Delete,
             Strings.Common_Cancel);
 
         if (!confirmed) return;
 
-        // Stopped before the file is touched, and waited for.
+        // Stopped before the file is touched, and waited for — both kinds of run, because the
+        // button is now reachable while either is active.
         //
-        // Sync on the fly holds the map in memory and writes it out every couple of windows. This
-        // is reached from the book's own page, which is reached from the reader — so the run is
-        // very likely alive right now, and deleting the file under it only meant the next save put
-        // everything back thirty seconds later. Which is exactly what "I deleted it and a third of
-        // chapter one was still there" looks like.
+        // Sync on the fly holds the map in memory and writes it out every couple of windows; the
+        // background align-ahead run checkpoints every twenty probes. Either one deleting the file
+        // out from under it only meant the next save put everything back moments later, which is
+        // exactly what "I deleted it and a third of chapter one was still there" looks like.
         await liveSync.StopAsync();
+        await alignment.StopAndWaitAsync();
 
         await library.ResetAlignmentAsync(BookId);
         await RefreshAlignmentProgressAsync();
 
-        // Only the mode that has a run to start starts one. In the other, an empty map is the
-        // whole point: from here on, everything in it was measured while reading.
-        if (!live) await StartAlignmentAsync();
+        // Nothing is started afterwards, deliberately.
+        //
+        // This used to clear and then immediately begin again, which made it impossible to simply
+        // throw a bad alignment away: the only way to get rid of one was to start another. Deleting
+        // and aligning are two decisions, and the page has a button for each.
     });
 
     private void OnAlignmentChanged(object? sender, AlignmentStatus status) =>

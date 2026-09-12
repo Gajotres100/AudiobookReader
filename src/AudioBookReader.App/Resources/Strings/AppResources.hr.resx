@@ -783,6 +783,18 @@
   <data name="Delete_RemoveEbookTitle" xml:space="preserve">
     <value>Ukloniti e-knjigu?</value>
   </data>
+  <data name="Align_Clear" xml:space="preserve">
+    <value>Obriši poravnanje</value>
+  </data>
+  <data name="Dialog_ClearTitle" xml:space="preserve">
+    <value>Obrisati poravnanje?</value>
+  </data>
+  <data name="Dialog_ClearBody" xml:space="preserve">
+    <value>Sve dosad izmjereno ({0} od {1} poglavlja) nestaje. Sama knjiga i tvoja pozicija ostaju, a nakon toga se ništa ne pokreće samo od sebe.</value>
+  </data>
+  <data name="Reader_TranslateChooser" xml:space="preserve">
+    <value>Prevedi s</value>
+  </data>
   <data name="Details_LiveAlignmentNote" xml:space="preserve">
     <value>Mjeri dio koji čitaš, dok ga čitaš. Nema čekanja.</value>
   </data>

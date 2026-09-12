@@ -179,11 +179,19 @@
                             Style="{StaticResource Secondary}"
                             Text="{x:Static s:Strings.Details_StopAlignment}" />
 
+                        <!--
+                            Deleting is its own button, next to the one that aligns.
+
+                            It used to clear and start again in one press, which left no way to
+                            simply be rid of an alignment: the only route to an empty map was
+                            another run. Two decisions, two buttons — and this one is destructive,
+                            so it is styled as such rather than sitting quietly as a secondary.
+                        -->
                         <Button
-                            Command="{Binding RealignCommand}"
-                            IsVisible="{Binding CanRealign}"
-                            Style="{StaticResource Secondary}"
-                            Text="{Binding RealignText}" />
+                            Command="{Binding ClearAlignmentCommand}"
+                            IsVisible="{Binding CanClearAlignment}"
+                            Style="{StaticResource Destructive}"
+                            Text="{Binding ClearAlignmentText}" />
                     </VerticalStackLayout>
                 </Border>
 

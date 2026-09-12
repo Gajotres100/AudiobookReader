@@ -76,4 +76,35 @@ public partial class AlignmentQueue
 
     /// <summary>Asks the running alignment to stop. Progress so far is kept.</summary>
     public partial void Stop();
+
+    /// <summary>
+    /// Stops a run and waits for the service to actually confirm it, rather than firing the stop
+    /// intent and hoping.
+    ///
+    /// <see cref="Stop"/> only sends the intent — Android can take a moment to tear the foreground
+    /// service down, and a caller about to delete the very map that run is checkpointing to needs
+    /// the writing to have actually stopped, not just been asked to. Capped rather than unbounded:
+    /// a service that never reports back must not leave deletion stuck forever.
+    /// </summary>
+    public async Task StopAndWaitAsync(CancellationToken ct = default)
+    {
+        if (!Status.IsRunning) return;
+
+        var stopped = new TaskCompletionSource();
+        void OnChanged(object? sender, AlignmentStatus status)
+        {
+            if (!status.IsRunning) stopped.TrySetResult();
+        }
+
+        Changed += OnChanged;
+        try
+        {
+            Stop();
+            await Task.WhenAny(stopped.Task, Task.Delay(TimeSpan.FromSeconds(5), ct));
+        }
+        finally
+        {
+            Changed -= OnChanged;
+        }
+    }
 }

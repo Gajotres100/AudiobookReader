@@ -29,6 +29,19 @@ public class AlignmentService : Service
     private CancellationTokenSource? _cancellation;
     private PowerManager.WakeLock? _wakeLock;
 
+    // A Stop followed quickly by a Start delivers both intents to this SAME Service instance —
+    // Android does not construct a new one while this is alive. Stop only asks the in-flight run
+    // to cancel; it does not wait for it to actually unwind, and OnStartCommand used to react by
+    // unconditionally overwriting _cancellation and launching a second RunAsync — two runs racing
+    // for the same field, the same wake lock, and the same book row, and the OLD run's delayed
+    // StopSelf()/OnDestroy tearing the service down out from under the NEW run it had already
+    // been superseded by. _running chains a new run onto whatever is still in flight so there is
+    // never more than one executing at once; _generation marks which run is the current one, so a
+    // superseded run's own cleanup knows to leave the service, the wake lock and the notification
+    // alone for whichever run is actually still using them.
+    private Task? _running;
+    private int _generation;
+
     public override IBinder? OnBind(Intent? intent) => null;
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
@@ -51,23 +64,32 @@ public class AlignmentService : Service
         CreateNotificationChannel();
         StartForeground(NotificationId, BuildNotification(Strings.Download_Preparing, 0));
 
-        _cancellation = new CancellationTokenSource();
+        var cancellation = new CancellationTokenSource();
+        _cancellation = cancellation;
 
-        // Only the whole-book run lives here. Sync on the fly runs in the app itself, because it
-        // only ever works while the reader is on screen and so needs neither a service nor the
-        // notification a service is obliged to post.
-        //
+        var generation = ++_generation;
+        var previous = _running;
+
         // Started through Task.Run because Android calls OnStartCommand on the main looper, and
         // nothing downstream configures its awaits. Without this, every continuation in the whole
         // alignment pipeline resumes on the UI thread — recognition included.
-        _ = Task.Run(() => RunAsync(bookId, _cancellation.Token));
+        _running = Task.Run(async () =>
+        {
+            if (previous is not null)
+            {
+                // Only waited for, not inspected — whatever it finished as, this run starts clean.
+                try { await previous; } catch { }
+            }
+
+            await RunAsync(bookId, cancellation.Token, generation);
+        });
 
         // Not sticky: a book half-aligned when the process died should resume because the user
         // asked again, not because Android silently restarted the service with a stale intent.
         return StartCommandResult.NotSticky;
     }
 
-    private async Task RunAsync(int bookId, CancellationToken ct)
+    private async Task RunAsync(int bookId, CancellationToken ct, int generation)
     {
         var services = IPlatformApplication.Current?.Services;
         var queue = services?.GetService<AlignmentQueue>();
@@ -129,9 +151,15 @@ public class AlignmentService : Service
         }
         finally
         {
-            ReleaseWakeLock();
-            StopForeground(StopForegroundFlags.Remove);
-            StopSelf();
+            // Only the run that is still current tears anything down. A superseded run reaching
+            // here has nothing left to clean up on its own behalf — the run that replaced it
+            // already owns the wake lock, the foreground state and the service's lifetime.
+            if (generation == _generation)
+            {
+                ReleaseWakeLock();
+                StopForeground(StopForegroundFlags.Remove);
+                StopSelf();
+            }
         }
     }
 

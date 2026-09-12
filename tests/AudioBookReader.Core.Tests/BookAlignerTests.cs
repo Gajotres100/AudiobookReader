@@ -176,6 +176,97 @@ public class BookAlignerTests : IAsyncLifetime, IDisposable
         return narration.TranscribeCalls;
     }
 
+    /// <summary>
+    /// Reproduces the exact shape a real bug left behind: every chapter marked "aligned through"
+    /// in the book row, but a map on disk holding nothing but the two low-confidence boundary
+    /// guesses per chapter — the signature of a build that scored every real anchor at 0 and lost
+    /// all of them to <see cref="ChapterSyncMap.FromAnchors"/>'s own tie-breaker. A book caught by
+    /// that bug must recover once a fixed build runs, not stay "Complete" with nothing usable.
+    /// </summary>
+    [Fact]
+    public async Task RedoesAChapterThatIsMarkedDoneButHoldsOnlyBoundaryGuesses()
+    {
+        var book = await CreatePairedBookAsync();
+        await Aligner(Narration()).AlignAsync(book.Id);
+
+        var healthy = await _database.GetBookAsync(book.Id);
+        Assert.Equal(SyncState.Complete, healthy!.SyncState);
+
+        // Poison chapter 0 exactly as the bug did: strip it down to the two boundary anchors,
+        // which by construction sit at BoundaryConfidence and nothing higher.
+        var map = await _syncMaps.LoadAsync(book.Id);
+        var chapters = await _database.GetChaptersAsync(book.Id);
+        var boundary = chapters[0];
+
+        var poisoned = new ChapterSyncMap
+        {
+            ChapterIndex = boundary.Index,
+            Anchors =
+            [
+                new Anchor(boundary.StartMs!.Value, boundary.TextStart!.Value, 0.2f),
+                new Anchor(boundary.EndMs!.Value, boundary.TextEnd!.Value, 0.2f),
+            ],
+        };
+        map!.SetChapter(poisoned);
+        await _syncMaps.SaveAsync(book.Id, map);
+
+        var healing = Narration();
+        await Aligner(healing).AlignAsync(book.Id);
+
+        // It listened again — a book that skipped straight past the poisoned chapter because the
+        // book row still claimed it was done would make no calls at all.
+        Assert.True(healing.TranscribeCalls > 0);
+
+        var healedMap = await _syncMaps.LoadAsync(book.Id);
+        var healedChapter = healedMap!.ForChapter(boundary.Index);
+        Assert.NotNull(healedChapter);
+        Assert.True(healedChapter!.HasMeasurement(0.2f), "the poisoned chapter should hold real anchors again");
+
+        var final = await _database.GetBookAsync(book.Id);
+        Assert.Equal(SyncState.Complete, final!.SyncState);
+    }
+
+    /// <summary>
+    /// The companion to the healing test above: a chapter that finished with a genuinely good
+    /// measurement, sitting ahead of one that did not, must not be redone just because a LATER
+    /// chapter is unmeasured. Healing walks forward from chapter 0 and stops at the first bad
+    /// chapter it finds — it does not, say, jump straight to whichever chapter is worst.
+    /// </summary>
+    [Fact]
+    public async Task DoesNotRedoAHealthyChapterAheadOfAnUnrelatedGap()
+    {
+        var book = await CreatePairedBookAsync();
+        await Aligner(Narration()).AlignAsync(book.Id);
+
+        var map = await _syncMaps.LoadAsync(book.Id);
+        var chapters = await _database.GetChaptersAsync(book.Id);
+
+        // Poison the last chapter only; chapters before it keep their real measurements.
+        var last = chapters[^1];
+        map!.SetChapter(new ChapterSyncMap
+        {
+            ChapterIndex = last.Index,
+            Anchors =
+            [
+                new Anchor(last.StartMs!.Value, last.TextStart!.Value, 0.2f),
+                new Anchor(last.EndMs!.Value, last.TextEnd!.Value, 0.2f),
+            ],
+        });
+        await _syncMaps.SaveAsync(book.Id, map);
+
+        var healing = Narration();
+        await Aligner(healing).AlignAsync(book.Id);
+
+        // Only the poisoned chapter needed redoing, not the whole book.
+        var wholeBookCalls = await CountCallsForAFullRunAsync();
+        Assert.True(
+            healing.TranscribeCalls < wholeBookCalls,
+            $"healing run made {healing.TranscribeCalls} calls, a full run makes {wholeBookCalls}");
+
+        var healedMap = await _syncMaps.LoadAsync(book.Id);
+        Assert.True(healedMap!.ForChapter(last.Index)!.HasMeasurement(0.2f));
+    }
+
     // ---- Refusals ----
 
     [Fact]

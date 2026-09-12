@@ -45,16 +45,49 @@ public class BookAligner(
         var map = await LoadOrCreateMapAsync(book);
         var aligner = new ChapterAligner(tokenized, transcriber, _settings, throttle, log);
 
-        // Two answers, and the earlier one wins.
+        // AlignedThroughChapter is the only trustworthy answer to "where does this run continue".
+        // It advances exactly once per chapter, only after that chapter's aligner.AlignAsync call
+        // returns having actually finished — so a chapter cut short by Stop, or by a run that
+        // crashed partway through, never advances it, and resuming never skips past unfinished
+        // work.
         //
-        // The map says which chapters hold a measurement, which used to be the same question as
-        // which are finished — it no longer is, because a long chapter now saves what it has found
-        // part of the way through. A chapter with some anchors in it may still be half done, and
-        // only the book's own record says which chapters actually ran to the end.
+        // The map's own opinion (FirstChapterNeedingWork) used to override this by taking whichever
+        // of the two was earlier — which sounds cautious but broke resume the one time it mattered:
+        // a chapter poisoned by a bug (every real anchor scored 0 confidence, so only the two
+        // boundary guesses survived FromAnchors) never counts as measured, so the map kept saying
+        // "start from chapter 1" even after six chapters had genuinely finished. Trusting the map
+        // over the book's own record turned a one-chapter bug into "the whole book restarts every
+        // time". It is kept as a log line so a real mismatch is still visible, but it no longer
+        // steers anything.
         var fromMap = map.FirstChapterNeedingWork(chapters.Count, _settings.BoundaryConfidence);
-        var first = Math.Min(fromMap, Math.Max(book.AlignedThroughChapter + 1, 0));
+        var claimedThrough = Math.Max(book.AlignedThroughChapter, -1);
 
-        log?.Invoke($"book {bookId}: {textLength:N0} chars of text, {chapters.Count} chapters, starting at {first}");
+        // Heals a book caught by that same bug before this fix existed: a chapter the record
+        // calls finished, but whose only anchors are the two boundary guesses, carries the exact
+        // signature of every real anchor having been discarded. Redoing it costs nothing now that
+        // a fixed build actually keeps what it measures, and the alternative is a book stuck
+        // "Complete" forever with nothing usable in most of its chapters.
+        //
+        // Deliberately narrow: it only ever moves the start EARLIER than AlignedThroughChapter+1,
+        // and only for a chapter the map can see and call unmeasured. A chapter with no audio of
+        // its own (HasAudioRange false) never gets an entry in the map at all — ForChapter returns
+        // null for it — so it can never match this check and can never be mistaken for poisoned.
+        var healFrom = -1;
+        for (var i = 0; i <= claimedThrough && i < chapters.Count; i++)
+        {
+            if (map.ForChapter(chapters[i].Index) is { } chapterMap
+                && !chapterMap.HasMeasurement(_settings.BoundaryConfidence))
+            {
+                healFrom = i;
+                break;
+            }
+        }
+
+        var first = healFrom >= 0 ? healFrom : Math.Max(claimedThrough + 1, 0);
+
+        log?.Invoke(
+            $"book {bookId}: {textLength:N0} chars of text, {chapters.Count} chapters, starting at {first} " +
+            $"(map's own opinion: {fromMap}, healing: {healFrom})");
 
         if (first >= chapters.Count) return;
 
