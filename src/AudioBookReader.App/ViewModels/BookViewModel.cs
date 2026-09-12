@@ -424,9 +424,30 @@ public partial class BookViewModel(
 
         if (!TracksPlayback) return;
 
-        if (HasAudio) await StartPlaybackAsync();
+        // Not awaited: connecting to the playback service starts it cold whenever nothing else
+        // has touched it since the app began, which measured at roughly a second on top of
+        // preparing the file itself — all of it paid again on every switch between two audio-only
+        // books, since each one is a different file. None of that needs to hold up the page: the
+        // title and chapter list above are already on screen, and Tick, started right after this,
+        // picks up the real position and duration the moment the service actually answers.
+        if (HasAudio) _ = LoadPlaybackInBackgroundAsync();
 
         StartTicking();
+    }
+
+    private async Task LoadPlaybackInBackgroundAsync()
+    {
+        try
+        {
+            await StartPlaybackAsync();
+        }
+        catch (Exception ex)
+        {
+            // Logged rather than shown: this used to fail silently to the same place when it was
+            // awaited inline and the page's own catch swallowed it, so staying quiet here changes
+            // nothing about what the reader sees, only when the rest of the page becomes usable.
+            AppLog.Error("connecting to playback", ex);
+        }
     }
 
     private async Task StartPlaybackAsync()
