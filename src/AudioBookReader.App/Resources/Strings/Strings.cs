@@ -288,10 +288,6 @@ public static class Strings
     public static string Budget_BalancedDetail => Get(nameof(Budget_BalancedDetail));
     /// <summary>All cores, no pauses. Best with “only while charging” and the screen off.</summary>
     public static string Budget_FastDetail => Get(nameof(Budget_FastDetail));
-    /// <summary>~{0} h for a 10-hour book</summary>
-    public static string Budget_EstimateHours => Get(nameof(Budget_EstimateHours));
-    /// <summary>~{0} min for a 10-hour book</summary>
-    public static string Budget_EstimateMinutes => Get(nameof(Budget_EstimateMinutes));
     /// <summary>No battery limit</summary>
     public static string Settings_NoBatteryLimit => Get(nameof(Settings_NoBatteryLimit));
     /// <summary>{0} is a whole number, e.g. 20.</summary>
@@ -476,6 +472,8 @@ public static class Strings
     public static string Help_PresetBalanced => Get(nameof(Help_PresetBalanced));
     /// <summary>Every core, no pauses. Several times faster than the other two, and the phone will get warm.</summary>
     public static string Help_PresetFast => Get(nameof(Help_PresetFast));
+    /// <summary>Switching presets only takes effect after you stop and restart alignment — it does not change a run…</summary>
+    public static string Help_PresetChangeNote => Get(nameof(Help_PresetChangeNote));
     /// <summary>Why it can be slower than the estimate</summary>
     public static string Help_SlowerSection => Get(nameof(Help_SlowerSection));
     /// <summary>Heat. The moment the system reports the phone warming, the app eases off on its own — first t…</summary>

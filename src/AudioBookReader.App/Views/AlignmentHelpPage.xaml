@@ -85,6 +85,9 @@
                             <Label FontFamily="OpenSansSemibold" Text="{x:Static s:Strings.Budget_Fast}" />
                             <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Help_PresetFast}" />
                         </VerticalStackLayout>
+
+                        <BoxView Style="{StaticResource Divider}" />
+                        <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Help_PresetChangeNote}" />
                     </VerticalStackLayout>
                 </Border>
 

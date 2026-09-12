@@ -74,7 +74,6 @@
 
                                     <VerticalStackLayout Grid.Column="1" Spacing="2">
                                         <Label FontFamily="OpenSansSemibold" Text="{Binding Name}" />
-                                        <Label FontSize="13" Text="{Binding Estimate}" />
                                         <Label Style="{StaticResource Muted}" Text="{Binding Detail}" />
                                     </VerticalStackLayout>
                                 </Grid>

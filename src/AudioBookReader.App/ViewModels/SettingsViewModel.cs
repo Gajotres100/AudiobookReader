@@ -9,9 +9,6 @@ namespace AudioBookReader.App.ViewModels;
 /// <summary>One CPU preset as the settings list shows it.</summary>
 public class BudgetOption(CpuBudget budget, bool isSelected)
 {
-    /// <summary>A ten-hour audiobook, so the presets can be compared on something concrete.</summary>
-    private const long ReferenceBookMs = 10 * 60 * 60 * 1000L;
-
     public CpuBudget Budget { get; } = budget;
 
     public string Name { get; } = budget.Id switch
@@ -23,7 +20,10 @@ public class BudgetOption(CpuBudget budget, bool isSelected)
 
     public bool IsSelected { get; } = isSelected;
 
-    public string Estimate { get; } = Describe(budget.EstimateAlignmentTime(ReferenceBookMs));
+    // Deliberately no time estimate here: EstimateAlignmentTime only knows the reference book's
+    // length, not the one actually being aligned, and depends on the device staying cool and idle
+    // the whole time. Showing a number a real run routinely misses reads as a broken promise
+    // rather than a preset description.
 
     public string Detail { get; } = budget.Id switch
     {
@@ -31,11 +31,6 @@ public class BudgetOption(CpuBudget budget, bool isSelected)
         "balanced" => Strings.Budget_BalancedDetail,
         _ => Strings.Budget_FastDetail,
     };
-
-    private static string Describe(TimeSpan estimate) =>
-        estimate.TotalHours >= 1
-            ? string.Format(Strings.Budget_EstimateHours, estimate.TotalHours.ToString("0.#"))
-            : string.Format(Strings.Budget_EstimateMinutes, estimate.TotalMinutes.ToString("0"));
 }
 
 /// <summary>One language the app can speak, as the setting lists it.</summary>

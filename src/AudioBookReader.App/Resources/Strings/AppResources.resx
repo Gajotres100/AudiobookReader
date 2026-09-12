@@ -482,12 +482,6 @@
   <data name="Budget_FastDetail" xml:space="preserve">
     <value>All cores, no pauses. Best with “only while charging” and the screen off.</value>
   </data>
-  <data name="Budget_EstimateHours" xml:space="preserve">
-    <value>~{0} h for a 10-hour book</value>
-  </data>
-  <data name="Budget_EstimateMinutes" xml:space="preserve">
-    <value>~{0} min for a 10-hour book</value>
-  </data>
   <data name="Settings_NoBatteryLimit" xml:space="preserve">
     <value>No battery limit</value>
   </data>
@@ -793,6 +787,9 @@
   </data>
   <data name="Help_PresetFast" xml:space="preserve">
     <value>Every core, no pauses. Several times faster than the other two, and the phone will get warm.</value>
+  </data>
+  <data name="Help_PresetChangeNote" xml:space="preserve">
+    <value>Switching presets only takes effect after you stop and restart alignment — it does not change a run already under way.</value>
   </data>
   <data name="Help_SlowerSection" xml:space="preserve">
     <value>Why it can be slower than the estimate</value>
