@@ -10,10 +10,32 @@ namespace AudioBookReader.App.Services;
 /// </summary>
 public partial class TabReselect
 {
-    /// <summary>Raised with the route of the tab that was tapped again.</summary>
-    public event EventHandler<string>? Reselected;
+    /// <summary>
+    /// The one listener that gets told, not a list of them.
+    ///
+    /// A plain event would let every AppShell that has ever existed pile onto this singleton: each
+    /// language change builds a new AppShell, and each one's constructor subscribed here without
+    /// anything ever unsubscribing the last one. The tab bar's own reselect handler stays cleaned up
+    /// on the native side (TabReselect.Android.cs), but this cross-platform event had no such
+    /// guard — so the next reselect after a language switch called back into every AppShell that
+    /// switch had ever discarded, including ones whose Shell was already torn down, which is what
+    /// actually crashed with a NullReferenceException in ShellSectionRenderer. Only the current
+    /// AppShell should ever hear this, so subscribing replaces the previous listener instead of
+    /// joining it.
+    /// </summary>
+    private EventHandler<string>? _reselected;
 
-    private void Raise(string route) => Reselected?.Invoke(this, route);
+    /// <summary>Raised with the route of the tab that was tapped again.</summary>
+    public event EventHandler<string>? Reselected
+    {
+        add => _reselected = value;
+        remove
+        {
+            if (ReferenceEquals(_reselected, value)) _reselected = null;
+        }
+    }
+
+    private void Raise(string route) => _reselected?.Invoke(this, route);
 
     /// <summary>
     /// Attaches to whatever bottom bar is on screen now.
