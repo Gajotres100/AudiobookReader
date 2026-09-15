@@ -40,7 +40,7 @@ public record LanguageOption(string Code, string Name);
 /// <param name="Id">Stored, so it survives a change of wording or language.</param>
 public record RecognitionOption(string Id, string Name, string Detail, bool IsSelected);
 
-public partial class SettingsViewModel(AlignmentSettingsStore settings, Language language) : ObservableObject
+public partial class SettingsViewModel(AlignmentSettingsStore settings, Language language, ServerAccount account) : ObservableObject
 {
     public ObservableCollection<BudgetOption> Budgets { get; } = [];
 
@@ -113,8 +113,20 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings, Language
         ? Strings.Settings_NoBatteryLimit
         : string.Format(Strings.Settings_PauseBelow, MinimumBatteryPercent.ToString("0"));
 
+    /// <summary>Whether the setting below is worth showing at all — nothing to jump to otherwise.</summary>
+    [ObservableProperty]
+    public partial bool HasServer { get; set; }
+
+    [ObservableProperty]
+    public partial bool OpenServerOnStart { get; set; }
+
+    partial void OnOpenServerOnStartChanged(bool value) => account.OpenServerOnStart = value;
+
     public void Load()
     {
+        HasServer = account.IsConfigured;
+        OpenServerOnStart = account.OpenServerOnStart;
+
         var current = settings.Budget;
 
         Budgets.Clear();

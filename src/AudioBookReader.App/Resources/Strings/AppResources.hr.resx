@@ -156,6 +156,15 @@
   <data name="Settings_AlignmentNote" xml:space="preserve">
     <value>Poravnanje se samo pauzira i nastavlja — nikad ne gubi napredak. Uz to se samo usporava ako se telefon zagrije, bez obzira na odabrano.</value>
   </data>
+  <data name="Settings_StartSection" xml:space="preserve">
+    <value>Gdje se aplikacija otvara</value>
+  </data>
+  <data name="Settings_OpenServerOnStart" xml:space="preserve">
+    <value>Otvori server pri pokretanju</value>
+  </data>
+  <data name="Settings_OpenServerOnStartNote" xml:space="preserve">
+    <value>Preskače lokalnu policu i ide ravno na knjige tvog servera kad se app otvori. Biblioteka i preuzimanja ostaju udaljeni jedan dodir.</value>
+  </data>
   <data name="Settings_DiagnosticsSection" xml:space="preserve">
     <value>Dijagnostika</value>
   </data>

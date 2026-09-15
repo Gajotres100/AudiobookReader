@@ -124,6 +124,27 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!--  ======== Where the app opens ========  -->
+
+            <Border IsVisible="{Binding HasServer}" Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="14">
+
+                    <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Settings_StartSection}" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label
+                            Grid.Column="0"
+                            Text="{x:Static s:Strings.Settings_OpenServerOnStart}"
+                            VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding OpenServerOnStart}" />
+                    </Grid>
+
+                    <Label
+                        Style="{StaticResource Muted}"
+                        Text="{x:Static s:Strings.Settings_OpenServerOnStartNote}" />
+                </VerticalStackLayout>
+            </Border>
+
             <!--  ======== How accurately it listens ========  -->
 
             <Border Style="{StaticResource Card}">

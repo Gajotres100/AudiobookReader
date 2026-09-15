@@ -161,6 +161,15 @@
   <data name="Settings_AlignmentNote" xml:space="preserve">
     <value>Aligning only pauses and resumes — it never loses progress. It also slows itself down if the phone gets warm, whatever is set here.</value>
   </data>
+  <data name="Settings_StartSection" xml:space="preserve">
+    <value>Where the app opens</value>
+  </data>
+  <data name="Settings_OpenServerOnStart" xml:space="preserve">
+    <value>Open the server shelf on start</value>
+  </data>
+  <data name="Settings_OpenServerOnStartNote" xml:space="preserve">
+    <value>Skips the local shelf and goes straight to your server's books when the app opens. The library and its downloads are still one tap away.</value>
+  </data>
   <data name="Settings_DiagnosticsSection" xml:space="preserve">
     <value>Diagnostics</value>
   </data>

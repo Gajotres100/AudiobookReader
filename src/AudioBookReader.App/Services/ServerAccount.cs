@@ -23,6 +23,21 @@ public class ServerAccount
     private const string UserKey = "server.username";
     private const string PasswordKey = "server.password";
     private const string TrustAnyCertificateKey = "server.trustAnyCertificate";
+    private const string OpenOnStartKey = "server.openOnStart";
+
+    /// <summary>
+    /// Land on the server shelf instead of the local library when the app starts.
+    ///
+    /// Only meaningful once a server is configured — offering it earlier would be a switch for a
+    /// screen the user cannot reach yet. Checked once, at the app's own startup, rather than on
+    /// every rebuild of the shell a language change causes: the point is "when I open the app", not
+    /// "whenever the shell happens to be rebuilt".
+    /// </summary>
+    public bool OpenServerOnStart
+    {
+        get => Preferences.Default.Get(OpenOnStartKey, false);
+        set => Preferences.Default.Set(OpenOnStartKey, value);
+    }
 
     /// <summary>
     /// Skip certificate validation for this connection — for a self-signed server with no other way

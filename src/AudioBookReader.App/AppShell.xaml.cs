@@ -5,6 +5,16 @@ namespace AudioBookReader.App;
 
 public partial class AppShell : Shell
 {
+	/// <summary>
+	/// Whether the app-startup jump to the server has already happened this process.
+	///
+	/// A language change rebuilds this whole shell with <c>new AppShell()</c>, and that must not
+	/// look like the app starting again — someone who switched languages while reading is not
+	/// asking to be dropped onto the server shelf. Static and per-process rather than per-instance
+	/// is what tells "the app just launched" apart from "the shell was just rebuilt".
+	/// </summary>
+	private static bool _openedServerOnStart;
+
 	public AppShell()
 	{
 		InitializeComponent();
@@ -14,6 +24,32 @@ public partial class AppShell : Shell
 		// this is how it gets up here.
 		if (IPlatformApplication.Current?.Services.GetService<TabReselect>() is { } taps)
 			taps.Reselected += (_, route) => ToRootOf(route);
+
+		// Deferred rather than run inline: the shell has no navigation stack to send anywhere
+		// until it has actually finished appearing, and posting it is what lets that happen first.
+		if (!_openedServerOnStart
+			&& IPlatformApplication.Current?.Services.GetService<ServerAccount>() is
+				{ IsConfigured: true, OpenServerOnStart: true })
+		{
+			_openedServerOnStart = true;
+			Dispatcher.Dispatch(async () =>
+			{
+				try
+				{
+					// A slow or unreachable server must not hold the library tab hostage — someone
+					// who opens the app to read on a plane, with the server unreachable, still ends
+					// up looking at their books rather than a blank shelf that never loads. Racing
+					// the connection against a wait rather than passing it a token: RestoreAsync has
+					// no cancellation of its own to thread through, and abandoning the wait here is
+					// what the person actually cares about, not whether the request itself gives up.
+					if (await ServerReachableInTimeAsync()) await GoToAsync("server");
+				}
+				catch (Exception ex)
+				{
+					AppLog.Error("opening the server shelf on start", ex);
+				}
+			});
+		}
 
 		// Pages reached by navigation rather than from the shell's own structure have to be
 		// registered by route, or GoToAsync cannot resolve them.
@@ -56,6 +92,23 @@ public partial class AppShell : Shell
 		// straight inside a TabBar has MAUI wrap it in a section of its own, and that wrapper gets
 		// a generated route which resolves to nothing.
 		if (section.CurrentItem?.Route is { Length: > 0 } route) ToRootOf(route);
+	}
+
+	/// <summary>
+	/// Whether the server answers within a wait worth making someone sit through on app start.
+	///
+	/// Ten seconds either restores a working sign-in or it does not; nothing about a server that
+	/// takes longer than that to answer a request is going to feel like the app opened quickly.
+	/// </summary>
+	private static async Task<bool> ServerReachableInTimeAsync()
+	{
+		if (IPlatformApplication.Current?.Services.GetService<ServerConnection>() is not { } server)
+			return false;
+
+		var attempt = server.RestoreAsync();
+		var timedOut = await Task.WhenAny(attempt, Task.Delay(TimeSpan.FromSeconds(10))) != attempt;
+
+		return !timedOut && await attempt;
 	}
 
 	/// <summary>

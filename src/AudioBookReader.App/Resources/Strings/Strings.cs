@@ -90,6 +90,12 @@ public static class Strings
     public static string Settings_OnlyScreenOff => Get(nameof(Settings_OnlyScreenOff));
     /// <summary>Aligning only pauses and resumes — it never loses progress. It also slows itself down if the…</summary>
     public static string Settings_AlignmentNote => Get(nameof(Settings_AlignmentNote));
+    /// <summary>Where the app opens</summary>
+    public static string Settings_StartSection => Get(nameof(Settings_StartSection));
+    /// <summary>Open the server shelf on start</summary>
+    public static string Settings_OpenServerOnStart => Get(nameof(Settings_OpenServerOnStart));
+    /// <summary>Skips the local shelf and goes straight to your server's books when the app opens. The libra…</summary>
+    public static string Settings_OpenServerOnStartNote => Get(nameof(Settings_OpenServerOnStartNote));
     /// <summary>Diagnostics</summary>
     public static string Settings_DiagnosticsSection => Get(nameof(Settings_DiagnosticsSection));
     /// <summary>Detailed log</summary>
