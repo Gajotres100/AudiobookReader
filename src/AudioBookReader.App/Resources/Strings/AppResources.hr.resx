@@ -201,6 +201,12 @@
   <data name="Server_SecurityNote" xml:space="preserve">
     <value>Sve stoji u zaštićenom spremniku uređaja, uz ključ u sustavskom keystoreu. Bez „Zapamti prijavu” ostaješ prijavljen 30 dana od zadnjeg otvaranja aplikacije.</value>
   </data>
+  <data name="Server_TrustAnyCertificate" xml:space="preserve">
+    <value>Vjeruj certifikatu ovog servera, i ako je samopotpisan</value>
+  </data>
+  <data name="Server_TrustAnyCertificateWarning" xml:space="preserve">
+    <value>Isključuje provjeru kome certifikat ovog servera stvarno pripada — uključi ovo samo za server koji sam vodiš, i samo ako razumiješ da bi netko koji uspije presresti promet prema ovoj adresi mogao neopaženo čitati ili mijenjati podatke. Vrijedi od sljedećeg pokretanja aplikacije.</value>
+  </data>
   <data name="Server_Disconnect" xml:space="preserve">
     <value>Odspoji se</value>
   </data>

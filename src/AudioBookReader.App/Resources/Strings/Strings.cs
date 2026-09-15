@@ -120,6 +120,10 @@ public static class Strings
     public static string Server_Connect => Get(nameof(Server_Connect));
     /// <summary>Everything is kept in the device's protected store, with the key in the system keystore. With…</summary>
     public static string Server_SecurityNote => Get(nameof(Server_SecurityNote));
+    /// <summary>Trust this server's certificate, even if self-signed</summary>
+    public static string Server_TrustAnyCertificate => Get(nameof(Server_TrustAnyCertificate));
+    /// <summary>Skips checking who this server's certificate actually belongs to — only turn this on for a s…</summary>
+    public static string Server_TrustAnyCertificateWarning => Get(nameof(Server_TrustAnyCertificateWarning));
     /// <summary>Disconnect</summary>
     public static string Server_Disconnect => Get(nameof(Server_Disconnect));
     /// <summary>On the server</summary>

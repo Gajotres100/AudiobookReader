@@ -119,6 +119,21 @@
                     Placeholder="{x:Static s:Strings.Server_TokenPlaceholder}"
                     Text="{Binding Token}" />
 
+                <BoxView Style="{StaticResource Divider}" />
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label
+                        Grid.Column="0"
+                        Text="{x:Static s:Strings.Server_TrustAnyCertificate}"
+                        VerticalOptions="Center" />
+                    <Switch Grid.Column="1" IsToggled="{Binding TrustAnyCertificate}" />
+                </Grid>
+
+                <Label
+                    IsVisible="{Binding TrustAnyCertificate}"
+                    Style="{StaticResource Failure}"
+                    Text="{x:Static s:Strings.Server_TrustAnyCertificateWarning}" />
+
                 <Button
                     Command="{Binding ConnectCommand}"
                     Style="{StaticResource Primary}"

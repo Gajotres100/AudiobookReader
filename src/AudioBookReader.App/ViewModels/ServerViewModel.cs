@@ -59,7 +59,7 @@ public class Shelf(string name, IReadOnlyList<ServerBookRow> books) : List<Serve
         : string.Format(Strings.Server_BookCount, books.Count);
 }
 
-public partial class ServerViewModel(ServerConnection server) : ObservableObject
+public partial class ServerViewModel(ServerConnection server, ServerAccount account) : ObservableObject
 {
     /// <summary>
     /// The shelves, in the order they are read: the newest arrivals, then each series, then
@@ -108,6 +108,19 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
 
     public bool UsesPassword => !UsesToken;
 
+    /// <summary>
+    /// Skip certificate validation for this server — for a self-signed one with no other way in.
+    ///
+    /// Saved as it is toggled, but only read by the connection itself once, when that singleton is
+    /// first built — so a change here takes hold from the app's next launch, not mid-session. Worth
+    /// saying plainly in the warning next to it rather than leaving someone to discover it by
+    /// pressing Connect and finding nothing changed.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool TrustAnyCertificate { get; set; }
+
+    partial void OnTrustAnyCertificateChanged(bool value) => account.TrustAnyCertificate = value;
+
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
 
@@ -128,6 +141,7 @@ public partial class ServerViewModel(ServerConnection server) : ObservableObject
         Url = server.Url ?? "";
         // Reflects what was chosen last time, and starts on for a server never connected to.
         RemembersSignIn = await server.RemembersSignInAsync() || server.Url is null;
+        TrustAnyCertificate = account.TrustAnyCertificate;
 
         IsConnected = await server.RestoreAsync();
 

@@ -12,12 +12,34 @@ namespace AudioBookReader.App.Services;
 /// </summary>
 public class ServerConnection(ServerAccount account, BookImporter importer, DownloadFolder folder)
 {
-    private readonly AudiobookshelfClient _client = new(new HttpClient
+    private readonly AudiobookshelfClient _client = new(new HttpClient(BuildHandler(account))
     {
         // Long, because a library scan on a server with a few thousand titles is not fast, and a
         // download of a whole audiobook is slower still.
         Timeout = TimeSpan.FromMinutes(30),
     });
+
+    /// <summary>
+    /// The default handler, unless the user has explicitly said this one server's certificate
+    /// should not be checked.
+    ///
+    /// Read once, at the point this whole object is built, which is early in the app's life — the
+    /// setting is meant to describe "this server, from now on" rather than something that can
+    /// change mid-session, and .NET's handlers refuse to be reconfigured once a request has gone
+    /// through one anyway.
+    /// </summary>
+    private static HttpClientHandler BuildHandler(ServerAccount account)
+    {
+        var handler = new HttpClientHandler();
+
+        if (account.TrustAnyCertificate)
+        {
+            AppLog.Info("server: certificate validation disabled for this connection (user opt-in)");
+            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
+        }
+
+        return handler;
+    }
 
     public bool IsConnected { get; private set; }
 

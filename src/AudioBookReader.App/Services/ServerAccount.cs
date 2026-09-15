@@ -22,6 +22,23 @@ public class ServerAccount
     private const string RefreshKey = "server.refresh";
     private const string UserKey = "server.username";
     private const string PasswordKey = "server.password";
+    private const string TrustAnyCertificateKey = "server.trustAnyCertificate";
+
+    /// <summary>
+    /// Skip certificate validation for this connection — for a self-signed server with no other way
+    /// in.
+    ///
+    /// Off by default and only ever on because the person who owns the phone typed this exact
+    /// address themselves and turned this on knowingly for it. That is a materially smaller risk
+    /// than trusting every certificate everywhere: someone intercepting traffic still has to be
+    /// sitting on the path to the one address the user already chose to trust, not merely on any
+    /// network the phone happens to join.
+    /// </summary>
+    public bool TrustAnyCertificate
+    {
+        get => Preferences.Default.Get(TrustAnyCertificateKey, false);
+        set => Preferences.Default.Set(TrustAnyCertificateKey, value);
+    }
 
     /// <summary>Raised when the app connects or disconnects, so screens can show the change.</summary>
     public event EventHandler? Changed;

@@ -208,6 +208,12 @@
   <data name="Server_SecurityNote" xml:space="preserve">
     <value>Everything is kept in the device's protected store, with the key in the system keystore. Without “Remember sign-in” you stay signed in for 30 days from the last time you opened the app.</value>
   </data>
+  <data name="Server_TrustAnyCertificate" xml:space="preserve">
+    <value>Trust this server's certificate, even if self-signed</value>
+  </data>
+  <data name="Server_TrustAnyCertificateWarning" xml:space="preserve">
+    <value>Skips checking who this server's certificate actually belongs to — only turn this on for a server you run yourself, and only if you understand that anyone able to intercept traffic to this address could then read or alter it undetected. Takes effect the next time the app starts.</value>
+  </data>
   <data name="Server_Disconnect" xml:space="preserve">
     <value>Disconnect</value>
   </data>
