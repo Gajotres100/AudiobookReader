@@ -34,6 +34,18 @@ public class Book
     [Indexed]
     public string? AudioPath { get; set; }
 
+    /// <summary>
+    /// Where the audio actually came from, before alignment made an internal copy — a
+    /// <c>content://</c> URI or external path, still owned by the user rather than the app.
+    ///
+    /// Set once, the first time <see cref="AudioPath"/> is redirected to an internal copy, and
+    /// never afterward: a book can only be copied in from one real place, and overwriting this on
+    /// every re-copy would eventually record whatever the internal copy's own path happened to be
+    /// instead of the original. Null for a book whose <see cref="AudioPath"/> already points at the
+    /// user's own file — there is nothing else to remember in that case.
+    /// </summary>
+    public string? OriginalAudioPath { get; set; }
+
     [Indexed]
     public string? EbookPath { get; set; }
 

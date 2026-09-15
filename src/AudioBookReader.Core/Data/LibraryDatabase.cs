@@ -62,7 +62,7 @@ public class LibraryDatabase
     /// </summary>
     public async Task<Book?> FindBookByMediaPathAsync(string path) =>
         await (await ReadyAsync()).Table<Book>()
-            .Where(b => b.AudioPath == path || b.EbookPath == path)
+            .Where(b => b.AudioPath == path || b.OriginalAudioPath == path || b.EbookPath == path)
             .FirstOrDefaultAsync();
 
     public async Task<int> AddBookAsync(Book book)

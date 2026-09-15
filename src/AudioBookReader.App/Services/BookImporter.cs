@@ -152,6 +152,11 @@ public class BookImporter(
         var name = Path.GetFileName(location.TrimEnd('/'));
         if (string.IsNullOrWhiteSpace(name) || !Path.HasExtension(name)) name = $"{book.Title}.m4b";
 
+        // Remembered before AudioPath is redirected, and only if nothing is remembered yet — a
+        // second call here (a re-attach, or alignment running again) must not overwrite the real
+        // original with whatever the internal copy's own path happens to be.
+        book.OriginalAudioPath ??= location;
+
         await using (var source = references.OpenRead(location))
             book.AudioPath = await CopyInAsync(source, name, progress, ct);
 
@@ -218,7 +223,11 @@ public class BookImporter(
     public async Task<string?> OwnFileAsync(int bookId, bool audio)
     {
         var book = await database.GetBookAsync(bookId);
-        var path = audio ? book?.AudioPath : book?.EbookPath;
+
+        // OriginalAudioPath is where the user's own file actually is once alignment has redirected
+        // AudioPath to an internal copy; falling back to AudioPath covers a book whose audio was
+        // never copied in, where AudioPath is still the user's own reference.
+        var path = audio ? book?.OriginalAudioPath ?? book?.AudioPath : book?.EbookPath;
 
         return path is not null && references.IsReference(path) ? Readable(path) : null;
     }
@@ -276,7 +285,15 @@ public class BookImporter(
 
         var book = await library.DetachAudioAsync(bookId, fromText);
 
-        if (before?.AudioPath is { } path) await DeleteIfUnusedAsync(path);
+        // The internal copy (if alignment made one) and the user's real original are two different
+        // paths once OriginalAudioPath exists, and each needs its own call: DeleteIfUnusedAsync
+        // deletes an app-owned copy outright but only touches a reference when alsoReferenced says
+        // to, so passing both here — instead of only AudioPath, and instead of dropping
+        // alsoReferenced on the floor as this used to — reaches the original file the way removing
+        // audio is supposed to.
+        if (before?.AudioPath is { } path) await DeleteIfUnusedAsync(path, alsoReferenced);
+        if (before?.OriginalAudioPath is { } original) await DeleteIfUnusedAsync(original, alsoReferenced);
+
         return book;
     }
 
@@ -328,7 +345,7 @@ public class BookImporter(
 
         if (book is null) return;
 
-        foreach (var path in new[] { book.AudioPath, book.EbookPath })
+        foreach (var path in new[] { book.AudioPath, book.OriginalAudioPath, book.EbookPath })
             if (path is not null) await DeleteIfUnusedAsync(path, alsoReferenced);
 
         // Covers are written per import and shared with nothing.

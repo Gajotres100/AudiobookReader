@@ -356,4 +356,48 @@ public class LibraryServiceTests : IAsyncLifetime, IDisposable
         Assert.Equal(90_000, state.AudioPositionMs);
         Assert.Equal(1.5f, state.Speed);
     }
+
+    // ---- Original audio path ----
+
+    /// <summary>
+    /// Confirms the column that survives the app-level EnsureLocalAudioAsync round-trip: the
+    /// database itself just needs to persist whatever the caller sets it to, with no help beyond
+    /// what every other field already gets from sqlite-net.
+    /// </summary>
+    [Fact]
+    public async Task OriginalAudioPathSurvivesASaveAndReload()
+    {
+        var book = await _service.CreateFromAudioAsync(Audio());
+
+        book!.OriginalAudioPath = "content://com.example.provider/document/original.m4b";
+        await _database.UpdateBookAsync(book);
+
+        var reloaded = await _database.GetBookAsync(book.Id);
+
+        Assert.Equal("content://com.example.provider/document/original.m4b", reloaded!.OriginalAudioPath);
+    }
+
+    /// <summary>
+    /// The lookup DeleteIfUnusedAsync relies on to avoid deleting a file another book still needs
+    /// has to see OriginalAudioPath too, not only AudioPath — otherwise a book whose audio was
+    /// copied in for alignment looks unshared even when its original file is the one another entry
+    /// still points at.
+    /// </summary>
+    [Fact]
+    public async Task FindByMediaPathMatchesOnTheOriginalAudioPathToo()
+    {
+        var book = await _service.CreateFromAudioAsync(Audio());
+
+        book!.AudioPath = "/data/app/books/internal-copy.m4b";
+        book.OriginalAudioPath = "content://com.example.provider/document/original.m4b";
+        await _database.UpdateBookAsync(book);
+
+        var byInternalCopy = await _database.FindBookByMediaPathAsync("/data/app/books/internal-copy.m4b");
+        var byOriginal = await _database.FindBookByMediaPathAsync("content://com.example.provider/document/original.m4b");
+
+        Assert.NotNull(byInternalCopy);
+        Assert.Equal(book.Id, byInternalCopy!.Id);
+        Assert.NotNull(byOriginal);
+        Assert.Equal(book.Id, byOriginal!.Id);
+    }
 }
