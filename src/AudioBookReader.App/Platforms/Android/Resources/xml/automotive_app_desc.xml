@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Tells Android Auto this app is a media app worth showing at all. Without this the system never
+    considers it, no matter how correct the MediaSession underneath is.
+-->
+<automotiveApp>
+	<uses name="media" />
+</automotiveApp>

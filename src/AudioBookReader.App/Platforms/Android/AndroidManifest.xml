@@ -44,6 +44,13 @@
 		android:supportsRtl="true"
 		android:label="@string/app_name">
 
+		<!-- Declares this as a media app to Android Auto. The existing MediaSession — title,
+		     author, cover, chapter-stepping commands — is what the car actually draws; this is
+		     only the permission slip that gets it considered at all. -->
+		<meta-data
+			android:name="com.google.android.gms.car.application"
+			android:resource="@xml/automotive_app_desc" />
+
 		<service
 			android:name=".Playback.PlaybackService"
 			android:exported="true"
