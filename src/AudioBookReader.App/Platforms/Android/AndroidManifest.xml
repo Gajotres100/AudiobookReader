@@ -51,28 +51,13 @@
 			android:name="com.google.android.gms.car.application"
 			android:resource="@xml/automotive_app_desc" />
 
-		<service
-			android:name=".Playback.PlaybackService"
-			android:exported="true"
-			android:foregroundServiceType="mediaPlayback">
-			<intent-filter>
-				<action android:name="androidx.media3.session.MediaSessionService" />
-				<action android:name="androidx.media3.session.MediaLibraryService" />
-				<!-- The action older Android Auto builds still look for. Media3's MediaLibraryService
-				     answers both this and the two above from the same binder, so one service
-				     declaration covers every client generation. -->
-				<action android:name="android.media.browse.MediaBrowserService" />
-			</intent-filter>
-		</service>
-
-		<service
-			android:name=".Alignment.AlignmentService"
-			android:exported="false"
-			android:foregroundServiceType="dataSync" />
-
-		<!-- DownloadService, which fetches a book from a server, is declared by its own [Service]
-		     attribute: the generated element already carries exported=false and the dataSync type,
-		     and a hand-written one here would name a class that does not exist under that name. -->
+		<!-- Every service is declared by its own [Service] attribute rather than by hand here.
+		     A hand-written element names a class that does not exist: the build gives each one a
+		     generated Java name, so ".Playback.PlaybackService" resolved to nothing while the real
+		     service ran under its generated name alongside it. Two declarations of the playback
+		     service meant Android Auto listed the app twice, once as an entry that could not be
+		     bound at all. The attributes carry the exported flag, the foreground service type and
+		     the intent filters. -->
 
 	</application>
 </manifest>

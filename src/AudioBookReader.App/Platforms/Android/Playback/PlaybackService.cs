@@ -65,6 +65,24 @@ public class PlaybackService : MediaLibraryService
         // Pause rather than play on into a room when the headphones come out.
         _player.SetHandleAudioBecomingNoisy(true);
 
+        // Asks the system for the audio before playing any, and says what kind it is.
+        //
+        // ExoPlayer does not request audio focus unless told to, and without that request a car
+        // never routes the audio anywhere: the book played to nothing at all over Android Auto
+        // until some other app opened the media route first, after which the book could be heard
+        // riding along on it. Focus is also what makes the rest behave — navigation prompts and
+        // calls duck or pause the narration instead of talking over it, and it resumes afterwards.
+        //
+        // Speech rather than music as the content type, because that is what an audiobook is and
+        // the system ducks the two differently: losing a sentence under a turn instruction is worse
+        // than losing a bar of music.
+        _player.SetAudioAttributes(
+            new AudioAttributes.Builder()
+                .SetUsage(C.UsageMedia)!
+                .SetContentType(C.AudioContentTypeSpeech)!
+                .Build()!,
+            /* handleAudioFocus: */ true);
+
         // Tapping the lock-screen controls opens the app rather than doing nothing. Without a
         // session activity the system has nowhere to send the tap, which makes the controls feel
         // like a dead widget belonging to no app.
