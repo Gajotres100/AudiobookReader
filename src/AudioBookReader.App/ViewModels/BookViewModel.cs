@@ -466,17 +466,23 @@ public partial class BookViewModel(
         var startMs = state?.AudioPositionMs ?? 0;
         var speed = state?.Speed ?? 1f;
 
+        // Shown before the player is asked for anything, because none of it needs the player: where
+        // this book was left, how long it is and how fast it was being read are all already in hand
+        // from the database. Waiting for the service to come up cold and for the file to be prepared
+        // — measured together at a few seconds for a long m4b held on the user's own storage — meant
+        // the page sat at 0:00 with an empty scrubber and no chapter for the whole of it, which is
+        // what opening a book felt slow doing.
+        PositionMs = startMs;
+        DurationMs = _book!.DurationMs;
+        SpeedText = FormatSpeed(speed);
+        UpdateChapterTitle();
+
         AppLog.Info($"loading book {BookId} at {startMs} ms, speed {speed}");
 
         await playback.LoadAsync(
-            BookId, _book!.AudioPath!, startMs, speed,
+            BookId, _book.AudioPath!, startMs, speed,
             title: Title, author: Author, coverPath: _book.CoverPath,
             chapterStarts: ChapterStarts());
-
-        PositionMs = startMs;
-        DurationMs = _book.DurationMs;
-        SpeedText = FormatSpeed(speed);
-        UpdateChapterTitle();
     }
 
     private void AdoptPlayerState()
@@ -518,6 +524,14 @@ public partial class BookViewModel(
     private void Tick()
     {
         if (!HasAudio) return;
+
+        // Nothing to read until the player actually holds this book. Before that the controller
+        // answers for a service that is not up yet — position zero, not playing — and copying that
+        // in would drag the scrubber back to the start of the book a second after the page had
+        // correctly shown where the reader left off, then push that zero into the database on the
+        // save below. The same guard covers a player that is busy with a different book, whose
+        // position says nothing about this one.
+        if (playback.BookId != BookId) return;
 
         IsPlaying = playback.IsPlaying;
         PositionMs = playback.PositionMs;

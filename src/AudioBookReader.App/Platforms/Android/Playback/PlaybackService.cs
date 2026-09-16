@@ -324,13 +324,23 @@ public class PlaybackService : MediaLibraryService
 
             Task.Run(async () =>
             {
-                var book = ParseBookId(mediaId) is { } id && service._database is { } database
-                    ? await database.GetBookAsync(id)
-                    : null;
+                try
+                {
+                    var book = ParseBookId(mediaId) is { } id && service._database is { } database
+                        ? await database.GetBookAsync(id)
+                        : null;
 
-                future.SetResult(book is null
-                    ? LibraryResult.OfError(LibraryResult.ResultErrorBadValue)
-                    : LibraryResult.OfItem(DescribeBook(book), null));
+                    future.SetResult(book is null
+                        ? LibraryResult.OfError(LibraryResult.ResultErrorBadValue)
+                        : LibraryResult.OfItem(DescribeBook(book), null));
+                }
+                catch (Exception ex)
+                {
+                    // The future has to be answered no matter what: a browser waiting on one that
+                    // never completes has nothing to time out against and simply hangs.
+                    AppLog.Error("Android Auto: looking up a book", ex);
+                    future.SetResult(LibraryResult.OfError(LibraryResult.ResultErrorUnknown));
+                }
             });
 
             return future.Future;
@@ -354,44 +364,59 @@ public class PlaybackService : MediaLibraryService
 
             Task.Run(async () =>
             {
-                var requestedId = mediaItems?.FirstOrDefault()?.MediaId;
-                var book = ParseBookId(requestedId) is { } id && service._database is { } database
-                    ? await database.GetBookAsync(id)
-                    : null;
-
-                if (book is null || !book.HasAudio || service._database is not { } db)
+                try
                 {
-                    // Nothing resolvable — hand back whatever was asked for unchanged rather than
-                    // silently dropping the request.
+                    var requestedId = mediaItems?.FirstOrDefault()?.MediaId;
+                    var book = ParseBookId(requestedId) is { } id && service._database is { } database
+                        ? await database.GetBookAsync(id)
+                        : null;
+
+                    if (book is null || !book.HasAudio || service._database is not { } db)
+                    {
+                        // Nothing resolvable — hand back whatever was asked for unchanged rather
+                        // than silently dropping the request.
+                        future.SetResult(new MediaSession.MediaItemsWithStartPosition(
+                            mediaItems ?? new List<MediaItem>(), startIndex, startPositionMs));
+                        return;
+                    }
+
+                    var state = await db.GetReadingStateAsync(book.Id);
+                    var chapters = await db.GetChaptersAsync(book.Id);
+
+                    service._chapterStarts = chapters
+                        .Where(c => c.StartMs is not null)
+                        .Select(c => c.StartMs!.Value)
+                        .ToArray();
+
+                    // So the service writes this book's position down while the car plays it —
+                    // nothing else is watching, and this path never goes through Load.
+                    service.CurrentBookId = book.Id;
+                    service.SetSpeed(state?.Speed ?? 1f);
+
+                    var resumeMs = startPositionMs != C.TimeUnset
+                        ? startPositionMs
+                        : state?.AudioPositionMs ?? 0;
+
+                    var item = new MediaItem.Builder()
+                        .SetMediaId(BookMediaId(book.Id))!
+                        .SetUri(ResolveUri(book.AudioPath!))!
+                        .SetMediaMetadata(new MediaMetadata.Builder()
+                            .SetTitle(book.Title)!
+                            .SetArtist(book.Author)!
+                            .SetArtworkUri(Artwork(book.CoverPath))!
+                            .Build())!
+                        .Build()!;
+
+                    future.SetResult(new MediaSession.MediaItemsWithStartPosition(
+                        new List<MediaItem> { item }, 0, resumeMs));
+                }
+                catch (Exception ex)
+                {
+                    // Answered even on failure: an unfinished future is a car stuck on a spinner.
+                    AppLog.Error("Android Auto: starting a book", ex);
                     future.SetResult(new MediaSession.MediaItemsWithStartPosition(
                         mediaItems ?? new List<MediaItem>(), startIndex, startPositionMs));
-                    return;
                 }
-
-                var state = await db.GetReadingStateAsync(book.Id);
-                var chapters = await db.GetChaptersAsync(book.Id);
-
-                service._chapterStarts = chapters
-                    .Where(c => c.StartMs is not null)
-                    .Select(c => c.StartMs!.Value)
-                    .ToArray();
-
-                service.SetSpeed(state?.Speed ?? 1f);
-
-                var resumeMs = startPositionMs != C.TimeUnset ? startPositionMs : state?.AudioPositionMs ?? 0;
-
-                var item = new MediaItem.Builder()
-                    .SetMediaId(BookMediaId(book.Id))!
-                    .SetUri(ResolveUri(book.AudioPath!))!
-                    .SetMediaMetadata(new MediaMetadata.Builder()
-                        .SetTitle(book.Title)!
-                        .SetArtist(book.Author)!
-                        .SetArtworkUri(Artwork(book.CoverPath))!
-                        .Build())!
-                    .Build()!;
-
-                future.SetResult(new MediaSession.MediaItemsWithStartPosition(
-                    new List<MediaItem> { item }, 0, resumeMs));
             });
 
             return future.Future;
@@ -511,9 +536,61 @@ public class PlaybackService : MediaLibraryService
         _stateIsPlaying = _player.IsPlaying;
         _stateSpeed = _player.PlaybackParameters?.Speed ?? 1f;
 
+        RememberPosition();
+
         // Five times a second: fast enough that a scrubber does not visibly lag and that alignment
         // never works from a stale playhead, cheap enough to leave running while a book plays.
         _playerThread.PostDelayed(PublishState, 200);
+    }
+
+    /// <summary>Which book the player holds, so its position can be written down. Null when unknown.</summary>
+    public int? CurrentBookId { get; private set; }
+
+    private DateTime _lastPositionSaved = DateTime.MinValue;
+
+    /// <summary>
+    /// Writes the playing position down every few seconds, from the service rather than from a page.
+    ///
+    /// The pages that used to be the only writers are only alive while someone is looking at them,
+    /// and an audiobook is mostly listened to when nobody is: screen off in a pocket, a sleep timer
+    /// running, or — now — nothing on screen at all because the book was started from a car. All of
+    /// those used to end with the position last saved wherever the reader had happened to be
+    /// looking, which could be an hour of listening earlier. The player is the thing that knows
+    /// where playback actually is, and it is alive for all of it.
+    ///
+    /// Only while genuinely playing: a player that is buffering or parked at zero before its seek
+    /// has landed would otherwise overwrite a good position with the start of the book.
+    /// </summary>
+    private void RememberPosition()
+    {
+        if (!_stateIsPlaying
+            || CurrentBookId is not { } bookId
+            || _database is not { } database
+            || DateTime.UtcNow - _lastPositionSaved <= TimeSpan.FromSeconds(5))
+        {
+            return;
+        }
+
+        _lastPositionSaved = DateTime.UtcNow;
+
+        var positionMs = Interlocked.Read(ref _statePositionMs);
+        var speed = _stateSpeed;
+
+        _ = SaveAsync();
+
+        async Task SaveAsync()
+        {
+            try
+            {
+                await database.SaveReadingStateAsync(bookId, audioPositionMs: positionMs, speed: speed);
+            }
+            catch (Exception ex)
+            {
+                // Nowhere to report this to — there may be no screen at all. Losing one write is
+                // survivable; the next one is five seconds away.
+                AppLog.Error("saving the playing position", ex);
+            }
+        }
     }
 
     /// <summary>True once the player has buffered and is sitting on the position it was sent to.</summary>
@@ -574,6 +651,10 @@ public class PlaybackService : MediaLibraryService
     /// without it they have nothing to step through, and a single-file audiobook offers no next at
     /// all.
     /// </param>
+    /// <param name="bookId">
+    /// Which book this is, so the service can write the position down while it plays. Null leaves
+    /// it unrecorded rather than recorded against the wrong book.
+    /// </param>
     public void Load(
         string audioPath,
         long startMs,
@@ -581,17 +662,23 @@ public class PlaybackService : MediaLibraryService
         string? title = null,
         string? author = null,
         string? coverPath = null,
-        long[]? chapterStarts = null)
+        long[]? chapterStarts = null,
+        int? bookId = null)
     {
         if (!OnPlayerThread)
         {
-            _playerThread.Post(() => Load(audioPath, startMs, speed, title, author, coverPath, chapterStarts));
+            _playerThread.Post(() => Load(audioPath, startMs, speed, title, author, coverPath, chapterStarts, bookId));
             return;
         }
 
         if (_player is null) return;
 
         _chapterStarts = chapterStarts ?? [];
+        CurrentBookId = bookId;
+
+        // A fresh book must not inherit the previous one's save clock, or the first few seconds of
+        // it would go unrecorded because the last one was written moments ago.
+        _lastPositionSaved = DateTime.MinValue;
 
         if (LoadedPath != audioPath)
         {

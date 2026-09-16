@@ -62,6 +62,7 @@ public partial class PlaybackController
     public partial void CancelSleep();
 
     private partial void LoadCore(
+        int bookId,
         string audioPath,
         long startMs,
         float speed,
@@ -88,7 +89,7 @@ public partial class PlaybackController
     {
         if (!await ConnectAsync(ct)) return false;
 
-        LoadCore(audioPath, startMs, speed, title, author, coverPath, chapterStarts);
+        LoadCore(bookId, audioPath, startMs, speed, title, author, coverPath, chapterStarts);
         _bookId = bookId;
         return true;
     }

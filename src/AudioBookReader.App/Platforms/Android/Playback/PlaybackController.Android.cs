@@ -45,6 +45,7 @@ public partial class PlaybackController
     }
 
     private partial void LoadCore(
+        int bookId,
         string audioPath,
         long startMs,
         float speed,
@@ -52,7 +53,7 @@ public partial class PlaybackController
         string? author,
         string? coverPath,
         long[]? chapterStarts) =>
-        Service?.Load(audioPath, startMs, speed, title, author, coverPath, chapterStarts);
+        Service?.Load(audioPath, startMs, speed, title, author, coverPath, chapterStarts, bookId);
 
     public partial void Play() => Service?.Play();
     public partial void Pause() => Service?.Pause();
