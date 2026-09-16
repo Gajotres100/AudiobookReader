@@ -1,28 +1,37 @@
 using Android.App;
 using Android.Content;
 using Android.OS;
+using AndroidX.Concurrent.Futures;
 using AndroidX.Media3.Common;
 using AndroidX.Media3.ExoPlayer;
 using AndroidX.Media3.Session;
 using AudioBookReader.App.Services;
+using AudioBookReader.Core.Data;
+using AudioBookReader.Core.Models;
+using Google.Common.Util.Concurrent;
 
 namespace AudioBookReader.App.Platforms.Android.Playback;
 
 /// <summary>
 /// Hosts the player.
 ///
-/// A <see cref="MediaSessionService"/> rather than a plain service because that is what makes
+/// A <see cref="MediaLibraryService"/> — a <see cref="MediaSessionService"/> that can additionally
+/// answer "what's in the library" — rather than a plain service, because that is what makes
 /// playback behave the way people expect from an audiobook app: it survives the app going to the
-/// background, publishes transport controls to the lock screen and notification shade, and
-/// responds to headset and Bluetooth buttons — none of which have to be written here.
+/// background, publishes transport controls to the lock screen and notification shade, responds to
+/// headset and Bluetooth buttons, and — the library half — is what lets Android Auto discover the
+/// app at all. A plain <c>MediaSessionService</c> controls whatever is already playing but is
+/// invisible to Android Auto's launcher, since the car finds media apps by asking who can browse a
+/// library, not who owns a session.
 /// </summary>
 [Service(Exported = true, ForegroundServiceType = global::Android.Content.PM.ForegroundService.TypeMediaPlayback)]
-[IntentFilter(["androidx.media3.session.MediaSessionService"])]
-public class PlaybackService : MediaSessionService
+[IntentFilter(["androidx.media3.session.MediaSessionService", "androidx.media3.session.MediaLibraryService", "android.media.browse.MediaBrowserService"])]
+public class PlaybackService : MediaLibraryService
 {
     private IExoPlayer? _player;
-    private MediaSession? _session;
+    private MediaLibrarySession? _session;
     private SleepTimer? _sleepTimer;
+    private LibraryDatabase? _database;
 
     /// <summary>The running instance, so the app can arm the sleep timer without another binding.</summary>
     public static PlaybackService? Current { get; private set; }
@@ -66,11 +75,23 @@ public class PlaybackService : MediaSessionService
                 ?.AddFlags(ActivityFlags.SingleTop),
             PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
 
+        // Resolved here rather than constructed, because the library is a singleton the rest of
+        // the app already shares — Android builds this service itself, so there is no constructor
+        // to hand it one.
+        _database = IPlatformApplication.Current?.Services.GetService<LibraryDatabase>();
+
         // The session sees a player that can move between chapters; the app keeps using the real
         // one directly. Wrapping only for the session is deliberate — everything the wrapper
         // changes is about what the outside world may ask for, and nothing inside the app goes
         // through it.
-        var session = new MediaSession.Builder(this, new ChapterNavigation(_player, () => _chapterStarts));
+        //
+        // A MediaLibrarySession rather than a plain MediaSession, and it needs a callback up
+        // front — unlike MediaSession.Builder, where a callback is optional, MediaLibrarySession's
+        // constructor requires one because "what can be browsed" has no sensible default.
+        var session = new MediaLibrarySession.Builder(
+            this,
+            new ChapterNavigation(_player, () => _chapterStarts),
+            new LibraryCallback(this));
         if (open is not null) session.SetSessionActivity(open);
 
         _session = session.Build();
@@ -96,7 +117,14 @@ public class PlaybackService : MediaSessionService
         PublishState();
     }
 
-    public override MediaSession? OnGetSession(MediaSession.ControllerInfo? controllerInfo) => _session;
+    // Two C# abstract slots for one real Java method (androidx.media3.session.MediaLibraryService
+    // declares onGetSession covariantly, returning MediaLibrarySession rather than the plain
+    // MediaSession its own base class returns). Only the covariant one below is what actually
+    // becomes the Java override; MediaSessionService's original signature still has to compile,
+    // but is never itself invoked once this one exists.
+    public override MediaLibrarySession? OnGetSession(MediaSession.ControllerInfo? controllerInfo) => _session;
+
+    public override MediaLibrarySession? OnGetSessionFromMediaLibraryService(MediaSession.ControllerInfo? controllerInfo) => _session;
 
     /// <summary>Where each chapter begins, for the buttons outside the app to move between them.</summary>
     private long[] _chapterStarts = [];
@@ -191,6 +219,215 @@ public class PlaybackService : MediaSessionService
                 return [];
             }
         }
+    }
+
+    // ---- Android Auto browsing ----
+
+    /// <summary>The id of the one browsable node: a flat shelf of every book with audio.</summary>
+    private const string RootMediaId = "root";
+
+    private const string BookIdPrefix = "book/";
+
+    private static string BookMediaId(int bookId) => BookIdPrefix + bookId;
+
+    private static int? ParseBookId(string? mediaId) =>
+        mediaId is not null
+        && mediaId.StartsWith(BookIdPrefix, StringComparison.Ordinal)
+        && int.TryParse(mediaId.AsSpan(BookIdPrefix.Length), out var id)
+            ? id
+            : null;
+
+    /// <summary>
+    /// Describes a book for the browse list: enough to draw a row (title, author, cover) and to be
+    /// tapped, but no audio URI. Real playback is resolved lazily in <see cref="LibraryCallback"/>
+    /// when the item is actually chosen — the browse list can otherwise be built from the database
+    /// alone, without touching whatever storage each book's audio happens to live in.
+    /// </summary>
+    private static MediaItem DescribeBook(Book book)
+    {
+        var metadata = new MediaMetadata.Builder()
+            .SetTitle(book.Title)!
+            .SetArtist(book.Author)!
+            .SetArtworkUri(Artwork(book.CoverPath))!
+            .SetIsBrowsable(Java.Lang.Boolean.False)!
+            .SetIsPlayable(Java.Lang.Boolean.True)!
+            .Build();
+
+        return new MediaItem.Builder()
+            .SetMediaId(BookMediaId(book.Id))!
+            .SetMediaMetadata(metadata)!
+            .Build()!;
+    }
+
+    private static MediaItem RootItem() => new MediaItem.Builder()
+        .SetMediaId(RootMediaId)!
+        .SetMediaMetadata(new MediaMetadata.Builder().SetIsBrowsable(Java.Lang.Boolean.True)!.SetIsPlayable(Java.Lang.Boolean.False)!.Build())!
+        .Build()!;
+
+    /// <summary>
+    /// Answers what Android Auto — or any other <c>MediaBrowser</c> — asks a
+    /// <see cref="MediaLibraryService"/>: what is here, and what does picking one of them play.
+    ///
+    /// Kept deliberately shallow — one root, one flat list of books — because a car head unit is
+    /// not the place to reproduce the app's own navigation, and because every extra query answered
+    /// here is one more thing pulled up while the app may not even be in the foreground.
+    /// </summary>
+    private sealed class LibraryCallback(PlaybackService service) : Java.Lang.Object, MediaLibrarySession.ICallback
+    {
+        public IListenableFuture? OnGetLibraryRoot(
+            MediaLibrarySession? session, MediaSession.ControllerInfo? browser, LibraryParams? libraryParams)
+        {
+            var future = new SimpleFuture();
+            future.SetResult(LibraryResult.OfItem(RootItem(), libraryParams));
+            return future.Future;
+        }
+
+        public IListenableFuture? OnGetChildren(
+            MediaLibrarySession? session, MediaSession.ControllerInfo? browser, string? parentId, int page,
+            int pageSize, LibraryParams? libraryParams)
+        {
+            var future = new SimpleFuture();
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    if (parentId != RootMediaId || service._database is not { } database)
+                    {
+                        future.SetResult(LibraryResult.OfItemList(new List<MediaItem>(), libraryParams));
+                        return;
+                    }
+
+                    var books = await database.GetBooksAsync();
+                    var items = books
+                        .Where(b => b.HasAudio)
+                        .OrderByDescending(b => b.LastOpenedUtc ?? b.AddedUtc)
+                        .Select(DescribeBook)
+                        .ToList();
+
+                    future.SetResult(LibraryResult.OfItemList(items, libraryParams));
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Error("Android Auto: listing books", ex);
+                    future.SetResult(LibraryResult.OfError(LibraryResult.ResultErrorUnknown));
+                }
+            });
+
+            return future.Future;
+        }
+
+        public IListenableFuture? OnGetItem(
+            MediaLibrarySession? session, MediaSession.ControllerInfo? browser, string? mediaId)
+        {
+            var future = new SimpleFuture();
+
+            Task.Run(async () =>
+            {
+                var book = ParseBookId(mediaId) is { } id && service._database is { } database
+                    ? await database.GetBookAsync(id)
+                    : null;
+
+                future.SetResult(book is null
+                    ? LibraryResult.OfError(LibraryResult.ResultErrorBadValue)
+                    : LibraryResult.OfItem(DescribeBook(book), null));
+            });
+
+            return future.Future;
+        }
+
+        /// <summary>
+        /// Where a tap in the car actually turns into audio: the browse item carries only an id,
+        /// so whatever asked to play it — Android Auto, a voice command, a resumed session — is
+        /// handed back a real, playable item built from the database, resuming from wherever
+        /// <see cref="ReadingState"/> last left this book.
+        ///
+        /// The chapter-stepping buttons follow along for free: <see cref="ChapterNavigation"/>
+        /// reads <see cref="_chapterStarts"/> through a closure on every press, so setting it here
+        /// is all a car-started book needs to get "next/previous chapter" working too.
+        /// </summary>
+        public IListenableFuture? OnSetMediaItems(
+            MediaSession? session, MediaSession.ControllerInfo? controller, IList<MediaItem>? mediaItems,
+            int startIndex, long startPositionMs)
+        {
+            var future = new SimpleFuture();
+
+            Task.Run(async () =>
+            {
+                var requestedId = mediaItems?.FirstOrDefault()?.MediaId;
+                var book = ParseBookId(requestedId) is { } id && service._database is { } database
+                    ? await database.GetBookAsync(id)
+                    : null;
+
+                if (book is null || !book.HasAudio || service._database is not { } db)
+                {
+                    // Nothing resolvable — hand back whatever was asked for unchanged rather than
+                    // silently dropping the request.
+                    future.SetResult(new MediaSession.MediaItemsWithStartPosition(
+                        mediaItems ?? new List<MediaItem>(), startIndex, startPositionMs));
+                    return;
+                }
+
+                var state = await db.GetReadingStateAsync(book.Id);
+                var chapters = await db.GetChaptersAsync(book.Id);
+
+                service._chapterStarts = chapters
+                    .Where(c => c.StartMs is not null)
+                    .Select(c => c.StartMs!.Value)
+                    .ToArray();
+
+                service.SetSpeed(state?.Speed ?? 1f);
+
+                var resumeMs = startPositionMs != C.TimeUnset ? startPositionMs : state?.AudioPositionMs ?? 0;
+
+                var item = new MediaItem.Builder()
+                    .SetMediaId(BookMediaId(book.Id))!
+                    .SetUri(ResolveUri(book.AudioPath!))!
+                    .SetMediaMetadata(new MediaMetadata.Builder()
+                        .SetTitle(book.Title)!
+                        .SetArtist(book.Author)!
+                        .SetArtworkUri(Artwork(book.CoverPath))!
+                        .Build())!
+                    .Build()!;
+
+                future.SetResult(new MediaSession.MediaItemsWithStartPosition(
+                    new List<MediaItem> { item }, 0, resumeMs));
+            });
+
+            return future.Future;
+        }
+    }
+
+    /// <summary>
+    /// A <c>ListenableFuture</c> that can be completed once a database read finishes.
+    ///
+    /// Media3's browsing callbacks are Guava futures by contract, but the concrete factory types
+    /// (<c>Futures.immediateFuture</c>, <c>SettableFuture</c>) are not part of the small
+    /// <c>listenablefuture</c> artifact Media3 depends on for its public API, so nothing constructs
+    /// one for us — and hand-implementing <c>java.util.concurrent.Future</c> directly does not work
+    /// on Android's own class library, which does not yet carry the <c>Future.State</c> member a
+    /// modern binding expects an implementer to override.
+    ///
+    /// <c>CallbackToFutureAdapter</c> (AndroidX's own, from <c>androidx.concurrent:concurrent-futures</c>,
+    /// already pulled in transitively) sidesteps both problems: it hands back a fully-formed,
+    /// already-compiled future and asks only for the one thing this class actually needs to
+    /// provide — somewhere to write the result when it is ready.
+    /// </summary>
+    private sealed class SimpleFuture : Java.Lang.Object, CallbackToFutureAdapter.IResolver
+    {
+        private CallbackToFutureAdapter.Completer? _completer;
+
+        public IListenableFuture Future { get; }
+
+        public SimpleFuture() => Future = CallbackToFutureAdapter.GetFuture(this)!;
+
+        public Java.Lang.Object? AttachCompleter(CallbackToFutureAdapter.Completer? completer)
+        {
+            _completer = completer;
+            return "PlaybackService library callback";
+        }
+
+        public void SetResult(Java.Lang.Object? result) => _completer?.Set(result);
     }
 
     /// <summary>
@@ -358,11 +595,7 @@ public class PlaybackService : MediaSessionService
 
         if (LoadedPath != audioPath)
         {
-            // A book is either kept in app storage or referenced where the user has it, so the
-            // location is either a path or a content URI and only the first needs wrapping.
-            var uri = audioPath.StartsWith("content://", StringComparison.OrdinalIgnoreCase)
-                ? global::Android.Net.Uri.Parse(audioPath)!
-                : global::Android.Net.Uri.FromFile(new Java.IO.File(audioPath))!;
+            var uri = ResolveUri(audioPath);
 
             // With the title, the author and the cover.
             //
@@ -397,6 +630,13 @@ public class PlaybackService : MediaSessionService
         !string.IsNullOrEmpty(coverPath) && System.IO.File.Exists(coverPath)
             ? global::Android.Net.Uri.FromFile(new Java.IO.File(coverPath))
             : null;
+
+    /// <summary>A book is either kept in app storage or referenced where the user has it, so the
+    /// location is either a path or a content URI and only the first needs wrapping.</summary>
+    private static global::Android.Net.Uri ResolveUri(string audioPath) =>
+        audioPath.StartsWith("content://", StringComparison.OrdinalIgnoreCase)
+            ? global::Android.Net.Uri.Parse(audioPath)!
+            : global::Android.Net.Uri.FromFile(new Java.IO.File(audioPath))!;
 
     public void Play() => OnPlayer(() =>
     {

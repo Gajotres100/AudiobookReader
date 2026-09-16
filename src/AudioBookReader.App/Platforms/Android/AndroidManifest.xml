@@ -57,6 +57,11 @@
 			android:foregroundServiceType="mediaPlayback">
 			<intent-filter>
 				<action android:name="androidx.media3.session.MediaSessionService" />
+				<action android:name="androidx.media3.session.MediaLibraryService" />
+				<!-- The action older Android Auto builds still look for. Media3's MediaLibraryService
+				     answers both this and the two above from the same binder, so one service
+				     declaration covers every client generation. -->
+				<action android:name="android.media.browse.MediaBrowserService" />
 			</intent-filter>
 		</service>
 
