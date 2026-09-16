@@ -47,6 +47,18 @@
                 Style="{StaticResource PlayInline}"
                 Text="{Binding PlayLabel}" />
 
+            <!--
+                The same slot, and never both: a book with a narration plays it, and a book without
+                one can be read aloud by the phone instead. Attaching an audiobook later takes this
+                away and gives the real voice back.
+            -->
+            <Button
+                Grid.Column="1"
+                Command="{Binding ToggleSpeechCommand}"
+                IsVisible="{Binding CanSpeak}"
+                Style="{StaticResource PlayInline}"
+                Text="{Binding SpeakLabel}" />
+
             <!--  Was a downward swipe; that gesture now belongs to scrolling the text.  -->
             <Button
                 Grid.Column="2"

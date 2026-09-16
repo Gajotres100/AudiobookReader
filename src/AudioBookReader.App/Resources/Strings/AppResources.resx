@@ -128,6 +128,9 @@
   <data name="Details_DeleteBook" xml:space="preserve">
     <value>Delete book</value>
   </data>
+  <data name="Reader_NoVoice" xml:space="preserve">
+    <value>This phone has no speech voice it can read this book with.</value>
+  </data>
   <data name="Reader_Chapters" xml:space="preserve">
     <value>Chapters</value>
   </data>

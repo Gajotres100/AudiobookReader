@@ -69,6 +69,8 @@ public static class Strings
     /// <summary>Delete book</summary>
     public static string Details_DeleteBook => Get(nameof(Details_DeleteBook));
     /// <summary>Chapters</summary>
+    public static string Reader_NoVoice => Get(nameof(Reader_NoVoice));
+
     public static string Reader_Chapters => Get(nameof(Reader_Chapters));
     /// <summary>Bookmarks</summary>
     public static string Bookmarks_Title => Get(nameof(Bookmarks_Title));

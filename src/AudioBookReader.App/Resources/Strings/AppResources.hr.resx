@@ -123,6 +123,9 @@
   <data name="Details_DeleteBook" xml:space="preserve">
     <value>Obriši knjigu</value>
   </data>
+  <data name="Reader_NoVoice" xml:space="preserve">
+    <value>Ovaj telefon nema glas kojim bi pročitao ovu knjigu.</value>
+  </data>
   <data name="Reader_Chapters" xml:space="preserve">
     <value>Poglavlja</value>
   </data>

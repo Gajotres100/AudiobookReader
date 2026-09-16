@@ -35,6 +35,7 @@ public partial class ReaderViewModel(
     public partial string Title { get; set; } = "";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSpeak))]
     [NotifyPropertyChangedFor(nameof(ShowFollowHint))]
     public partial bool IsBusy { get; set; }
 
@@ -103,6 +104,7 @@ public partial class ReaderViewModel(
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowFollowHint))]
     [NotifyPropertyChangedFor(nameof(CanPlay))]
+    [NotifyPropertyChangedFor(nameof(CanSpeak))]
     public partial bool HasAudio { get; set; }
 
     /// <summary>
@@ -360,6 +362,7 @@ public partial class ReaderViewModel(
         PageNumber = page;
         PageCount = count;
 
+        _topSentence = topSentence;
         CurrentChapterTitle = ChapterTitleAtSentence(topSentence);
     }
 
@@ -1347,6 +1350,7 @@ public partial class ReaderViewModel(
 
     public void Dispose()
     {
+        StopSpeaking();
         StopHolding();
         _ticker?.Stop();
 
@@ -1394,4 +1398,160 @@ public partial class ReaderViewModel(
             // Last, so a book whose own text happens to contain one of the names above is left
             // alone rather than having it substituted out from under it.
             .Replace("{{BODY}}", bodyHtml);
+
+    // ---- Reading it aloud ----
+
+    /// <summary>
+    /// The sentence at the top of the page, as the page last reported it. Where the voice starts.
+    /// </summary>
+    private int _topSentence;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SpeakLabel))]
+    public partial bool IsSpeaking { get; set; }
+
+    /// <summary>
+    /// Whether the phone can read this book out loud.
+    ///
+    /// Only a book with no narration of its own. Where a real reader exists, a synthesised one is a
+    /// worse version of what the book already has, and the two would fight over the same page — so
+    /// attaching an audiobook to a book later takes this away, which is the right way round.
+    /// </summary>
+    public bool CanSpeak => !HasAudio && !IsBusy;
+
+    public string SpeakLabel => IsSpeaking ? "⏸︎" : "▶︎";
+
+    private CancellationTokenSource? _speech;
+
+    [RelayCommand]
+    private async Task ToggleSpeechAsync()
+    {
+        if (IsSpeaking)
+        {
+            StopSpeaking();
+            await SavePositionAsync(null);
+            return;
+        }
+
+        if (_text is null || _text.Sentences.Count == 0) return;
+
+        var speech = new CancellationTokenSource();
+        _speech = speech;
+        IsSpeaking = true;
+        FollowStatus = "";
+
+        try
+        {
+            await SpeakAsync(speech.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Pressing pause, or leaving the page.
+        }
+        catch (Exception ex)
+        {
+            // A phone with no speech engine, or one that has none for this book's language. Said on
+            // screen rather than only in the log: from the reader's side the button simply did
+            // nothing, and that is the one outcome worth explaining.
+            AppLog.Error("reading the book aloud", ex);
+            FollowStatus = Strings.Reader_NoVoice;
+        }
+        finally
+        {
+            if (ReferenceEquals(_speech, speech)) StopSpeaking();
+            await SavePositionAsync(null);
+        }
+    }
+
+    /// <summary>
+    /// Speaks one sentence at a time, from wherever the reader is looking.
+    ///
+    /// Sentence by sentence rather than the whole book at once: it is what makes the text follow
+    /// along, what lets pausing happen within a few words rather than at the end of a chapter, and
+    /// what keeps a synthesiser from being handed half a megabyte of prose in one call.
+    /// </summary>
+    private async Task SpeakAsync(CancellationToken ct)
+    {
+        if (_text is null) return;
+
+        var voice = await VoiceForBookAsync();
+        var index = Math.Clamp(_lastSentence >= 0 ? _lastSentence : _topSentence, 0, _text.Sentences.Count - 1);
+        var spokenSinceSave = 0;
+
+        while (!ct.IsCancellationRequested && index < _text.Sentences.Count)
+        {
+            var sentence = _text.Sentences[index];
+
+            SpeakingAt(sentence);
+
+            var words = _text.PlainText[sentence.Start..sentence.End].Trim();
+
+            // Sentences that are only punctuation or a stray heading marker: nothing to say, and
+            // some engines answer an empty string by never completing.
+            if (words.Length > 0)
+                await TextToSpeech.Default.SpeakAsync(words, new SpeechOptions { Locale = voice }, ct);
+
+            index++;
+
+            if (++spokenSinceSave >= 10)
+            {
+                spokenSinceSave = 0;
+                await SavePositionAsync(null);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Puts the sentence being spoken on screen and lights it up.
+    ///
+    /// Deliberately its own path rather than a call into the narration's follow loop: that loop is
+    /// driven by where the audio is and belongs to the alignment, and a voice with no recording
+    /// behind it has no business inside it.
+    /// </summary>
+    private void SpeakingAt(Sentence sentence)
+    {
+        var previousDocument = SpineIndex;
+        _lastSentence = sentence.Index;
+
+        ShowDocumentAt(sentence.Start);
+
+        // A document change reloads the page, and the script that highlights will not exist until
+        // it has. The page re-applies PendingHighlight once it is ready.
+        if (SpineIndex == previousDocument) HighlightRequested?.Invoke(this, sentence.Index);
+    }
+
+    /// <summary>
+    /// A voice in the book's own language, when the phone has one.
+    ///
+    /// The language was worked out at import and is already on the book, so there is nothing to
+    /// guess: a Croatian novel read in an English voice is unlistenable in a way that is obvious in
+    /// one sentence. Null hands the choice back to the system default, which is the right answer
+    /// when the phone has nothing closer.
+    /// </summary>
+    private async Task<Locale?> VoiceForBookAsync()
+    {
+        if (_book?.Language is not { Length: > 0 } language) return null;
+
+        try
+        {
+            var voices = await TextToSpeech.Default.GetLocalesAsync();
+
+            return voices.FirstOrDefault(v =>
+                v.Language.StartsWith(language, StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("looking for a voice", ex);
+            return null;
+        }
+    }
+
+    private void StopSpeaking()
+    {
+        _speech?.Cancel();
+        _speech?.Dispose();
+        _speech = null;
+
+        IsSpeaking = false;
+    }
 }
