@@ -427,8 +427,14 @@ public partial class ReaderViewModel(
 
         try
         {
+            // Read before anything is shown, because showing a document needs it. Once per
+            // process: the file cannot change under a running app.
+            await ShellAsync();
+
             _book = await database.GetBookAsync(BookId);
             if (_book?.EbookPath is null) return;
+
+            await database.MarkOpenedAsync(BookId);
 
             Title = _book.Title;
             HasAudio = _book.HasAudio;
@@ -1351,357 +1357,41 @@ public partial class ReaderViewModel(
     }
 
     /// <summary>
+    /// The reader page's shell, read once from the app package and kept for the life of the process.
+    ///
+    /// It used to be a pair of raw string literals in this file — three hundred lines of HTML, CSS
+    /// and JavaScript with no syntax highlighting, no way to open the page in a browser to see what
+    /// a gesture actually did, and every brace competing with C#'s own. As a file it is none of
+    /// those things, and this class lost a third of its length in the move.
+    /// </summary>
+    private static string? _shell;
+
+    private static async Task<string> ShellAsync()
+    {
+        if (_shell is not null) return _shell;
+
+        await using var stream = await FileSystem.OpenAppPackageFileAsync("reader.html");
+        using var reader = new StreamReader(stream);
+
+        return _shell = await reader.ReadToEndAsync();
+    }
+
+    /// <summary>
     /// Wraps a document's body in the shell that makes it readable and interactive.
     ///
     /// The spans are already in the HTML — placed by the extractor in the same pass that produced
-    /// the offsets alignment uses — so this only adds the styling that shows the highlight and the
-    /// click handler that reports which sentence was tapped.
+    /// the offsets alignment uses — so the shell only adds the styling that shows the highlight and
+    /// the click handler that reports which sentence was tapped.
     /// </summary>
-    private string BuildPage(string bodyHtml)
-    {
-        var page = new StringBuilder();
-
-        // The text is laid out in screen-wide CSS columns rather than one long scroll, so it reads
-        // as pages that turn sideways — what a book does, and what makes a horizontal swipe mean
-        // something. Vertical scrolling is switched off entirely, which frees the downward swipe
-        // to mean "show me the chapters".
-        page.Append("""
-            <!doctype html>
-            <html><head>
-            <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-            <style>
-              html, body { height: 100%; margin: 0; overflow: hidden; }
-              body { font-family: {{FONTFAMILY}}; font-size: {{FONTSIZE}}px; line-height: 1.65;
-                     letter-spacing: {{LETTERSPACING}};
-                     color: {{FOREGROUND}}; background: {{BACKGROUND}};
-                     -webkit-user-select: none; user-select: none; }
-              #size {
-                position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
-                padding: 10px 16px; border-radius: 10px; font-family: sans-serif; font-size: 15px;
-                background: rgba(0, 0, 0, 0.72); color: #fff; opacity: 0; pointer-events: none;
-                transition: opacity 140ms linear; z-index: 10;
-              }
-              #size.on { opacity: 1; }
-              /* One continuous column, scrolled downwards. Text that flows on rather than breaking
-                 into fixed pages is what the reader asked for and what a phone does naturally: a
-                 sentence is never cut in half by a page edge, and the thumb already knows how to
-                 move it. */
-              #content {
-                box-sizing: border-box;
-                height: 100%;
-                padding: 22px 20px 40vh;
-                overflow-y: auto;
-                overflow-x: hidden;
-                -webkit-overflow-scrolling: touch;
-              }
-              #content::-webkit-scrollbar { width: 0; }
-              img { max-width: 100%; max-height: 76vh; height: auto; }
-              p { margin: 0 0 0.85em; }
-              h1, h2, h3 { margin: 0 0 0.6em; }
-              span[data-idx] { transition: background-color 120ms linear; }
-              span.hl { background: {{HIGHLIGHT}}; border-radius: 3px; }
-            </style>
-            <style id="hlrule">span.hl { background: {{HIGHLIGHT}}; border-radius: 3px; }</style>
-            </head><body>
-            <div id="size"></div>
-            <div id="content">
-            """);
-
-        page.Append(bodyHtml);
-
-        page.Append("""
-            </div>
-            <script>
-              var content = document.getElementById('content');
-              var pageCount = 1, current = -1, reported = '';
-
-              // A "page" is one screenful. The text scrolls freely, but the slider and the counter
-              // still need a unit, and a screenful is the one the reader can see.
-              function step() { return content.clientHeight; }
-
-              function pageNow() {
-                return Math.max(0, Math.round(content.scrollTop / step()));
-              }
-
-              function measure() {
-                pageCount = Math.max(1, Math.ceil(content.scrollHeight / step()));
-                report();
-              }
-
-              function report() {
-                var page = pageNow();
-                var top = topSentence();
-
-                // The sentence travels with the page so the host can name the chapter being read.
-                // Scrolling is the only thing that moves it, and the host has no other way to know.
-                var state = page + '/' + pageCount + '/' + top;
-                if (state === reported) return;
-
-                reported = state;
-                location.href = 'abr://pages/' + (page + 1) + '/' + pageCount + '/' + top;
-              }
-
-              // -1 means "the end", used when arriving backwards from the document after this one.
-              function goToPage(n) {
-                var page = n < 0 ? pageCount - 1 : Math.max(0, Math.min(n, pageCount - 1));
-                content.scrollTop = page * step();
-                report();
-              }
-
-              content.addEventListener('scroll', function () {
-                clearTimeout(window.__scrollReport);
-                window.__scrollReport = setTimeout(report, 120);
-              }, { passive: true });
-
-              function highlight(idx) {
-                if (idx === current) return;
-                document.querySelectorAll('span.hl').forEach(function (e) { e.classList.remove('hl'); });
-
-                var parts = document.querySelectorAll('[data-idx="' + idx + '"]');
-                parts.forEach(function (e) { e.classList.add('hl'); });
-                current = idx;
-
-                if (!parts.length) return;
-
-                // Scrolled only when the sentence has left the comfortable band, and then brought
-                // to a third of the way down rather than to the top. Following the voice line by
-                // line would keep the page in constant motion, which is unreadable; letting it
-                // reach the bottom edge before moving means the reader can always see what comes
-                // next.
-                var box = parts[0].getBoundingClientRect();
-                var height = content.clientHeight;
-
-                if (box.top > height * 0.12 && box.bottom < height * 0.78) return;
-
-                content.scrollTo({
-                  top: content.scrollTop + box.top - height * 0.32,
-                  behavior: 'smooth'
-                });
-              }
-
-              // Puts a sentence back where the eye was after the text has reflowed under it — which
-              // it does whenever the size or the face changes.
-              function keepInView(idx) {
-                if (idx === '-1') return;
-
-                var parts = document.querySelectorAll('[data-idx="' + idx + '"]');
-                if (!parts.length) return;
-
-                content.scrollTop += parts[0].getBoundingClientRect().top - content.clientHeight * 0.12;
-                report();
-              }
-
-              // The first sentence visible, used to remember the reading position.
-              function topSentence() {
-                var spans = document.querySelectorAll('[data-idx]');
-                for (var i = 0; i < spans.length; i++) {
-                  var box = spans[i].getBoundingClientRect();
-                  if (box.bottom > 0 && box.top < content.clientHeight) return spans[i].getAttribute('data-idx');
-                }
-                return '-1';
-              }
-
-              // Gestures are handled here rather than by a recognizer around the WebView, because
-              // the web view consumes its own touches and a recognizer outside it never sees them.
-              //
-              // Four gestures share the same finger: a single tap shows and hides the controls; a
-              // double tap jumps the narration to the sentence under it; a press and hold looks up
-              // the single word under it; a sideways swipe turns the page. Single and double tap
-              // cannot both fire the instant a finger lifts -- the first tap has to wait a moment
-              // to see whether a second one is coming, which is the one place this reads slower
-              // than a plain tap handler would.
-              var startX = 0, startY = 0, swiped = false, holdTimer = 0, held = false;
-              var lastTapAt = 0, lastTapX = 0, lastTapY = 0, tapTimer = 0;
-              var DOUBLE_TAP_MS = 300, TAP_SLOP = 30;
-
-              function cancelHold() {
-                clearTimeout(holdTimer);
-                holdTimer = 0;
-              }
-
-              // The word under a point, independent of language: Croatian's diacritic letters are
-              // letters to this regex exactly as plain a-z are. caretRangeFromPoint finds the exact
-              // text node the finger is over regardless of what formatting wraps it, which a
-              // data-idx span cannot -- that marks a whole sentence, not the word inside it.
-              function wordAtPoint(x, y) {
-                if (!document.caretRangeFromPoint) return null;
-
-                var range = document.caretRangeFromPoint(x, y);
-                if (!range || range.startContainer.nodeType !== 3) return null;
-
-                var text = range.startContainer.textContent;
-                var isWordChar = function (ch) { return ch && /[\p{L}\p{N}'\u2019-]/u.test(ch); };
-
-                var start = range.startOffset, end = range.startOffset;
-                while (start > 0 && isWordChar(text[start - 1])) start--;
-                while (end < text.length && isWordChar(text[end])) end++;
-
-                return start < end ? text.slice(start, end) : null;
-              }
-
-              document.addEventListener('touchstart', function (e) {
-                startX = e.changedTouches[0].clientX;
-                startY = e.changedTouches[0].clientY;
-                swiped = false;
-                held = false;
-
-                if (e.touches.length !== 1) { cancelHold(); return; }
-
-                holdTimer = setTimeout(function () {
-                  held = true;
-                  holdTimer = 0;
-
-                  var word = wordAtPoint(startX, startY);
-                  if (word) location.href = 'abr://translate/' + encodeURIComponent(word);
-                }, 450);
-              }, { passive: true });
-
-              document.addEventListener('touchmove', function (e) {
-                var dx = Math.abs(e.touches[0].clientX - startX);
-                var dy = Math.abs(e.touches[0].clientY - startY);
-
-                // A finger on its way somewhere is not a press and hold.
-                if (dx > 12 || dy > 12) cancelHold();
-              }, { passive: true });
-
-              document.addEventListener('touchend', function (e) {
-                cancelHold();
-
-                var dx = e.changedTouches[0].clientX - startX;
-                var dy = e.changedTouches[0].clientY - startY;
-
-                // Down the page belongs to the text now, so only sideways is a gesture: it moves
-                // between the book's documents, which is the one thing scrolling cannot do.
-                if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-                  swiped = true;
-                  location.href = dx < 0 ? 'abr://page/next' : 'abr://page/previous';
-                  return;
-                }
-
-                // A finger that moved at all was scrolling, not tapping.
-                if (Math.abs(dx) > 12 || Math.abs(dy) > 12) swiped = true;
-              }, { passive: true });
-
-              document.addEventListener('click', function (e) {
-                // Neither a scroll nor a completed hold should also count as a tap.
-                if (swiped) { swiped = false; return; }
-                if (held) { held = false; return; }
-
-                var now = Date.now();
-                var isDoubleTap = tapTimer !== 0
-                  && (now - lastTapAt) < DOUBLE_TAP_MS
-                  && Math.abs(e.clientX - lastTapX) < TAP_SLOP
-                  && Math.abs(e.clientY - lastTapY) < TAP_SLOP;
-
-                if (isDoubleTap) {
-                  clearTimeout(tapTimer);
-                  tapTimer = 0;
-
-                  var span = e.target.closest ? e.target.closest('[data-idx]') : null;
-                  if (span) {
-                    var idx = span.getAttribute('data-idx');
-                    highlight(parseInt(idx, 10));
-                    location.href = 'abr://seek/' + idx;
-                  }
-                  return;
-                }
-
-                // Not yet a double tap -- remembered, and given one interval to be joined by a
-                // second before it counts as a plain tap on its own.
-                lastTapAt = now;
-                lastTapX = e.clientX;
-                lastTapY = e.clientY;
-
-                tapTimer = setTimeout(function () {
-                  tapTimer = 0;
-                  location.href = 'abr://tap';
-                }, DOUBLE_TAP_MS);
-              });
-
-              // Restyles a page already on screen, keeping the reader on the passage they were
-              // looking at — changing the face reflows the columns, so the page number moves.
-              function applyAppearance(bg, fg, family, hl, spacing) {
-                var anchor = topSentence();
-
-                document.body.style.background = bg;
-                document.body.style.color = fg;
-                document.body.style.fontFamily = family;
-                document.body.style.letterSpacing = spacing;
-
-                var rule = document.getElementById('hlrule');
-                rule.textContent = 'span.hl { background: ' + hl + '; border-radius: 3px; }';
-
-                measure();
-                keepInView(anchor);
-              }
-
-              // Pinch to resize the text.
-              //
-              // Handled here for the same reason the swipes are: the web view keeps its own
-              // touches. Changing font size reflows the columns, so the page count changes and the
-              // reader is kept on the passage they were looking at rather than on a page number
-              // that now means something else.
-              var pinchStart = 0, sizeAtPinchStart = 0, sizeBadge = document.getElementById('size'), badgeTimer = 0;
-
-              function fontSize() {
-                return parseFloat(window.getComputedStyle(document.body).fontSize);
-              }
-
-              function spread(touches) {
-                var dx = touches[0].clientX - touches[1].clientX;
-                var dy = touches[0].clientY - touches[1].clientY;
-                return Math.hypot(dx, dy);
-              }
-
-              function showSize(size) {
-                sizeBadge.textContent = size + ' px';
-                sizeBadge.classList.add('on');
-
-                clearTimeout(badgeTimer);
-                badgeTimer = setTimeout(function () { sizeBadge.classList.remove('on'); }, 700);
-              }
-
-              document.addEventListener('touchstart', function (e) {
-                if (e.touches.length !== 2) return;
-
-                pinchStart = spread(e.touches);
-                sizeAtPinchStart = fontSize();
-              }, { passive: true });
-
-              document.addEventListener('touchmove', function (e) {
-                if (e.touches.length !== 2 || pinchStart === 0) return;
-
-                var size = Math.round(Math.max(13, Math.min(34, sizeAtPinchStart * spread(e.touches) / pinchStart)));
-                if (size === Math.round(fontSize())) return;
-
-                // Hold the first visible sentence still while the text reflows around it.
-                var anchor = topSentence();
-
-                document.body.style.fontSize = size + 'px';
-                showSize(size);
-                measure();
-                keepInView(anchor);
-              }, { passive: true });
-
-              document.addEventListener('touchend', function (e) {
-                if (e.touches.length > 0 || pinchStart === 0) return;
-
-                pinchStart = 0;
-                location.href = 'abr://font/' + Math.round(fontSize());
-              }, { passive: true });
-
-              window.addEventListener('resize', measure);
-              measure();
-            </script>
-            </body></html>
-            """);
-
-        return page.ToString()
+    private string BuildPage(string bodyHtml) =>
+        (_shell ?? "")
             .Replace("{{FONTSIZE}}", FontSize.ToString())
             .Replace("{{FONTFAMILY}}", FontCss)
             .Replace("{{LETTERSPACING}}", "normal")
             .Replace("{{BACKGROUND}}", Theme.Background)
             .Replace("{{FOREGROUND}}", Theme.Foreground)
-            .Replace("{{HIGHLIGHT}}", Theme.Highlight);
-    }
+            .Replace("{{HIGHLIGHT}}", Theme.Highlight)
+            // Last, so a book whose own text happens to contain one of the names above is left
+            // alone rather than having it substituted out from under it.
+            .Replace("{{BODY}}", bodyHtml);
 }

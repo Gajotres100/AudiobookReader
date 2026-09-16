@@ -400,4 +400,57 @@ public class LibraryServiceTests : IAsyncLifetime, IDisposable
         Assert.NotNull(byOriginal);
         Assert.Equal(book.Id, byOriginal!.Id);
     }
+
+    // ---- Last opened ----
+
+    /// <summary>
+    /// The shelf orders by when a book was last opened, so opening one has to move it to the front.
+    /// The column existed and was sorted on long before anything wrote it, which left every row null
+    /// and the order frozen at whatever sequence the books were imported in.
+    /// </summary>
+    [Fact]
+    public async Task OpeningABookMovesItToTheFrontOfTheShelf()
+    {
+        var first = await _service.CreateFromAudioAsync(Audio("audio-1"));
+        var second = await _service.CreateFromAudioAsync(Audio("audio-2"));
+
+        // Spelled out rather than relying on the clock: both books are created in the same
+        // millisecond here, which would leave the starting order undefined and the test flaky.
+        first!.AddedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        second!.AddedUtc = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        await _database.UpdateBookAsync(first);
+        await _database.UpdateBookAsync(second);
+
+        // Newest import first, before anything has been opened.
+        var byImport = await _database.GetBooksAsync();
+        Assert.Equal(second.Id, byImport[0].Id);
+
+        await _database.MarkOpenedAsync(first.Id);
+
+        var byUse = await _database.GetBooksAsync();
+        Assert.Equal(first.Id, byUse[0].Id);
+    }
+
+    /// <summary>
+    /// Opening a book must not carry the rest of its row along with it. Alignment writes its
+    /// progress onto the same row over hours, and a read-modify-write from the shelf would hand back
+    /// whatever that row looked like when the book was opened.
+    /// </summary>
+    [Fact]
+    public async Task OpeningABookLeavesAlignmentProgressAlone()
+    {
+        var book = await _service.CreateFromAudioAsync(Audio());
+
+        book!.AlignedThroughChapter = 17;
+        book.SyncState = SyncState.InProgress;
+        await _database.UpdateBookAsync(book);
+
+        await _database.MarkOpenedAsync(book.Id);
+
+        var reloaded = await _database.GetBookAsync(book.Id);
+
+        Assert.Equal(17, reloaded!.AlignedThroughChapter);
+        Assert.Equal(SyncState.InProgress, reloaded.SyncState);
+        Assert.NotNull(reloaded.LastOpenedUtc);
+    }
 }

@@ -44,6 +44,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<TabReselect>();
 		builder.Services.AddSingleton<WordTranslator>();
 		builder.Services.AddSingleton<MediaReferences>();
+		builder.Services.AddSingleton<CarConnection>();
 		builder.Services.AddSingleton<LiveSyncRunner>();
 		builder.Services.AddSingleton<BookImporter>();
 		builder.Services.AddSingleton<AlignmentSettingsStore>();

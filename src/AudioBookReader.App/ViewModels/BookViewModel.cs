@@ -381,6 +381,8 @@ public partial class BookViewModel(
         _book = await database.GetBookAsync(BookId);
         if (_book is null) return;
 
+        await database.MarkOpenedAsync(BookId);
+
         Title = _book.Title;
         Author = _book.Author ?? "";
         CoverPath = _book.CoverPath;

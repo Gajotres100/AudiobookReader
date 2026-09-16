@@ -393,6 +393,10 @@ public class PlaybackService : MediaLibraryService
                     service.CurrentBookId = book.Id;
                     service.SetSpeed(state?.Speed ?? 1f);
 
+                    // Picking a book in the car is opening it, and the shelf orders by that — so a
+                    // drive spent on one book leaves it at the top when the phone is next unlocked.
+                    await db.MarkOpenedAsync(book.Id);
+
                     var resumeMs = startPositionMs != C.TimeUnset
                         ? startPositionMs
                         : state?.AudioPositionMs ?? 0;

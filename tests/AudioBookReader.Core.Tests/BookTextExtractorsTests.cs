@@ -85,4 +85,71 @@ public class BookTextExtractorsTests : IDisposable
 
         await Assert.ThrowsAsync<NotSupportedException>(() => _extractors.ExtractAsync(path));
     }
+
+    // ---- Keeping one book ----
+
+    /// <summary>
+    /// Reading a paired book with measuring on has the reader, the live aligner and background
+    /// alignment all working from the same file at once, and each used to parse and hold its own
+    /// copy of it. The text is built once and never written to, so they can share one.
+    /// </summary>
+    [Fact]
+    public async Task AsksForTheSameBookTwiceAndGetsTheSameTextBack()
+    {
+        var path = WriteEpub("novel.epub");
+
+        var first = await _extractors.ExtractAsync(path);
+        var second = await _extractors.ExtractAsync(path);
+
+        Assert.Same(first.Text, second.Text);
+    }
+
+    /// <summary>
+    /// Chapters are database rows, and saving a book's chapters writes ids straight onto the objects
+    /// it is handed. Sharing those instances would let one caller's save rewrite what another is
+    /// still reading, so each caller gets its own.
+    /// </summary>
+    [Fact]
+    public async Task ChaptersAreNotSharedBetweenCallers()
+    {
+        var path = WriteEpub("novel.epub");
+
+        var first = await _extractors.ExtractAsync(path);
+        var second = await _extractors.ExtractAsync(path);
+
+        Assert.NotEmpty(first.Chapters);
+        Assert.NotSame(first.Chapters[0], second.Chapters[0]);
+
+        // What ReplaceChaptersAsync does to whatever it is given.
+        first.Chapters[0].BookId = 42;
+        first.Chapters[0].Id = 7;
+
+        var third = await _extractors.ExtractAsync(path);
+
+        Assert.Equal(0, third.Chapters[0].BookId);
+        Assert.Equal(0, third.Chapters[0].Id);
+    }
+
+    /// <summary>
+    /// A book replaced on disk — a re-import, or the same name written again — must not be answered
+    /// from the entry belonging to whatever used to be there.
+    /// </summary>
+    [Fact]
+    public async Task ADifferentBookAtTheSamePathIsReadAgain()
+    {
+        var path = Path.Combine(_dir, "notes.txt");
+
+        await File.WriteAllTextAsync(path, "The first book.");
+        var first = await _extractors.ExtractAsync(path);
+
+        // Stamped explicitly: the two writes land in the same millisecond on a fast disk, and the
+        // entry is keyed partly on the write time.
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(-30));
+        await File.WriteAllTextAsync(path, "A different book entirely.");
+
+        var second = await _extractors.ExtractAsync(path);
+
+        Assert.Equal("A different book entirely.", second.Text.PlainText);
+        Assert.NotSame(first.Text, second.Text);
+    }
 }

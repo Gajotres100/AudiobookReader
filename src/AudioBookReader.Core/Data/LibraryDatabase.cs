@@ -53,6 +53,18 @@ public class LibraryDatabase
         await (await ReadyAsync()).QueryAsync<Book>(
             "select * from books order by coalesce(LastOpenedUtc, AddedUtc) desc");
 
+    /// <summary>
+    /// Records that a book was just opened, which is what puts it at the top of the shelf.
+    ///
+    /// One targeted statement rather than writing the whole row back: alignment runs for hours and
+    /// saves its progress onto the same row, and a read-modify-write from here would hand it back
+    /// whatever the row looked like when this book was opened — quietly undoing however far it had
+    /// got. Nothing else on the row is this method's business.
+    /// </summary>
+    public async Task MarkOpenedAsync(int bookId) =>
+        await (await ReadyAsync()).ExecuteAsync(
+            "update books set LastOpenedUtc = ? where Id = ?", DateTime.UtcNow, bookId);
+
     public async Task<Book?> GetBookAsync(int id) =>
         await (await ReadyAsync()).Table<Book>().Where(b => b.Id == id).FirstOrDefaultAsync();
 

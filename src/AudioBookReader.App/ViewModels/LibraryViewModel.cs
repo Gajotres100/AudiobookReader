@@ -74,19 +74,22 @@ public partial class LibraryViewModel : ObservableObject
     private readonly BookFilePicker _picker;
     private readonly DownloadQueue _downloads;
     private readonly AlignmentQueue _alignment;
+    private readonly CarConnection _car;
 
     public LibraryViewModel(
         LibraryDatabase database,
         BookImporter importer,
         BookFilePicker picker,
         DownloadQueue downloads,
-        AlignmentQueue alignment)
+        AlignmentQueue alignment,
+        CarConnection car)
     {
         _database = database;
         _importer = importer;
         _picker = picker;
         _downloads = downloads;
         _alignment = alignment;
+        _car = car;
     }
 
     /// <summary>
@@ -266,6 +269,10 @@ public partial class LibraryViewModel : ObservableObject
         }
     }
 
+    /// <summary>Books that live on an Audiobookshelf server rather than on this phone.</summary>
+    [RelayCommand]
+    private static Task OpenServerAsync() => Shell.Current.GoToAsync("server");
+
     /// <summary>
     /// Opens the book as whatever it is.
     ///
@@ -274,16 +281,16 @@ public partial class LibraryViewModel : ObservableObject
     /// with the narration attached when the book is paired. Sending every book to the player first
     /// meant a novel with no audio was greeted by an empty transport, and a paired book made you
     /// press "Čitaj" every single time to get to the thing you came for.
+    ///
+    /// A car is the exception, and takes the audio half of everything. The reader is a page nobody
+    /// behind a wheel may look at, and following it would set recognition running for a screen that
+    /// must stay unread — so while a car screen is attached, every book opens into the player.
     /// </summary>
-    /// <summary>Books that live on an Audiobookshelf server rather than on this phone.</summary>
     [RelayCommand]
-    private static Task OpenServerAsync() => Shell.Current.GoToAsync("server");
-
-    [RelayCommand]
-    private static Task OpenAsync(BookCard? card) => card switch
+    private Task OpenAsync(BookCard? card) => card switch
     {
         null => Task.CompletedTask,
-        { HasText: true } => Shell.Current.GoToAsync($"reader?id={card.Id}"),
+        { HasText: true } when !_car.IsConnected => Shell.Current.GoToAsync($"reader?id={card.Id}"),
         _ => Shell.Current.GoToAsync($"book?id={card.Id}"),
     };
 
