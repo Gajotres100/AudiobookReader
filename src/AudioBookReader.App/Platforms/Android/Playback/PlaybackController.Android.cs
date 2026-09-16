@@ -61,6 +61,8 @@ public partial class PlaybackController
     public partial void Nudge(long deltaMs) => Service?.Nudge(deltaMs);
     public partial void SetSpeed(float speed) => Service?.SetSpeed(speed);
 
+    public partial void NotifyLibraryChanged() => Service?.NotifyLibraryChanged();
+
     public partial void SleepAfter(TimeSpan delay) => Service?.SleepAfter(delay);
     public partial void SleepAtPosition(long positionMs) => Service?.SleepAtPosition(positionMs);
     public partial void CancelSleep() => Service?.CancelSleep();

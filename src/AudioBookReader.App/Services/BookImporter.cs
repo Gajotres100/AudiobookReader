@@ -23,8 +23,18 @@ public class BookImporter(
     LibraryDatabase database,
     SyncMapStore syncMaps,
     BookTextExtractors extractors,
-    MediaReferences references)
+    MediaReferences references,
+    PlaybackController playback)
 {
+    /// <summary>
+    /// Says that the set of books has changed, for anything reading it from outside the app.
+    ///
+    /// Only where the car's own list would look different: it shows books with audio, so gaining
+    /// audio, losing it, or losing the whole book are the three that matter. Attaching text to a
+    /// book leaves that list exactly as it was.
+    /// </summary>
+    private void ShelfChanged() => playback.NotifyLibraryChanged();
+
     public bool IsAudio(string fileName) => AudioBookProbe.IsSupportedAudioFile(fileName);
 
     public bool IsEbook(string fileName) => extractors.CanHandle(fileName);
@@ -76,9 +86,12 @@ public class BookImporter(
             var attachment = new AudioAttachment(
                 location, hash, info.DurationMs, info.Chapters, info.Title, info.Author, coverPath);
 
-            return attachTo is { } bookId
+            var imported = attachTo is { } bookId
                 ? await library.AttachAudioAsync(bookId, attachment)
                 : await library.CreateFromAudioAsync(attachment);
+
+            ShelfChanged();
+            return imported;
         }
         catch
         {
@@ -294,6 +307,7 @@ public class BookImporter(
         if (before?.AudioPath is { } path) await DeleteIfUnusedAsync(path, alsoReferenced);
         if (before?.OriginalAudioPath is { } original) await DeleteIfUnusedAsync(original, alsoReferenced);
 
+        ShelfChanged();
         return book;
     }
 
@@ -342,6 +356,10 @@ public class BookImporter(
 
         await database.DeleteBookAsync(bookId);
         syncMaps.Delete(bookId);
+
+        // Before the early return below: the book is already gone from the library by here, so a
+        // car still showing it is showing something that no longer exists.
+        ShelfChanged();
 
         if (book is null) return;
 

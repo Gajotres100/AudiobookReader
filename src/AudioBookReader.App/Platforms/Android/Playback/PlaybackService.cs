@@ -239,6 +239,38 @@ public class PlaybackService : MediaLibraryService
         }
     }
 
+    /// <summary>
+    /// Tells subscribed browsers that the shelf changed, so a car reads it again.
+    ///
+    /// A browser asks for the children of the root once and keeps what it got. A book imported
+    /// while driving — which is exactly when a phone is handed a file and a car is showing the
+    /// list — was therefore in the library and missing from the screen at the same time, with
+    /// nothing wrong anywhere to find.
+    /// </summary>
+    public void NotifyLibraryChanged()
+    {
+        if (_session is not { } session || _database is not { } database) return;
+
+        _ = TellAsync();
+
+        async Task TellAsync()
+        {
+            try
+            {
+                var books = await database.GetBooksAsync();
+                var count = books.Count(b => b.HasAudio);
+
+                // On the thread the session was built on, like everything else asked of it.
+                _playerThread.Post(() => session.NotifyChildrenChanged(RootMediaId, count, null));
+            }
+            catch (Exception ex)
+            {
+                // The car keeps the list it has, which is the behaviour without this entirely.
+                AppLog.Error("telling a browser the library changed", ex);
+            }
+        }
+    }
+
     // ---- Android Auto browsing ----
 
     /// <summary>The id of the one browsable node: a flat shelf of every book with audio.</summary>

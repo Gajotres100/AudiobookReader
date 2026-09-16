@@ -54,6 +54,15 @@ public partial class PlaybackController
     public partial void Nudge(long deltaMs);
     public partial void SetSpeed(float speed);
 
+    /// <summary>
+    /// Tells anything browsing the library from outside — a car, chiefly — that the shelf changed.
+    ///
+    /// A browser reads the list once and keeps it: a book imported while driving was genuinely in
+    /// the library and genuinely absent from the car screen, because nothing had told the car to
+    /// look again. Only the service can say it, since the subscription belongs to its session.
+    /// </summary>
+    public partial void NotifyLibraryChanged();
+
     public partial void SleepAfter(TimeSpan delay);
 
     /// <summary>Stops when playback reaches a position — how "until the end of this chapter" is done.</summary>
