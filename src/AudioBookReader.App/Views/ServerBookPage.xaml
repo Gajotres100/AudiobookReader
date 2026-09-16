@@ -134,22 +134,17 @@
                 first. With one half already here, the button above names the other and that is all
                 there is to say.
             -->
-            <Grid
-                ColumnDefinitions="*,*"
-                ColumnSpacing="8"
-                IsVisible="{Binding ShowsHalfChoice}">
-                <Button
-                    Grid.Column="0"
-                    Command="{Binding DownloadAudioOnlyCommand}"
-                    Style="{StaticResource Secondary}"
-                    Text="{x:Static s:Strings.ServerBook_JustAudio}" />
+            <Button
+                Command="{Binding DownloadAudioOnlyCommand}"
+                IsVisible="{Binding ShowsHalfChoice}"
+                Style="{StaticResource Secondary}"
+                Text="{x:Static s:Strings.ServerBook_JustAudio}" />
 
-                <Button
-                    Grid.Column="1"
-                    Command="{Binding DownloadEbookOnlyCommand}"
-                    Style="{StaticResource Secondary}"
-                    Text="{x:Static s:Strings.ServerBook_JustEbook}" />
-            </Grid>
+            <Button
+                Command="{Binding DownloadEbookOnlyCommand}"
+                IsVisible="{Binding ShowsHalfChoice}"
+                Style="{StaticResource Secondary}"
+                Text="{x:Static s:Strings.ServerBook_JustEbook}" />
 
             <Button
                 Command="{Binding CancelCommand}"
