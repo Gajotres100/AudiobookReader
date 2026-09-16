@@ -1113,6 +1113,18 @@ public partial class ReaderViewModel(
         // walk this book's text to another book's playhead.
         var playingThisBook = playback.BookId == BookId;
 
+        // Saved here rather than left to a sentence tap: tapping a sentence saves the text
+        // position, not this, and someone listening with their eyes closed — the whole point of a
+        // sleep timer — never taps anything. Without this, nothing wrote the audio position for a
+        // paired book read through this page at all, so a process killed while the phone slept lost
+        // the entire session and came back wherever it last happened to be saved, which could be
+        // nowhere later than the very start.
+        if (playingThisBook && playback.IsPlaying && DateTime.UtcNow - _lastPositionSaved > TimeSpan.FromSeconds(5))
+        {
+            _lastPositionSaved = DateTime.UtcNow;
+            _ = database.SaveReadingStateAsync(BookId, audioPositionMs: playback.PositionMs, speed: playback.Speed);
+        }
+
         if (!IsFollowing || _sync is null || !playback.IsPlaying || !playingThisBook)
         {
             if (DateTime.UtcNow - _lastMiss > TimeSpan.FromSeconds(10))
@@ -1180,6 +1192,7 @@ public partial class ReaderViewModel(
 
     private DateTime _lastMiss = DateTime.MinValue;
     private DateTime _lastTrace = DateTime.MinValue;
+    private DateTime _lastPositionSaved = DateTime.MinValue;
 
     /// <summary>The sentence the page should highlight once a freshly loaded document is ready.</summary>
     public int PendingHighlight => _lastSentence;
