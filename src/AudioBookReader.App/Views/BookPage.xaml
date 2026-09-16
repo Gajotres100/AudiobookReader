@@ -62,14 +62,25 @@
                 Text="☰" />
         </Grid>
 
-        <!--  Countdown, shown only while a timer is armed.  -->
+        <!--
+            Countdown, shown only while a timer is armed.
+
+            Sitting in the same Auto-height row as the icon toolbar rather than a row of its own,
+            so nothing else in the page needed its row index renumbered — the row simply grows to
+            fit both. Pinned below the 44px-tall icon buttons (Margin top) rather than centred
+            across the row's own height: centring it there put a short "09:18" close enough to the
+            ⏱ button to brush against it, and an "until end of chapter" countdown routinely runs
+            long enough to need the h:mm:ss form, which is wide enough to reach the flag and speed
+            buttons too.
+        -->
         <Label
             Grid.Row="0"
             HorizontalOptions="Center"
             IsVisible="{Binding HasSleepTimer}"
+            Margin="0,48,0,0"
             Style="{StaticResource Muted}"
             Text="{Binding SleepButtonText}"
-            VerticalOptions="Center" />
+            VerticalOptions="Start" />
 
         <!--  Confirms a held flag actually saved something.  -->
         <Label
@@ -154,19 +165,30 @@
         <!--  Chapter bar: tapping the title opens and closes the list  -->
         <Grid
             Grid.Row="2"
-            ColumnDefinitions="46,*,46"
+            ColumnDefinitions="60,*,60"
             IsVisible="{Binding HasAudio}">
+            <!--
+                Bigger than the Icon style's usual 44px: these two and the chapter title between
+                them are the buttons most likely to be reached for without looking — on a phone in
+                a pocket, or by feel in the dark — and 44px was reported hard to land a thumb on
+                reliably. The toolbar's other icon buttons stay at the shared size; only these three
+                needed the exception.
+            -->
             <Button
                 Grid.Column="0"
                 Command="{Binding PreviousChapterCommand}"
+                FontSize="26"
+                HeightRequest="56"
                 Style="{StaticResource Icon}"
-                Text="‹" />
+                Text="‹"
+                WidthRequest="56" />
 
             <Label
                 Grid.Column="1"
                 FontFamily="OpenSansSemibold"
                 HorizontalTextAlignment="Center"
                 LineBreakMode="TailTruncation"
+                Padding="0,16"
                 Text="{Binding ChapterHeading}"
                 VerticalOptions="Center">
                 <Label.GestureRecognizers>
@@ -177,8 +199,11 @@
             <Button
                 Grid.Column="2"
                 Command="{Binding NextChapterCommand}"
+                FontSize="26"
+                HeightRequest="56"
                 Style="{StaticResource Icon}"
-                Text="›" />
+                Text="›"
+                WidthRequest="56" />
         </Grid>
 
         <!--  Position within the chapter  -->
