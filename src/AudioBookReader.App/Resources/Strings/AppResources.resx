@@ -232,6 +232,21 @@
   <data name="ServerBook_Download" xml:space="preserve">
     <value>Download</value>
   </data>
+  <data name="ServerBook_DownloadAudio" xml:space="preserve">
+    <value>Download the audiobook</value>
+  </data>
+  <data name="ServerBook_DownloadEbook" xml:space="preserve">
+    <value>Download the ebook</value>
+  </data>
+  <data name="ServerBook_AlreadyHere" xml:space="preserve">
+    <value>This book is already in your library, with everything the server has of it.</value>
+  </data>
+  <data name="ServerBook_AudioHereTextMissing" xml:space="preserve">
+    <value>The narration is already here. The server also has the text, which would let it follow along.</value>
+  </data>
+  <data name="ServerBook_TextHereAudioMissing" xml:space="preserve">
+    <value>The text is already here. The server also has the narration.</value>
+  </data>
   <data name="ServerBook_CancelDownload" xml:space="preserve">
     <value>Stop downloading</value>
   </data>

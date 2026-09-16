@@ -225,6 +225,21 @@
   <data name="ServerBook_Download" xml:space="preserve">
     <value>Preuzmi</value>
   </data>
+  <data name="ServerBook_DownloadAudio" xml:space="preserve">
+    <value>Preuzmi audioknjigu</value>
+  </data>
+  <data name="ServerBook_DownloadEbook" xml:space="preserve">
+    <value>Preuzmi e-knjigu</value>
+  </data>
+  <data name="ServerBook_AlreadyHere" xml:space="preserve">
+    <value>Ova je knjiga već u tvojoj biblioteci, sa svime što server ima od nje.</value>
+  </data>
+  <data name="ServerBook_AudioHereTextMissing" xml:space="preserve">
+    <value>Naracija je već ovdje. Server ima i tekst, koji bi je onda mogao pratiti.</value>
+  </data>
+  <data name="ServerBook_TextHereAudioMissing" xml:space="preserve">
+    <value>Tekst je već ovdje. Server ima i naraciju.</value>
+  </data>
   <data name="ServerBook_CancelDownload" xml:space="preserve">
     <value>Prekini preuzimanje</value>
   </data>

@@ -217,11 +217,23 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
     /// that runs this is handed an intent, not an object, and everything it needs is in the detail
     /// it fetches anyway.
     /// </param>
+    /// <param name="wantAudio">
+    /// Whether to fetch the narration. False when the book is already here with its audio and only
+    /// its other half is missing — there is no sense pulling a gigabyte over again for that.
+    /// </param>
+    /// <param name="wantEbook">Whether to fetch the text, on the same terms.</param>
+    /// <param name="attachTo">
+    /// An entry already in the library that this belongs to, so a missing half joins the book it
+    /// completes instead of arriving as a second copy of the same title.
+    /// </param>
     public async Task<int> ImportAsync(
         string itemId,
         IProgress<ImportProgress>? progress = null,
         CancellationToken ct = default,
-        bool toAppStorage = false)
+        bool toAppStorage = false,
+        bool wantAudio = true,
+        bool wantEbook = true,
+        int? attachTo = null)
     {
         var detail = await Wrap(() => _client.GetBookAsync(itemId, ct));
         var book = detail.Book;
@@ -229,11 +241,16 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
         // One file only, for now. A book split across forty files needs the app to hold more than
         // one audio path per book, and holding it as one long file it is not would be a lie the
         // chapter list and every seek would then repeat.
-        if (detail.AudioFiles.Count > 1)
+        //
+        // Only when the audio is actually wanted: a split book whose text is the missing half can
+        // still have that text fetched, and refusing the whole errand over the half nobody asked
+        // for would be the app being difficult for its own sake.
+        if (wantAudio && detail.AudioFiles.Count > 1)
             throw new NotSupportedException(
                 string.Format(Strings.Server_SplitFilesLong, detail.AudioFiles.Count));
 
-        int? bookId = null;
+        // Seeded with the book this is completing, when it is completing one.
+        int? bookId = attachTo;
 
         // Everything written for this import, so a download that does not finish leaves nothing
         // behind. What succeeds is kept: it is the book itself, in the user's own folder.
@@ -242,7 +259,7 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
 
         try
             {
-            if (detail.AudioFiles.Count == 1)
+            if (wantAudio && detail.AudioFiles.Count == 1)
             {
                 var file = detail.AudioFiles[0];
 
@@ -257,12 +274,12 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
                 written.Add(path);
 
                 var imported = await importer.ImportAudioAsync(
-                    new PickedMedia(path, file.FileName), null, progress, ct);
+                    new PickedMedia(path, file.FileName), bookId, progress, ct);
 
                 bookId = imported.Id;
             }
 
-            if (detail.Ebook is { } ebook)
+            if (wantEbook && detail.Ebook is { } ebook)
             {
                 var path = await DownloadAsync(
                     toAppStorage ? null : Shelf(book),

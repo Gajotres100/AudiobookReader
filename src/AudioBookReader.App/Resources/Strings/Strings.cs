@@ -136,6 +136,16 @@ public static class Strings
     public static string ServerBook_OnServer => Get(nameof(ServerBook_OnServer));
     /// <summary>Download</summary>
     public static string ServerBook_Download => Get(nameof(ServerBook_Download));
+
+    public static string ServerBook_DownloadAudio => Get(nameof(ServerBook_DownloadAudio));
+
+    public static string ServerBook_DownloadEbook => Get(nameof(ServerBook_DownloadEbook));
+
+    public static string ServerBook_AlreadyHere => Get(nameof(ServerBook_AlreadyHere));
+
+    public static string ServerBook_AudioHereTextMissing => Get(nameof(ServerBook_AudioHereTextMissing));
+
+    public static string ServerBook_TextHereAudioMissing => Get(nameof(ServerBook_TextHereAudioMissing));
     /// <summary>Stop downloading</summary>
     public static string ServerBook_CancelDownload => Get(nameof(ServerBook_CancelDownload));
     /// <summary>Open book</summary>

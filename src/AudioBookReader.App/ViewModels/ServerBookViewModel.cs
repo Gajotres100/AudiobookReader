@@ -1,6 +1,7 @@
 using AudioBookReader.App.Resources.Strings;
 using AudioBookReader.App.Services;
 using AudioBookReader.Core.Data;
+using AudioBookReader.Core.Models;
 using AudioBookReader.App.Views;
 using AudioBookReader.Core.Servers;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -76,6 +77,26 @@ public partial class ServerBookViewModel : ObservableObject
         Status = status.Message;
 
         if (status.BookId is { } id) BookId = id;
+
+        // The half that just arrived is no longer missing, and the offer has to stop naming it.
+        // Without this the page went on saying "download the ebook" over an ebook now sitting in
+        // the library — the very thing this page was just taught not to do.
+        if (status.Phase == DownloadPhase.Finished) _ = ReconsiderAsync();
+    }
+
+    private async Task ReconsiderAsync()
+    {
+        try
+        {
+            if (_detail is null || BookId is not { } id) return;
+
+            DecideWhatIsMissing(await _database.GetBookAsync(id));
+        }
+        catch (Exception ex)
+        {
+            // The page still works with the offer it has, and the next visit reads it afresh.
+            AppLog.Error("re-reading what is still missing", ex);
+        }
     }
 
     public string ItemId { get; set; } = "";
@@ -111,7 +132,27 @@ public partial class ServerBookViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CannotDownload))]
     public partial bool CanDownload { get; set; }
 
+    /// <summary>Which halves this download would actually fetch.</summary>
+    public bool WantsAudio { get; private set; } = true;
+
+    public bool WantsEbook { get; private set; } = true;
+
+    /// <summary>What the button says, which is what it will do — the whole book, or the half of it
+    /// that is missing.</summary>
+    [ObservableProperty]
+    public partial string DownloadText { get; set; } = Strings.ServerBook_Download;
+
     public bool CannotDownload => !CanDownload && Obstacle.Length > 0;
+
+    /// <summary>
+    /// What is already here, when something is — the difference between a button that looks
+    /// redundant and one that says what it is for. Not a failure, so not dressed as one.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNote))]
+    public partial string Note { get; set; } = "";
+
+    public bool HasNote => Note.Length > 0;
 
     /// <summary>Why it cannot be brought over, when it cannot.</summary>
     [ObservableProperty]
@@ -179,21 +220,14 @@ public partial class ServerBookViewModel : ObservableObject
                 ? string.Format(Strings.Chapter_Count, _detail.Chapters.Count)
                 : "";
 
-            // The one thing that decides whether this can be brought over at all, said here rather
-            // than discovered by pressing a button that then refuses.
-            Obstacle = _detail.AudioFiles.Count > 1
-                ? string.Format(Strings.Server_SplitFilesLong, _detail.AudioFiles.Count)
-                : _detail.AudioFiles.Count == 0 && _detail.Ebook is null
-                    ? Strings.Server_NothingToDownload
-                    : "";
+            // Already here? Matched by title, which is all the two sides share before a file has
+            // been downloaded and hashed.
+            var here = (await _database.GetBooksAsync())
+                .FirstOrDefault(b => string.Equals(b.Title, book.Title, StringComparison.CurrentCultureIgnoreCase));
 
-            CanDownload = Obstacle.Length == 0;
+            BookId = here?.Id;
 
-            // Already here? Then say so instead of offering to fetch it twice. Matched by title,
-            // which is all the two sides share before a file has been downloaded and hashed.
-            BookId = (await _database.GetBooksAsync())
-                .FirstOrDefault(b => string.Equals(b.Title, book.Title, StringComparison.CurrentCultureIgnoreCase))
-                ?.Id;
+            DecideWhatIsMissing(here);
 
             // A download for this book may already be running — started here and then left, or
             // still going from before this page existed. That outranks the empty line that means
@@ -209,6 +243,66 @@ public partial class ServerBookViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>What is on the server that is not already on this phone, and whether it can come.
+    ///
+    /// The page used to ask one question — can this be downloaded — and answer it without ever
+    /// looking at the library, so a book already sitting in Books was offered for download again.
+    /// The honest question is per half. A book can be here as narration alone while the server also
+    /// keeps the text that would follow it, or the other way round, and that missing half is worth
+    /// fetching even though "the book" is already here. Both halves here means there is nothing to
+    /// offer at all.
+    ///
+    /// Split audio only blocks the audio. A book the server keeps in forty files still has one
+    /// ebook, and refusing to fetch that because of how the narration is stored would be the app
+    /// being difficult about something nobody asked for.
+    /// </summary>
+    private void DecideWhatIsMissing(Book? here)
+    {
+        var serverHasAudio = _detail!.AudioFiles.Count > 0;
+        var serverHasEbook = _detail.Ebook is not null;
+        var splitAudio = _detail.AudioFiles.Count > 1;
+
+        // Wanted means the server has it and this phone does not. A book already here with its
+        // narration still wants the text the server keeps beside it.
+        WantsAudio = serverHasAudio && here?.HasAudio != true;
+        WantsEbook = serverHasEbook && here?.HasText != true;
+
+        // Split audio stops the audio and nothing else. A book the server keeps in forty files
+        // still has one ebook, and refusing to fetch that over how the narration is stored would
+        // be the app being difficult about something nobody asked for.
+        var audioOutOfReach = WantsAudio && splitAudio;
+        if (audioOutOfReach) WantsAudio = false;
+
+        CanDownload = WantsAudio || WantsEbook;
+
+        DownloadText = (WantsAudio, WantsEbook, here) switch
+        {
+            (true, false, not null) => Strings.ServerBook_DownloadAudio,
+            (false, true, not null) => Strings.ServerBook_DownloadEbook,
+            _ => Strings.ServerBook_Download,
+        };
+
+        // Red, and only for something genuinely in the way.
+        Obstacle = !serverHasAudio && !serverHasEbook
+            ? Strings.Server_NothingToDownload
+            : audioOutOfReach && !CanDownload
+                ? string.Format(Strings.Server_SplitFilesLong, _detail.AudioFiles.Count)
+                : "";
+
+        // Plain, and for telling the reader what they already have — which is the difference
+        // between a button that looks redundant and one that says what it is for.
+        Note = here is null
+            ? ""
+            : !CanDownload && Obstacle.Length == 0
+                ? Strings.ServerBook_AlreadyHere
+                : (WantsEbook, WantsAudio) switch
+                {
+                    (true, false) when here.HasAudio => Strings.ServerBook_AudioHereTextMissing,
+                    (false, true) when here.HasText => Strings.ServerBook_TextHereAudioMissing,
+                    _ => "",
+                };
     }
 
     private static string Describe(ServerBook book) => (book.HasAudio, book.HasEbook) switch
@@ -248,7 +342,7 @@ public partial class ServerBookViewModel : ObservableObject
 
         // Handed to a service and forgotten. Everything from here arrives through the queue, which
         // is what lets it carry on with this page closed and the screen locked.
-        _downloads.Start(ItemId, Title, toAppStorage);
+        _downloads.Start(ItemId, Title, toAppStorage, WantsAudio, WantsEbook, BookId);
     }
 
     /// <summary>

@@ -27,6 +27,11 @@ public class DownloadService : Service
     public const string ExtraItemId = "itemId";
     public const string ExtraTitle = "title";
     public const string ExtraAppStorage = "appStorage";
+    public const string ExtraWantAudio = "wantAudio";
+    public const string ExtraWantEbook = "wantEbook";
+
+    /// <summary>The library entry a missing half joins, or 0 when this is a whole new book.</summary>
+    public const string ExtraAttachTo = "attachTo";
 
     private const string ChannelId = "downloads";
 
@@ -50,6 +55,9 @@ public class DownloadService : Service
         var itemId = intent?.GetStringExtra(ExtraItemId);
         var title = intent?.GetStringExtra(ExtraTitle) ?? "";
         var toAppStorage = intent?.GetBooleanExtra(ExtraAppStorage, false) ?? false;
+        var wantAudio = intent?.GetBooleanExtra(ExtraWantAudio, true) ?? true;
+        var wantEbook = intent?.GetBooleanExtra(ExtraWantEbook, true) ?? true;
+        var attachTo = intent?.GetIntExtra(ExtraAttachTo, 0) ?? 0;
 
         if (string.IsNullOrEmpty(itemId))
         {
@@ -65,14 +73,22 @@ public class DownloadService : Service
         // Android calls this on the main looper and nothing downstream configures its awaits, so
         // without Task.Run every continuation in the import — tag reading and hashing included —
         // would resume on the UI thread.
-        _ = Task.Run(() => RunAsync(itemId, title, toAppStorage, _cancellation.Token));
+        _ = Task.Run(() => RunAsync(
+            itemId, title, toAppStorage, wantAudio, wantEbook, attachTo, _cancellation.Token));
 
         // Not sticky: a transfer killed with the process should resume because someone asked again,
         // not because Android replayed a stale intent at a file that is no longer there.
         return StartCommandResult.NotSticky;
     }
 
-    private async Task RunAsync(string itemId, string title, bool toAppStorage, CancellationToken ct)
+    private async Task RunAsync(
+        string itemId,
+        string title,
+        bool toAppStorage,
+        bool wantAudio,
+        bool wantEbook,
+        int attachTo,
+        CancellationToken ct)
     {
         var services = IPlatformApplication.Current?.Services;
         var queue = services?.GetService<DownloadQueue>();
@@ -94,7 +110,8 @@ public class DownloadService : Service
 
             AppLog.Info($"download: '{title}' starting");
 
-            var bookId = await server.ImportAsync(itemId, progress, ct, toAppStorage);
+            var bookId = await server.ImportAsync(
+                itemId, progress, ct, toAppStorage, wantAudio, wantEbook, attachTo > 0 ? attachTo : null);
 
             queue?.Report(new DownloadStatus(
                 itemId, title, DownloadPhase.Finished, Strings.Server_InLibraryNow, 1, bookId));

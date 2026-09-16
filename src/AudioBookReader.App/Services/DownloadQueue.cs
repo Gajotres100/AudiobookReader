@@ -67,7 +67,16 @@ public partial class DownloadQueue
 
     /// <summary>Starts fetching a book in a foreground service.</summary>
     /// <returns>False when one is already running, since only one runs at a time.</returns>
-    public bool Start(string itemId, string title, bool toAppStorage)
+    /// <param name="wantAudio">Whether the narration is among what is missing here.</param>
+    /// <param name="wantEbook">Whether the text is.</param>
+    /// <param name="attachTo">The library entry this completes, when it completes one.</param>
+    public bool Start(
+        string itemId,
+        string title,
+        bool toAppStorage,
+        bool wantAudio = true,
+        bool wantEbook = true,
+        int? attachTo = null)
     {
         if (Status.IsRunning) return false;
 
@@ -76,11 +85,12 @@ public partial class DownloadQueue
         // otherwise change on screen, and a button that visibly does nothing reads as a hang.
         Report(new DownloadStatus(itemId, title, DownloadPhase.Starting, Strings.Download_Preparing));
 
-        StartCore(itemId, title, toAppStorage);
+        StartCore(itemId, title, toAppStorage, wantAudio, wantEbook, attachTo);
         return true;
     }
 
-    private partial void StartCore(string itemId, string title, bool toAppStorage);
+    private partial void StartCore(
+        string itemId, string title, bool toAppStorage, bool wantAudio, bool wantEbook, int? attachTo);
 
     /// <summary>Asks the running download to stop. What it had written is deleted.</summary>
     public partial void Stop();

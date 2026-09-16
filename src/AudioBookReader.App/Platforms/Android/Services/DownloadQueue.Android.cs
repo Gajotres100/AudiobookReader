@@ -5,7 +5,8 @@ namespace AudioBookReader.App.Services;
 
 public partial class DownloadQueue
 {
-    private partial void StartCore(string itemId, string title, bool toAppStorage)
+    private partial void StartCore(
+        string itemId, string title, bool toAppStorage, bool wantAudio, bool wantEbook, int? attachTo)
     {
         var context = global::Android.App.Application.Context;
 
@@ -13,7 +14,10 @@ public partial class DownloadQueue
             .SetAction(DownloadService.ActionStart)
             .PutExtra(DownloadService.ExtraItemId, itemId)
             .PutExtra(DownloadService.ExtraTitle, title)
-            .PutExtra(DownloadService.ExtraAppStorage, toAppStorage);
+            .PutExtra(DownloadService.ExtraAppStorage, toAppStorage)
+            .PutExtra(DownloadService.ExtraWantAudio, wantAudio)
+            .PutExtra(DownloadService.ExtraWantEbook, wantEbook)
+            .PutExtra(DownloadService.ExtraAttachTo, attachTo ?? 0);
 
         // A foreground service, so the transfer survives the screen going off. This is the whole
         // point of the class: as a plain task it was suspended along with the app.

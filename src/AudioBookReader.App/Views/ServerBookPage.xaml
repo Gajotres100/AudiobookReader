@@ -72,6 +72,12 @@
                     Text="{Binding Obstacle}"
                     Style="{StaticResource Failure}" />
 
+                <!--  What is already here, which is what makes the button below make sense.  -->
+                <Label
+                    IsVisible="{Binding HasNote}"
+                    Text="{Binding Note}"
+                    Style="{StaticResource Muted}" />
+
                 <!--
                     Nothing about where it goes. That question is asked once, by Preuzmi, and asking
                     it here as well made the same decision available in two places with no way to
@@ -119,7 +125,7 @@
                 IsEnabled="{Binding CanDownload}"
                 IsVisible="{Binding IsIdle}"
                 Style="{StaticResource Primary}"
-                Text="{x:Static s:Strings.ServerBook_Download}" />
+                Text="{Binding DownloadText}" />
 
             <Button
                 Command="{Binding CancelCommand}"
