@@ -804,7 +804,7 @@
     <comment>{0} is the folder the user picked earlier.</comment>
   </data>
   <data name="Destination_FolderWillAsk" xml:space="preserve">
-    <value>The system will ask you to confirm the folder.</value>
+    <value>First time only: Android will ask you to confirm the folder. It is remembered after that.</value>
   </data>
   <data name="Destination_AppTitle" xml:space="preserve">
     <value>Internal app storage</value>

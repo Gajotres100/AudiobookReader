@@ -748,7 +748,7 @@
     <value>Sada: {0}</value>
   </data>
   <data name="Destination_FolderWillAsk" xml:space="preserve">
-    <value>Sustav će tražiti da potvrdiš mapu.</value>
+    <value>Samo prvi put: Android će tražiti da potvrdiš mapu. Poslije se pamti.</value>
   </data>
   <data name="Destination_AppTitle" xml:space="preserve">
     <value>Interna pohrana aplikacije</value>

@@ -24,11 +24,22 @@ public partial class DownloadDestinationPage : ContentPage
 
         _folder = folder;
 
-        // Said only when there is something to say. Before a folder has been granted this line
-        // would be a promise about a place the user has not seen yet.
-        ChosenFolder.Text = folder.IsChosen
-            ? string.Format(Strings.Destination_FolderChosen, folder.Describe())
-            : Strings.Destination_FolderWillAsk;
+        // Two different jobs, so two different weights.
+        //
+        // "Now: Audiobooks" is a note about a settled thing and can sit quietly at the bottom of
+        // the card. The other line is a warning that tapping this opens the system's folder picker
+        // — and at twelve grey pixels nobody read it, so choosing the Audiobooks folder and then
+        // being handed a folder picker looked like the app ignoring the answer just given.
+        if (folder.IsChosen)
+        {
+            ChosenFolder.Text = string.Format(Strings.Destination_FolderChosen, folder.Describe());
+        }
+        else
+        {
+            ChosenFolder.Text = Strings.Destination_FolderWillAsk;
+            ChosenFolder.FontSize = 14;
+            ChosenFolder.FontFamily = "OpenSansSemibold";
+        }
     }
 
     private async void OnFolderTapped(object? sender, TappedEventArgs e)
