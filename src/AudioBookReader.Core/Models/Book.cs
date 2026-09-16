@@ -91,6 +91,17 @@ public class Book
     /// </summary>
     public string? Language { get; set; }
 
+    /// <summary>
+    /// The item this came from on an Audiobookshelf server, when it came from one.
+    ///
+    /// Kept because the two sides otherwise share nothing but a title, and titles disagree: the
+    /// local one is read from the audio file's own tags and the server's from its metadata, so a
+    /// book plainly already here failed to match the item being looked at and was offered for
+    /// download all over again.
+    /// </summary>
+    [Indexed]
+    public string? ServerItemId { get; set; }
+
     public DateTime AddedUtc { get; set; }
     public DateTime? LastOpenedUtc { get; set; }
 

@@ -65,6 +65,14 @@ public class LibraryDatabase
         await (await ReadyAsync()).ExecuteAsync(
             "update books set LastOpenedUtc = ? where Id = ?", DateTime.UtcNow, bookId);
 
+    /// <summary>
+    /// Records which server item a book came from, so it is recognised next time it is seen there.
+    /// One column, for the same reason as <see cref="MarkOpenedAsync"/>.
+    /// </summary>
+    public async Task LinkToServerAsync(int bookId, string itemId) =>
+        await (await ReadyAsync()).ExecuteAsync(
+            "update books set ServerItemId = ? where Id = ?", itemId, bookId);
+
     public async Task<Book?> GetBookAsync(int id) =>
         await (await ReadyAsync()).Table<Book>().Where(b => b.Id == id).FirstOrDefaultAsync();
 

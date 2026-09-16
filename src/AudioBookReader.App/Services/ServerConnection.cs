@@ -1,4 +1,5 @@
 using AudioBookReader.App.Resources.Strings;
+using AudioBookReader.Core.Data;
 using AudioBookReader.Core.Servers;
 
 namespace AudioBookReader.App.Services;
@@ -10,7 +11,11 @@ namespace AudioBookReader.App.Services;
 /// screen that asks about the server is asking about the same one. It wraps the Core client with
 /// the stored account, so no screen has to know how signing in works or where the token is kept.
 /// </summary>
-public class ServerConnection(ServerAccount account, BookImporter importer, DownloadFolder folder)
+public class ServerConnection(
+    ServerAccount account,
+    BookImporter importer,
+    DownloadFolder folder,
+    LibraryDatabase database)
 {
     private readonly AudiobookshelfClient _client = new(new HttpClient(BuildHandler(account))
     {
@@ -299,7 +304,13 @@ public class ServerConnection(ServerAccount account, BookImporter importer, Down
 
             finished = true;
 
-            return bookId ?? throw new NotSupportedException(Strings.Server_NothingToDownload);
+            var id = bookId ?? throw new NotSupportedException(Strings.Server_NothingToDownload);
+
+            // Remembered so this book is recognised the next time its item is opened, instead of
+            // being matched on a title the two sides spell differently.
+            await database.LinkToServerAsync(id, itemId);
+
+            return id;
         }
         finally
         {

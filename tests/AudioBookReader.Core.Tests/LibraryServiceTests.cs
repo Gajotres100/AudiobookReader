@@ -453,4 +453,46 @@ public class LibraryServiceTests : IAsyncLifetime, IDisposable
         Assert.Equal(SyncState.InProgress, reloaded.SyncState);
         Assert.NotNull(reloaded.LastOpenedUtc);
     }
+
+    // ---- Where a book came from ----
+
+    /// <summary>
+    /// A book downloaded from a server has to be recognisable as that server's item afterwards.
+    /// The two sides otherwise share only a title, and titles disagree — the local one is read from
+    /// the audio file's tags, the server's from its metadata — so a book plainly already here was
+    /// offered for download again.
+    /// </summary>
+    [Fact]
+    public async Task ABookRemembersTheServerItemItCameFrom()
+    {
+        var book = await _service.CreateFromAudioAsync(Audio());
+
+        await _database.LinkToServerAsync(book!.Id, "li_9f3c1");
+
+        var reloaded = await _database.GetBookAsync(book.Id);
+
+        Assert.Equal("li_9f3c1", reloaded!.ServerItemId);
+    }
+
+    /// <summary>
+    /// Recording where a book came from must not carry the rest of its row along with it, for the
+    /// same reason opening one must not: alignment writes its progress onto that row for hours.
+    /// </summary>
+    [Fact]
+    public async Task LinkingToAServerLeavesAlignmentProgressAlone()
+    {
+        var book = await _service.CreateFromAudioAsync(Audio());
+
+        book!.AlignedThroughChapter = 12;
+        book.SyncState = SyncState.InProgress;
+        await _database.UpdateBookAsync(book);
+
+        await _database.LinkToServerAsync(book.Id, "li_9f3c1");
+
+        var reloaded = await _database.GetBookAsync(book.Id);
+
+        Assert.Equal(12, reloaded!.AlignedThroughChapter);
+        Assert.Equal(SyncState.InProgress, reloaded.SyncState);
+        Assert.Equal("li_9f3c1", reloaded.ServerItemId);
+    }
 }

@@ -22,6 +22,7 @@ public partial class ServerBookViewModel : ObservableObject
     private readonly ServerConnection _server;
     private readonly LibraryDatabase _database;
     private readonly DownloadQueue _downloads;
+    private readonly CarConnection _car;
 
     /// <summary>
     /// Watches the download queue rather than owning the transfer.
@@ -34,12 +35,13 @@ public partial class ServerBookViewModel : ObservableObject
     public ServerBookViewModel(
         ServerConnection server,
         LibraryDatabase database,
-        DownloadQueue downloads)
+        DownloadQueue downloads,
+        CarConnection car)
     {
         _server = server;
         _database = database;
         _downloads = downloads;
-
+        _car = car;
     }
 
     /// <summary>
@@ -90,7 +92,10 @@ public partial class ServerBookViewModel : ObservableObject
         {
             if (_detail is null || BookId is not { } id) return;
 
-            DecideWhatIsMissing(await _database.GetBookAsync(id));
+            var here = await _database.GetBookAsync(id);
+
+            LocalHasText = here?.HasText == true;
+            DecideWhatIsMissing(here);
         }
         catch (Exception ex)
         {
@@ -191,6 +196,9 @@ public partial class ServerBookViewModel : ObservableObject
 
     public bool IsInLibrary => BookId is not null;
 
+    /// <summary>Whether the copy already here has the text, which decides what opening it means.</summary>
+    public bool LocalHasText { get; private set; }
+
     public async Task LoadAsync()
     {
         if (_detail is not null || string.IsNullOrEmpty(ItemId)) return;
@@ -220,12 +228,22 @@ public partial class ServerBookViewModel : ObservableObject
                 ? string.Format(Strings.Chapter_Count, _detail.Chapters.Count)
                 : "";
 
-            // Already here? Matched by title, which is all the two sides share before a file has
-            // been downloaded and hashed.
-            var here = (await _database.GetBooksAsync())
-                .FirstOrDefault(b => string.Equals(b.Title, book.Title, StringComparison.CurrentCultureIgnoreCase));
+            // Already here? By the item it came from when that is recorded, and only then by title.
+            //
+            // Titles are the weaker half of this on purpose: the local one is read from the audio
+            // file's own tags and the server's from its metadata, and they disagree often enough —
+            // a subtitle, a series suffix, a colon — that a book plainly already here failed to
+            // match and was offered for download all over again. The link is exact and survives
+            // both sides being renamed; the title is the fallback for books that came over before
+            // anything was recording it.
+            var books = await _database.GetBooksAsync();
+
+            var here = books.FirstOrDefault(b => b.ServerItemId == ItemId)
+                ?? books.FirstOrDefault(b =>
+                    string.Equals(b.Title, book.Title, StringComparison.CurrentCultureIgnoreCase));
 
             BookId = here?.Id;
+            LocalHasText = here?.HasText == true;
 
             DecideWhatIsMissing(here);
 
@@ -372,9 +390,21 @@ public partial class ServerBookViewModel : ObservableObject
         return await page.Answer;
     }
 
+    /// <summary>
+    /// Goes to the copy already in the library, as whatever it is.
+    ///
+    /// The same rule the shelf uses, rather than always the player: a book with text opens into the
+    /// text, and one without has nothing to read. Sending everything to the player greeted a
+    /// text-only book with an empty transport. In a car it is always the player, for the reason
+    /// every other route there is.
+    /// </summary>
     [RelayCommand]
-    private Task OpenAsync() =>
-        BookId is { } id ? Shell.Current.GoToAsync($"book?id={id}") : Task.CompletedTask;
+    private Task OpenAsync() => BookId switch
+    {
+        null => Task.CompletedTask,
+        { } id when LocalHasText && !_car.IsConnected => Shell.Current.GoToAsync($"reader?id={id}"),
+        { } id => Shell.Current.GoToAsync($"book?id={id}"),
+    };
 
     [RelayCommand]
     private Task CloseAsync() => Shell.Current.GoToAsync("..");
