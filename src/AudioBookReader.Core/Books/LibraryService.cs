@@ -25,7 +25,10 @@ public record TextAttachment(
     IReadOnlyList<Chapter> Chapters,
     string? Title = null,
     string? Author = null,
-    string? Language = null);
+    string? Language = null,
+
+    /// <param name="CoverPath">Where the cover pulled out of the file was written, when it had one.</param>
+    string? CoverPath = null);
 
 /// <summary>
 /// Owns how a book's two media go together.
@@ -89,6 +92,10 @@ public class LibraryService(LibraryDatabase database, SyncMapStore syncMaps)
     public async Task<Book> AttachTextAsync(int bookId, TextAttachment text)
     {
         var book = await RequireBookAsync(bookId);
+
+        // Only when the book has none: a paired book already took one from its audio, and an
+        // ebook cover is not worth overwriting it with.
+        book.CoverPath ??= text.CoverPath;
 
         book.EbookPath = text.Path;
         book.EbookHash = text.Hash;

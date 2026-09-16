@@ -59,6 +59,7 @@ public class BookTextExtractors(IEnumerable<IBookTextExtractor>? extractors = nu
     private string? _key;
     private BookText? _text;
     private IReadOnlyList<Chapter>? _chapters;
+    private byte[]? _cover;
 
     /// <summary>
     /// Identifies a file by more than its name, so a book replaced on disk is not served from the
@@ -85,7 +86,7 @@ public class BookTextExtractors(IEnumerable<IBookTextExtractor>? extractors = nu
         lock (_gate)
         {
             return _key == key && _text is not null && _chapters is not null
-                ? new ExtractedBook(_text, Copy(_chapters))
+                ? new ExtractedBook(_text, Copy(_chapters), _cover)
                 : null;
         }
     }
@@ -99,6 +100,7 @@ public class BookTextExtractors(IEnumerable<IBookTextExtractor>? extractors = nu
             _key = key;
             _text = extracted.Text;
             _chapters = Copy(extracted.Chapters);
+            _cover = extracted.Cover;
         }
     }
 

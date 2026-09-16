@@ -56,7 +56,7 @@ public class EpubTextExtractor : IBookTextExtractor
             Author = string.IsNullOrWhiteSpace(epub.Author) ? null : epub.Author,
         };
 
-        return new ExtractedBook(text, BuildChapters(epub, files, documents, plainText.Length));
+        return new ExtractedBook(text, BuildChapters(epub, files, documents, plainText.Length), epub.CoverImage);
     }
 
     /// <summary>

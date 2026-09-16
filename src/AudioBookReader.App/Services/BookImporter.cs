@@ -209,6 +209,12 @@ public class BookImporter(
 
             var hash = await ContentHash.ComputeAsync(path, ct);
 
+            // The file's own cover, when it has one. A book with no audio had nowhere else to get
+            // one, so a shelf of novels came out as a wall of title cards.
+            var coverPath = extracted.Cover is { Length: > 0 } cover
+                ? await SaveCoverAsync(cover, Path.GetFileNameWithoutExtension(picked.FileName), ct)
+                : null;
+
             var attachment = new TextAttachment(
                 path,
                 hash,
@@ -216,7 +222,8 @@ public class BookImporter(
                 extracted.Chapters,
                 extracted.Text.Title,
                 extracted.Text.Author,
-                TextLanguage.Detect(extracted.Text.PlainText));
+                TextLanguage.Detect(extracted.Text.PlainText),
+                coverPath);
 
             return attachTo is { } bookId
                 ? await library.AttachTextAsync(bookId, attachment)

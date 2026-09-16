@@ -14,6 +14,9 @@ public sealed class TestEpubBuilder
 
     private readonly List<Section> _sections = [];
 
+    /// <summary>Cover art bytes, when the test needs the book to have a cover.</summary>
+    public byte[]? Cover { get; init; }
+
     public string Title { get; init; } = "Test Book";
     public string Author { get; init; } = "Test Author";
 
@@ -46,6 +49,13 @@ public sealed class TestEpubBuilder
         foreach (var section in _sections)
             WriteEntry(zip, $"OEBPS/{section.Id}.xhtml", BuildSection(section));
 
+        if (Cover is { Length: > 0 } art)
+        {
+            var entry = zip.CreateEntry("OEBPS/cover.png", CompressionLevel.NoCompression);
+            using var cover = entry.Open();
+            cover.Write(art);
+        }
+
         return path;
     }
 
@@ -53,6 +63,11 @@ public sealed class TestEpubBuilder
     {
         var manifest = new StringBuilder();
         var spine = new StringBuilder();
+
+        // Declared the way a real EPUB declares it: a manifest item carrying the cover-image
+        // property. Readers find the cover through that, not by guessing at a filename.
+        if (Cover is not null)
+            manifest.AppendLine("""    <item id="cover-image" href="cover.png" media-type="image/png" properties="cover-image"/>""");
 
         foreach (var section in _sections)
         {

@@ -152,4 +152,50 @@ public class BookTextExtractorsTests : IDisposable
         Assert.Equal("A different book entirely.", second.Text.PlainText);
         Assert.NotSame(first.Text, second.Text);
     }
+
+    // ---- Cover art ----
+
+    /// <summary>A book with no audio has nowhere else to get a cover, and an ebook nearly always
+    /// carries one — without this a shelf of novels was a wall of title cards.</summary>
+    [Fact]
+    public async Task ReadsTheCoverOutOfAnEpub()
+    {
+        var art = new byte[] { 0x89, 0x50, 0x4E, 0x47, 1, 2, 3, 4 };
+
+        var path = new TestEpubBuilder { Title = "A Novel", Cover = art }
+            .Add("c1", "One", "<p>The story begins here.</p>")
+            .WriteTo(Path.Combine(_dir, "withcover.epub"));
+
+        var book = await _extractors.ExtractAsync(path);
+
+        Assert.NotNull(book.Cover);
+        Assert.Equal(art, book.Cover);
+    }
+
+    /// <summary>
+    /// The kept copy has to carry the cover too. Handing back a book whose art had quietly gone
+    /// missing on the second read would be worse than not keeping it at all.
+    /// </summary>
+    [Fact]
+    public async Task TheKeptCopyStillHasTheCover()
+    {
+        var art = new byte[] { 0x89, 0x50, 0x4E, 0x47, 9, 9, 9 };
+
+        var path = new TestEpubBuilder { Title = "A Novel", Cover = art }
+            .Add("c1", "One", "<p>The story begins here.</p>")
+            .WriteTo(Path.Combine(_dir, "withcover.epub"));
+
+        await _extractors.ExtractAsync(path);
+        var second = await _extractors.ExtractAsync(path);
+
+        Assert.Equal(art, second.Cover);
+    }
+
+    [Fact]
+    public async Task ABookWithNoCoverSaysSo()
+    {
+        var book = await _extractors.ExtractAsync(WriteEpub("plain.epub"));
+
+        Assert.Null(book.Cover);
+    }
 }
