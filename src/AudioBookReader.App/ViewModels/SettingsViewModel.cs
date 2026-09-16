@@ -3,6 +3,7 @@ using AudioBookReader.App.Services;
 using AudioBookReader.App.Resources.Strings;
 using AudioBookReader.Core.Alignment;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace AudioBookReader.App.ViewModels;
 
@@ -174,5 +175,52 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings, Language
     {
         settings.MinimumBatteryPercent = (int)value;
         OnPropertyChanged(nameof(MinimumBatteryText));
+    }
+
+    // ---- Help and feedback ----
+
+    /// <summary>
+    /// Where the app and the version are, said plainly, because a bug report without them is a
+    /// guess.
+    /// </summary>
+    public string VersionText => string.Format(Strings.Settings_VersionLine, AppInfo.VersionString);
+
+    /// <summary>
+    /// Opens a report with the version, phone and Android version already in it.
+    ///
+    /// The three things every report needs and nobody wants to type: the person reporting knows
+    /// what went wrong, not which build they are on. Sent as query parameters that match the field
+    /// ids in the issue form, which GitHub fills in for them.
+    ///
+    /// Deliberately the issue tracker and not an email address: a report in an inbox is a
+    /// conversation with one person that nobody else can find, search, or add to.
+    /// </summary>
+    [RelayCommand]
+    private Task ReportProblemAsync() => OpenFormAsync("bug.yml", withDetails: true);
+
+    [RelayCommand]
+    private Task SuggestIdeaAsync() => OpenFormAsync("idea.yml", withDetails: false);
+
+    private static async Task OpenFormAsync(string template, bool withDetails)
+    {
+        var url = $"https://github.com/Gajotres100/syncbook/issues/new?template={template}";
+
+        if (withDetails)
+        {
+            url += $"&version={Uri.EscapeDataString(AppInfo.VersionString)}"
+                + $"&device={Uri.EscapeDataString($"{DeviceInfo.Manufacturer} {DeviceInfo.Model}")}"
+                + $"&android={Uri.EscapeDataString($"Android {DeviceInfo.VersionString}")}";
+        }
+
+        try
+        {
+            await Browser.Default.OpenAsync(url, BrowserLaunchMode.SystemPreferred);
+        }
+        catch (Exception ex)
+        {
+            // A phone with no browser at all, which is rare enough to be worth a line in the log
+            // rather than a dialog explaining something nobody can act on.
+            AppLog.Error("opening the issue form", ex);
+        }
     }
 }

@@ -97,6 +97,16 @@ public static class Strings
     /// <summary>Skips the local shelf and goes straight to your server's books when the app opens. The libra…</summary>
     public static string Settings_OpenServerOnStartNote => Get(nameof(Settings_OpenServerOnStartNote));
     /// <summary>Diagnostics</summary>
+    public static string Settings_HelpSection => Get(nameof(Settings_HelpSection));
+
+    public static string Settings_HelpBody => Get(nameof(Settings_HelpBody));
+
+    public static string Settings_ReportProblem => Get(nameof(Settings_ReportProblem));
+
+    public static string Settings_SuggestIdea => Get(nameof(Settings_SuggestIdea));
+
+    public static string Settings_VersionLine => Get(nameof(Settings_VersionLine));
+
     public static string Settings_DiagnosticsSection => Get(nameof(Settings_DiagnosticsSection));
     /// <summary>Detailed log</summary>
     public static string Settings_VerboseLog => Get(nameof(Settings_VerboseLog));

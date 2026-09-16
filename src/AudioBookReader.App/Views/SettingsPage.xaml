@@ -221,6 +221,39 @@
 
             <!--  ======== Diagnostics ========  -->
 
+
+            <!--
+                Where a report comes from. Deliberately the issue tracker rather than an email
+                address: a report in an inbox is a conversation with one person that nobody else
+                can find, search or add to.
+
+                Deliberately no donation link, here or anywhere in the app. Google Play's payment
+                rules reserve external payment links for tax-exempt charities, and apps have been
+                made to strip theirs out over exactly this. Support lives on the website.
+            -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="10">
+
+                    <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Settings_HelpSection}" />
+
+                    <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Settings_HelpBody}" />
+
+                    <Button
+                        Command="{Binding ReportProblemCommand}"
+                        Style="{StaticResource Secondary}"
+                        Text="{x:Static s:Strings.Settings_ReportProblem}" />
+
+                    <Button
+                        Command="{Binding SuggestIdeaCommand}"
+                        Style="{StaticResource Secondary}"
+                        Text="{x:Static s:Strings.Settings_SuggestIdea}" />
+
+                    <Label
+                        HorizontalTextAlignment="Center"
+                        Style="{StaticResource Muted}"
+                        Text="{Binding VersionText}" />
+                </VerticalStackLayout>
+            </Border>
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="10">
 
