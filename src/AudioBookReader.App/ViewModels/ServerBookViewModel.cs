@@ -140,6 +140,14 @@ public partial class ServerBookViewModel : ObservableObject
     /// <summary>Which halves this download would actually fetch.</summary>
     public bool WantsAudio { get; private set; } = true;
 
+    /// <summary>Whether both halves are missing, so picking one of them is a real choice.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsHalfChoice))]
+    public partial bool CanChooseHalf { get; set; }
+
+    /// <summary>The choice is only on offer while nothing is being fetched.</summary>
+    public bool ShowsHalfChoice => CanChooseHalf && IsIdle;
+
     public bool WantsEbook { get; private set; } = true;
 
     /// <summary>What the button says, which is what it will do — the whole book, or the half of it
@@ -169,6 +177,7 @@ public partial class ServerBookViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
+    [NotifyPropertyChangedFor(nameof(ShowsHalfChoice))]
     public partial bool IsDownloading { get; set; }
 
     public bool IsIdle => !IsDownloading;
@@ -295,12 +304,16 @@ public partial class ServerBookViewModel : ObservableObject
 
         CanDownload = WantsAudio || WantsEbook;
 
-        DownloadText = (WantsAudio, WantsEbook, here) switch
+        DownloadText = (WantsAudio, WantsEbook) switch
         {
-            (true, false, not null) => Strings.ServerBook_DownloadAudio,
-            (false, true, not null) => Strings.ServerBook_DownloadEbook,
+            (true, true) => Strings.ServerBook_DownloadBoth,
+            (true, false) => Strings.ServerBook_DownloadAudio,
+            (false, true) => Strings.ServerBook_DownloadEbook,
             _ => Strings.ServerBook_Download,
         };
+
+        // Only worth offering when there is genuinely a choice to make.
+        CanChooseHalf = WantsAudio && WantsEbook;
 
         // Red, and only for something genuinely in the way.
         Obstacle = !serverHasAudio && !serverHasEbook
@@ -339,9 +352,26 @@ public partial class ServerBookViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task DownloadAsync()
+    private Task DownloadAsync() => StartAsync(WantsAudio, WantsEbook);
+
+    /// <summary>
+    /// Fetching one half on its own, when both are missing and only one is wanted now.
+    ///
+    /// A book and its narration are not one thing arriving together: the audio is a gigabyte over
+    /// whatever connection is to hand and the text is a rounding error beside it, and someone about
+    /// to read on a train has a clear preference about which of those happens first. Offered only
+    /// when both are actually missing — with one of them already here there is nothing to choose
+    /// between, and the single button above says what it will do.
+    /// </summary>
+    [RelayCommand]
+    private Task DownloadAudioOnlyAsync() => StartAsync(audio: true, ebook: false);
+
+    [RelayCommand]
+    private Task DownloadEbookOnlyAsync() => StartAsync(audio: false, ebook: true);
+
+    private async Task StartAsync(bool audio, bool ebook)
     {
-        if (_detail is null || !CanDownload || IsDownloading) return;
+        if (_detail is null || IsDownloading || !(audio || ebook)) return;
 
         // One at a time. Two large transfers over one phone connection finish no sooner together
         // than in turn, and a second foreground service would post a second permanent notification.
@@ -360,7 +390,7 @@ public partial class ServerBookViewModel : ObservableObject
 
         // Handed to a service and forgotten. Everything from here arrives through the queue, which
         // is what lets it carry on with this page closed and the screen locked.
-        _downloads.Start(ItemId, Title, toAppStorage, WantsAudio, WantsEbook, BookId);
+        _downloads.Start(ItemId, Title, toAppStorage, audio, ebook, BookId);
     }
 
     /// <summary>

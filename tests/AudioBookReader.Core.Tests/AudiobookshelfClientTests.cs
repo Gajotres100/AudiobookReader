@@ -410,4 +410,27 @@ public class AudiobookshelfClientTests
         // The call, then the refusal to refresh. Not a third.
         Assert.Equal(2, attempts);
     }
+
+    /// <summary>
+    /// The full reply for a single book can describe its ebook only by the file, with no format
+    /// field anywhere — and the page then called a book with an ebook plainly attached
+    /// "audiobook only", and offered to download a half it already had a way to get.
+    /// </summary>
+    [Fact]
+    public async Task SeesAnEbookDescribedOnlyByItsFile()
+    {
+        var (client, _) = Connected(_ => Json("""
+            {"id":"li_1","media":{
+              "metadata":{"title":"Sufficiently Advanced Magic","authorName":"Andrew Rowe"},
+              "audioFiles":[{"ino":"1","duration":3600,"metadata":{"filename":"part1.m4b"}}],
+              "ebookFile":{"ino":"200","metadata":{"filename":"magic.epub","ext":".epub"}},
+              "duration":3600,"chapters":[]}}
+            """));
+
+        var detail = await client.GetBookAsync("li_1");
+
+        Assert.True(detail.Book.HasEbook);
+        Assert.Equal("epub", detail.Book.EbookFormat);
+        Assert.NotNull(detail.Ebook);
+    }
 }

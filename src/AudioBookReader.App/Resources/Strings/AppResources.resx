@@ -247,6 +247,15 @@
   <data name="ServerBook_Download" xml:space="preserve">
     <value>Download</value>
   </data>
+  <data name="ServerBook_DownloadBoth" xml:space="preserve">
+    <value>Download both</value>
+  </data>
+  <data name="ServerBook_JustAudio" xml:space="preserve">
+    <value>Audiobook only</value>
+  </data>
+  <data name="ServerBook_JustEbook" xml:space="preserve">
+    <value>Ebook only</value>
+  </data>
   <data name="ServerBook_DownloadAudio" xml:space="preserve">
     <value>Download the audiobook</value>
   </data>

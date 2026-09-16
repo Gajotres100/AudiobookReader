@@ -147,6 +147,12 @@ public static class Strings
     /// <summary>Download</summary>
     public static string ServerBook_Download => Get(nameof(ServerBook_Download));
 
+    public static string ServerBook_DownloadBoth => Get(nameof(ServerBook_DownloadBoth));
+
+    public static string ServerBook_JustAudio => Get(nameof(ServerBook_JustAudio));
+
+    public static string ServerBook_JustEbook => Get(nameof(ServerBook_JustEbook));
+
     public static string ServerBook_DownloadAudio => Get(nameof(ServerBook_DownloadAudio));
 
     public static string ServerBook_DownloadEbook => Get(nameof(ServerBook_DownloadEbook));

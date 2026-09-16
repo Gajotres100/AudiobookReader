@@ -240,6 +240,15 @@
   <data name="ServerBook_Download" xml:space="preserve">
     <value>Preuzmi</value>
   </data>
+  <data name="ServerBook_DownloadBoth" xml:space="preserve">
+    <value>Preuzmi oboje</value>
+  </data>
+  <data name="ServerBook_JustAudio" xml:space="preserve">
+    <value>Samo audioknjigu</value>
+  </data>
+  <data name="ServerBook_JustEbook" xml:space="preserve">
+    <value>Samo e-knjigu</value>
+  </data>
   <data name="ServerBook_DownloadAudio" xml:space="preserve">
     <value>Preuzmi audioknjigu</value>
   </data>

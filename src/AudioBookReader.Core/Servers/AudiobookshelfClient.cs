@@ -340,7 +340,14 @@ public class AudiobookshelfClient(HttpClient http)
             media?.Metadata?.Title ?? CoreStrings.Server_Untitled,
             media?.Metadata?.Author,
             media?.NumAudioFiles ?? media?.AudioFiles?.Count ?? 0,
-            media?.EbookFormat ?? media?.EbookFileFormat,
+            // Three places, because the server uses different ones depending on which call this
+            // came from: the listing carries a format field, while the full reply for a single
+            // book can carry only the file itself. Reading the format alone left a book with an
+            // ebook plainly attached described as "audiobook only" on its own page — the same
+            // trap the author fields set, one field lower.
+            media?.EbookFormat
+                ?? media?.EbookFileFormat
+                ?? media?.EbookFile?.Metadata?.Ext?.TrimStart('.'),
             media?.Duration ?? 0,
             series,
             sequence,
