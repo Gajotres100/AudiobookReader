@@ -146,10 +146,14 @@ public class CpuBudgetTests
 {
     private const long TenHoursMs = 10 * 60 * 60 * 1_000L;
 
+    // Doubled from the figures the presets were first documented with: coverage is
+    // ProbeDurationMs / ProbeIntervalMs, and halving the spacing from 60 s to 30 s halves that
+    // fraction's denominator, which doubles the audio actually transcribed and everything
+    // downstream of it in equal measure.
     [Theory]
-    [InlineData("eco", 200)]
-    [InlineData("balanced", 50)]
-    [InlineData("turbo", 12.5)]
+    [InlineData("eco", 400)]
+    [InlineData("balanced", 100)]
+    [InlineData("turbo", 25)]
     public void EveryPresetFinishesWellInsideTheTimeItTakesToListenToTheBook(string preset, double expectedMinutes)
     {
         var budget = CpuBudget.Presets.Single(p => p.Id == preset);
@@ -161,9 +165,13 @@ public class CpuBudgetTests
             TimeSpan.FromMinutes(expectedMinutes * 0.95),
             TimeSpan.FromMinutes(expectedMinutes * 1.05));
 
-        // Even the most cautious preset stays far ahead of a reader working through ten hours of
-        // audio, which is what makes the slow settings cost nothing in practice.
-        Assert.True(estimate < TimeSpan.FromHours(4));
+        // The actual promise, not a number that happened to hold when coverage was half of this:
+        // every preset finishes before the book itself would be heard start to finish. Eco no
+        // longer finishes with hours to spare the way it did at 60 s spacing — at 30 s it takes
+        // close to seven hours against ten of audio — so this still passes, but the comfortable
+        // margin the presets table describes is now closer to true for eco alone than the other
+        // two, which is worth knowing rather than papering over with a laxer bound.
+        Assert.True(estimate < TimeSpan.FromMilliseconds(TenHoursMs));
     }
 
     [Fact]
@@ -183,7 +191,12 @@ public class CpuBudgetTests
         var sparse = CpuBudget.Balanced.EstimateAlignmentTime(TenHoursMs);
         var dense = CpuBudget.Balanced.EstimateAlignmentTime(TenHoursMs, AlignmentSettings.Refinement);
 
-        Assert.True(dense > sparse * 5);
+        // The ratio is coverage, not a fixed number: Refinement transcribes effectively all of the
+        // audio, and the default's own coverage is ProbeDurationMs / ProbeIntervalMs — halving the
+        // spacing halves that ratio along with it, which is exactly what happened when the default
+        // moved from 60 s to 30 s and this stopped clearing "more than five times".
+        var defaultCoverage = new AlignmentSettings().ProbeDurationMs / (double)new AlignmentSettings().ProbeIntervalMs;
+        Assert.True(dense > sparse * (1 / defaultCoverage) * 0.9);
     }
 
     [Fact]

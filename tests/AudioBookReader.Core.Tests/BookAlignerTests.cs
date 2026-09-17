@@ -61,8 +61,8 @@ public class BookAlignerTests : IAsyncLifetime, IDisposable
             new TextAttachment(_ebookPath, "text-1", _bookText.Length, [], Title: "Novel"));
     }
 
-    private BookAligner Aligner(ITranscriber transcriber) =>
-        new(_database, _syncMaps, _extractors, transcriber);
+    private BookAligner Aligner(ITranscriber transcriber, AlignmentSettings? settings = null) =>
+        new(_database, _syncMaps, _extractors, transcriber, settings);
 
     private FakeNarration Narration(double noise = 0) => new(_bookText, BookMs, noise);
 
@@ -123,6 +123,15 @@ public class BookAlignerTests : IAsyncLifetime, IDisposable
 
     // ---- Interruption and resumption ----
 
+    /// <summary>
+    /// Pinned to its own probe spacing rather than whatever the app currently ships. What this
+    /// test checks — that a checkpoint has landed by call 10 — depends on how many calls a
+    /// chapter's run-in and regular probes add up to before one fires, and that count moves
+    /// whenever <see cref="AlignmentSettings.ProbeIntervalMs"/> is retuned. Fixing it here once
+    /// is what keeps this test about checkpointing rather than about today's tuning.
+    /// </summary>
+    private static readonly AlignmentSettings CheckpointTestSettings = new() { ProbeIntervalMs = 60_000 };
+
     [Fact]
     public async Task StoppingPartWayKeepsWhatWasAlreadyAligned()
     {
@@ -132,7 +141,7 @@ public class BookAlignerTests : IAsyncLifetime, IDisposable
         var transcriber = new CancelAfter(Narration(), calls: 10, cancellation);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => Aligner(transcriber).AlignAsync(book.Id, null, cancellation.Token));
+            () => Aligner(transcriber, CheckpointTestSettings).AlignAsync(book.Id, null, cancellation.Token));
 
         var stopped = await _database.GetBookAsync(book.Id);
         Assert.Equal(SyncState.Partial, stopped!.SyncState);

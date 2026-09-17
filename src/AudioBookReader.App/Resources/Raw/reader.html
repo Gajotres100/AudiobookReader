@@ -27,11 +27,23 @@
     -webkit-overflow-scrolling: touch;
   }
   #content::-webkit-scrollbar { width: 0; }
+  /* Set for the life of a press-and-hold-then-drag, so extending the selection does not
+     also scroll the text out from under the finger doing it. touch-action rather than
+     preventDefault: the touchmove listener stays passive, which is what keeps ordinary
+     scrolling smooth everywhere this class is not applied. */
+  #content.no-scroll { touch-action: none; }
   img { max-width: 100%; max-height: 76vh; height: auto; }
   p { margin: 0 0 0.85em; }
   h1, h2, h3 { margin: 0 0 0.6em; }
   span[data-idx] { transition: background-color 120ms linear; }
   span.hl { background: {{HIGHLIGHT}}; border-radius: 3px; }
+  /* A press-and-hold selection, drawn as boxes over the range rather than a native selection --
+     user-select is off everywhere else in this page so a stray drag never pops the browser's own
+     copy/share bar, and this is the one place text needs to look selected anyway. Fixed rather
+     than positioned in #content: getClientRects() is already viewport-relative, and the boxes
+     only exist for the life of one gesture, which never outlasts a scroll. */
+  .selbox { position: fixed; background: {{HIGHLIGHT}}; opacity: 0.55; border-radius: 2px;
+            pointer-events: none; z-index: 6; }
 </style>
 <style id="hlrule">span.hl { background: {{HIGHLIGHT}}; border-radius: 3px; }</style>
 </head><body>
@@ -133,11 +145,11 @@
   // the web view consumes its own touches and a recognizer outside it never sees them.
   //
   // Four gestures share the same finger: a single tap shows and hides the controls; a
-  // double tap jumps the narration to the sentence under it; a press and hold looks up
-  // the single word under it; a sideways swipe turns the page. Single and double tap
-  // cannot both fire the instant a finger lifts -- the first tap has to wait a moment
-  // to see whether a second one is coming, which is the one place this reads slower
-  // than a plain tap handler would.
+  // double tap jumps the narration to the sentence under it; a press and hold selects the
+  // word under it, and dragging before lifting extends that to a phrase; a sideways swipe
+  // turns the page. Single and double tap cannot both fire the instant a finger lifts --
+  // the first tap has to wait a moment to see whether a second one is coming, which is the
+  // one place this reads slower than a plain tap handler would.
   var startX = 0, startY = 0, swiped = false, holdTimer = 0, held = false;
   var lastTapAt = 0, lastTapX = 0, lastTapY = 0, tapTimer = 0;
   var DOUBLE_TAP_MS = 300, TAP_SLOP = 30;
@@ -147,24 +159,83 @@
     holdTimer = 0;
   }
 
-  // The word under a point, independent of language: Croatian's diacritic letters are
-  // letters to this regex exactly as plain a-z are. caretRangeFromPoint finds the exact
-  // text node the finger is over regardless of what formatting wraps it, which a
-  // data-idx span cannot -- that marks a whole sentence, not the word inside it.
-  function wordAtPoint(x, y) {
+  // The word at a point, as a Range rather than a string: a string is all a single tap
+  // needs, but extending the selection by dragging needs the boundary itself to build a
+  // wider range from. Independent of language -- Croatian's diacritic letters are letters
+  // to this regex exactly as plain a-z are. caretRangeFromPoint finds the exact text node
+  // the finger is over regardless of what formatting wraps it, which a data-idx span
+  // cannot -- that marks a whole sentence, not the word inside it.
+  function wordRangeAtPoint(x, y) {
     if (!document.caretRangeFromPoint) return null;
 
-    var range = document.caretRangeFromPoint(x, y);
-    if (!range || range.startContainer.nodeType !== 3) return null;
+    var point = document.caretRangeFromPoint(x, y);
+    if (!point || point.startContainer.nodeType !== 3) return null;
 
-    var text = range.startContainer.textContent;
+    var text = point.startContainer.textContent;
     var isWordChar = function (ch) { return ch && /[\p{L}\p{N}'\u2019-]/u.test(ch); };
 
-    var start = range.startOffset, end = range.startOffset;
+    var start = point.startOffset, end = point.startOffset;
     while (start > 0 && isWordChar(text[start - 1])) start--;
     while (end < text.length && isWordChar(text[end])) end++;
+    if (start >= end) return null;
 
-    return start < end ? text.slice(start, end) : null;
+    var word = document.createRange();
+    word.setStart(point.startContainer, start);
+    word.setEnd(point.startContainer, end);
+    return word;
+  }
+
+  // ---- Press, hold, and drag to extend ----
+  //
+  // The anchor stays put; the other end follows the finger. Which end that is depends on
+  // which side of the anchor the finger has moved to, and compareBoundaryPoints answers
+  // that in document order without this having to walk nodes itself -- the same call
+  // works whether the drag stays inside one paragraph or crosses into the next one.
+  var selecting = false, selectionAnchor = null, selectionBoxes = [];
+
+  function clearSelectionBoxes() {
+    for (var i = 0; i < selectionBoxes.length; i++) selectionBoxes[i].remove();
+    selectionBoxes = [];
+  }
+
+  function drawSelectionBoxes(range) {
+    clearSelectionBoxes();
+    var rects = range.getClientRects();
+    for (var i = 0; i < rects.length; i++) {
+      var r = rects[i];
+      if (r.width <= 0 || r.height <= 0) continue;
+
+      var box = document.createElement('div');
+      box.className = 'selbox';
+      box.style.left = r.left + 'px';
+      box.style.top = r.top + 'px';
+      box.style.width = r.width + 'px';
+      box.style.height = r.height + 'px';
+      document.body.appendChild(box);
+      selectionBoxes.push(box);
+    }
+  }
+
+  function extendSelectionTo(x, y) {
+    var here = wordRangeAtPoint(x, y);
+    if (!here) return selectionAnchor;
+
+    var anchorFirst = selectionAnchor.compareBoundaryPoints(Range.START_TO_START, here) <= 0;
+    var combined = document.createRange();
+    combined.setStart(
+      anchorFirst ? selectionAnchor.startContainer : here.startContainer,
+      anchorFirst ? selectionAnchor.startOffset : here.startOffset);
+    combined.setEnd(
+      anchorFirst ? here.endContainer : selectionAnchor.endContainer,
+      anchorFirst ? here.endOffset : selectionAnchor.endOffset);
+    return combined;
+  }
+
+  function endSelection() {
+    selecting = false;
+    selectionAnchor = null;
+    clearSelectionBoxes();
+    document.getElementById('content').classList.remove('no-scroll');
   }
 
   document.addEventListener('touchstart', function (e) {
@@ -172,28 +243,50 @@
     startY = e.changedTouches[0].clientY;
     swiped = false;
     held = false;
+    endSelection();
 
     if (e.touches.length !== 1) { cancelHold(); return; }
 
     holdTimer = setTimeout(function () {
-      held = true;
       holdTimer = 0;
 
-      var word = wordAtPoint(startX, startY);
-      if (word) location.href = 'abr://translate/' + encodeURIComponent(word);
+      var anchor = wordRangeAtPoint(startX, startY);
+      if (!anchor) return;
+
+      held = true;
+      selecting = true;
+      selectionAnchor = anchor;
+      // Blocks the page's own scrolling for the rest of this touch, so dragging to widen
+      // the selection does not also carry the text away underneath it.
+      document.getElementById('content').classList.add('no-scroll');
+      drawSelectionBoxes(anchor);
     }, 450);
   }, { passive: true });
 
   document.addEventListener('touchmove', function (e) {
-    var dx = Math.abs(e.touches[0].clientX - startX);
-    var dy = Math.abs(e.touches[0].clientY - startY);
+    var x = e.touches[0].clientX, y = e.touches[0].clientY;
 
-    // A finger on its way somewhere is not a press and hold.
-    if (dx > 12 || dy > 12) cancelHold();
+    if (selecting) {
+      drawSelectionBoxes(extendSelectionTo(x, y));
+      return;
+    }
+
+    // A finger on its way somewhere, before the hold has fired, is not a press and hold.
+    if (Math.abs(x - startX) > 12 || Math.abs(y - startY) > 12) cancelHold();
   }, { passive: true });
 
   document.addEventListener('touchend', function (e) {
     cancelHold();
+
+    if (selecting) {
+      var x = e.changedTouches[0].clientX, y = e.changedTouches[0].clientY;
+      var chosen = extendSelectionTo(x, y);
+      var phrase = chosen.toString().replace(/\s+/g, ' ').trim();
+
+      endSelection();
+      if (phrase) location.href = 'abr://translate/' + encodeURIComponent(phrase);
+      return;
+    }
 
     var dx = e.changedTouches[0].clientX - startX;
     var dy = e.changedTouches[0].clientY - startY;
@@ -209,6 +302,8 @@
     // A finger that moved at all was scrolling, not tapping.
     if (Math.abs(dx) > 12 || Math.abs(dy) > 12) swiped = true;
   }, { passive: true });
+
+  document.addEventListener('touchcancel', endSelection, { passive: true });
 
   document.addEventListener('click', function (e) {
     // Neither a scroll nor a completed hold should also count as a tap.

@@ -1,17 +1,20 @@
 namespace AudioBookReader.App.Services;
 
 /// <summary>
-/// Looks up a single word, by handing it to whatever the phone already uses for that.
+/// Looks up a word or a selected phrase, by handing it to whatever the phone already uses for
+/// that.
 ///
 /// Deliberately not a translator this app writes itself: picking a provider, a target language
 /// and an API key is a whole feature on its own, and Android already carries one — the same
 /// "Translate" action that shows up when text is selected anywhere on the phone. A press and hold
-/// on a word in the reader is the same request in different clothes, so it is handed to the same
-/// place. Whichever app answers it, and in whatever language it was last asked for, is that app's
-/// decision to remember, not this one's to duplicate.
+/// in the reader, extended by a drag to more than one word, is the same request in different
+/// clothes, so it is handed to the same place. Whichever app answers it — a dictionary, a
+/// translator, an assistant able to explain a passage — is whatever the phone has installed for
+/// this system action, not a list this app curates or a service it calls itself: nothing in the
+/// selected text leaves the device except by the app the user themselves picks from that chooser.
 /// </summary>
 public partial class WordTranslator
 {
-    /// <summary>Offers the word to every app on the phone that can act on selected text.</summary>
-    public partial void Translate(string word);
+    /// <summary>Offers the text to every app on the phone that can act on selected text.</summary>
+    public partial void Translate(string text);
 }
