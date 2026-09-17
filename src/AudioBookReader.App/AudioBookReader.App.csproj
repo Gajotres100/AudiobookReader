@@ -22,8 +22,8 @@
 		<ApplicationTitle>Syncbook</ApplicationTitle>
 		<ApplicationId>com.gajotres.audiobookreader</ApplicationId>
 
-		<ApplicationDisplayVersion>0.4</ApplicationDisplayVersion>
-		<ApplicationVersion>4</ApplicationVersion>
+		<ApplicationDisplayVersion>0.5</ApplicationDisplayVersion>
+		<ApplicationVersion>5</ApplicationVersion>
 
 		<!-- Android 10. The thermal-status API that drives CPU backoff arrives in 29, so this floor
 		     removes a pile of version guards for devices that are long gone anyway. -->
