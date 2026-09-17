@@ -29,6 +29,11 @@ public partial class SettingsPage : ContentPage
         if (sender is Element { BindingContext: RecognitionOption option }) _viewModel.Select(option);
     }
 
+    private void OnProbeSpacingTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is Element { BindingContext: ProbeSpacingOption option }) _viewModel.Select(option);
+    }
+
     /// <summary>Opens the page that explains what alignment is doing and why it can be slow.</summary>
     private async void OnAlignmentHelp(object? sender, EventArgs e)
     {

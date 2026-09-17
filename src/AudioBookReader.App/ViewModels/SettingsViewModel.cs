@@ -41,6 +41,15 @@ public record LanguageOption(string Code, string Name);
 /// <param name="Id">Stored, so it survives a change of wording or language.</param>
 public record RecognitionOption(string Id, string Name, string Detail, bool IsSelected);
 
+/// <summary>
+/// One probe spacing for aligning a book in advance, as the setting offers it.
+/// </summary>
+/// <param name="IntervalMs">
+/// Stored directly rather than an id: the four spacings are the setting, with nothing about the
+/// wording that could change independently of the number itself.
+/// </param>
+public record ProbeSpacingOption(long IntervalMs, string Name, string Detail, bool IsSelected);
+
 public partial class SettingsViewModel(AlignmentSettingsStore settings, Language language, ServerAccount account) : ObservableObject
 {
     public ObservableCollection<BudgetOption> Budgets { get; } = [];
@@ -77,6 +86,14 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings, Language
 
     /// <summary>The two speech models, with the cost of the better one said out loud.</summary>
     public ObservableCollection<RecognitionOption> Recognitions { get; } = [];
+
+    /// <summary>
+    /// The four probe spacings aligning a book in advance can use, with the cost of each said out
+    /// loud rather than hidden the way the CPU presets are: combining a dense spacing with the
+    /// slowest preset can now take longer than the book itself, which someone choosing between
+    /// them has to be able to see coming.
+    /// </summary>
+    public ObservableCollection<ProbeSpacingOption> ProbeSpacings { get; } = [];
 
     /// <summary>
     /// Ask the model when each word was spoken.
@@ -142,6 +159,18 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings, Language
         Recognitions.Add(new RecognitionOption(
             "base", Strings.Recognition_Base, Strings.Recognition_BaseDetail, settings.Recognition == "base"));
 
+        var currentInterval = settings.ProbeIntervalMs;
+
+        ProbeSpacings.Clear();
+        ProbeSpacings.Add(new ProbeSpacingOption(
+            60_000, Strings.Spacing_60, Strings.Spacing_60Detail, currentInterval == 60_000));
+        ProbeSpacings.Add(new ProbeSpacingOption(
+            45_000, Strings.Spacing_45, Strings.Spacing_45Detail, currentInterval == 45_000));
+        ProbeSpacings.Add(new ProbeSpacingOption(
+            30_000, Strings.Spacing_30, Strings.Spacing_30Detail, currentInterval == 30_000));
+        ProbeSpacings.Add(new ProbeSpacingOption(
+            15_000, Strings.Spacing_15, Strings.Spacing_15Detail, currentInterval == 15_000));
+
         OnPropertyChanged(nameof(WordTimestamps));
         VerboseLog = settings.VerboseLog;
         ChargingOnly = settings.ChargingOnly;
@@ -162,6 +191,12 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings, Language
     public void Select(RecognitionOption option)
     {
         settings.Recognition = option.Id;
+        Load();
+    }
+
+    public void Select(ProbeSpacingOption option)
+    {
+        settings.ProbeIntervalMs = option.IntervalMs;
         Load();
     }
 

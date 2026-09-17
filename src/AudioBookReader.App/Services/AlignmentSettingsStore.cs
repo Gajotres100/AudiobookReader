@@ -17,6 +17,14 @@ public class AlignmentSettingsStore
     private const string VerboseLogKey = "diagnostics.verbose";
     private const string RecognitionKey = "alignment.recognition";
     private const string WordTimesKey = "alignment.wordTimes";
+    private const string ProbeIntervalKey = "alignment.probeIntervalMs";
+
+    /// <summary>
+    /// The spacings this can actually be set to, from sparsest to densest. A stored value outside
+    /// this list — left over from a build that offered a different set — falls back to the default
+    /// rather than aligning at a spacing nobody chose and nothing here can show a name for.
+    /// </summary>
+    public static readonly long[] ProbeIntervalOptionsMs = [60_000, 45_000, 30_000, 15_000];
 
     /// <summary>
     /// Write the detailed following diagnostics to the log.
@@ -71,6 +79,25 @@ public class AlignmentSettingsStore
     }
 
     public WhisperModel Model => WhisperModelStore.ById(Recognition);
+
+    /// <summary>
+    /// Spacing between probes when a book is aligned ahead of time, in milliseconds.
+    ///
+    /// Only that path. Reading along while reading (<see cref="LiveSyncRunner"/>) measures the
+    /// passage under the eye as it is read and always uses its own fixed spacing regardless of
+    /// this setting — the two answer different questions ("how far ahead is the whole book
+    /// mapped" against "is this paragraph right now"), and retuning one must not retune the other.
+    /// </summary>
+    public long ProbeIntervalMs
+    {
+        get
+        {
+            var stored = Preferences.Default.Get(ProbeIntervalKey, 30_000L);
+            return Array.IndexOf(ProbeIntervalOptionsMs, stored) >= 0 ? stored : 30_000L;
+        }
+        set => Preferences.Default.Set(
+            ProbeIntervalKey, Array.IndexOf(ProbeIntervalOptionsMs, value) >= 0 ? value : 30_000L);
+    }
 
     /// <summary>
     /// Ask the model when each word was spoken, rather than assuming a constant rate across the

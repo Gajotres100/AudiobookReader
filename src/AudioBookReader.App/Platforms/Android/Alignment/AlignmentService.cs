@@ -125,8 +125,12 @@ public class AlignmentService : Service
             var thermal = new ThermalAwareThrottle(budget);
             var throttle = new EnvironmentGate(preferences, thermal);
 
+            // The only place a chosen probe spacing actually reaches an aligner: read-along while
+            // reading has its own fixed spacing and never sees this setting at all.
+            var schedule = new AlignmentSettings { ProbeIntervalMs = preferences.ProbeIntervalMs };
+
             var aligner = new BookAligner(
-                database, syncMaps, extractors, transcriber, throttle: throttle, log: AppLog.Info);
+                database, syncMaps, extractors, transcriber, schedule, throttle: throttle, log: AppLog.Info);
 
             var progress = new Progress<AlignmentProgress>(p => Publish(queue, bookId, p, chapterCount, thermal, throttle));
 
