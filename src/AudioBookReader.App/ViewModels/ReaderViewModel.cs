@@ -1423,13 +1423,21 @@ public partial class ReaderViewModel(
 
     private CancellationTokenSource? _speech;
 
+    /// <summary>
+    /// Starts the voice, or stops it.
+    ///
+    /// Deliberately not an async command. An async one disables its own button for as long as it
+    /// is running, and this one runs for as long as the book is being read aloud — so the pause
+    /// button was dead for exactly the stretch anybody would press it. Starting and stopping is
+    /// instant; the reading itself is left running behind it.
+    /// </summary>
     [RelayCommand]
-    private async Task ToggleSpeechAsync()
+    private void ToggleSpeech()
     {
         if (IsSpeaking)
         {
             StopSpeaking();
-            await SavePositionAsync(null);
+            _ = SavePositionAsync(null);
             return;
         }
 
@@ -1440,6 +1448,11 @@ public partial class ReaderViewModel(
         IsSpeaking = true;
         FollowStatus = "";
 
+        _ = ReadAloudAsync(speech);
+    }
+
+    private async Task ReadAloudAsync(CancellationTokenSource speech)
+    {
         try
         {
             await SpeakAsync(speech.Token);
