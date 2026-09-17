@@ -1395,6 +1395,8 @@ public partial class ReaderViewModel(
             .Replace("{{BACKGROUND}}", Theme.Background)
             .Replace("{{FOREGROUND}}", Theme.Foreground)
             .Replace("{{HIGHLIGHT}}", Theme.Highlight)
+            .Replace("{{TRANSLATE_LABEL}}", Strings.Reader_TranslateAction)
+            .Replace("{{EXPLAIN_LABEL}}", Strings.Reader_ExplainAction)
             // Last, so a book whose own text happens to contain one of the names above is left
             // alone rather than having it substituted out from under it.
             .Replace("{{BODY}}", bodyHtml);

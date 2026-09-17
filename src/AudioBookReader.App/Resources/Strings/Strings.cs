@@ -568,6 +568,12 @@ public static class Strings
     public static string Dialog_ClearBody => Get(nameof(Dialog_ClearBody));
     /// <summary>Title of the app chooser for translating a word.</summary>
     public static string Reader_TranslateChooser => Get(nameof(Reader_TranslateChooser));
+
+    public static string Reader_ExplainChooser => Get(nameof(Reader_ExplainChooser));
+
+    public static string Reader_TranslateAction => Get(nameof(Reader_TranslateAction));
+
+    public static string Reader_ExplainAction => Get(nameof(Reader_ExplainAction));
     /// <summary>Measures the passage you are reading, while you read it. Nothing to wait for.</summary>
     public static string Details_LiveAlignmentNote => Get(nameof(Details_LiveAlignmentNote));
     /// <summary>Works through the whole book in the background, so it is ready before you get there.</summary>

@@ -873,6 +873,15 @@
   <data name="Reader_TranslateChooser" xml:space="preserve">
     <value>Prevedi s</value>
   </data>
+  <data name="Reader_ExplainChooser" xml:space="preserve">
+    <value>Objasni s</value>
+  </data>
+  <data name="Reader_TranslateAction" xml:space="preserve">
+    <value>Prevedi</value>
+  </data>
+  <data name="Reader_ExplainAction" xml:space="preserve">
+    <value>Objasni</value>
+  </data>
   <data name="Details_LiveAlignmentNote" xml:space="preserve">
     <value>Mjeri dio koji čitaš, dok ga čitaš. Nema čekanja.</value>
   </data>

@@ -28,8 +28,13 @@ public partial class ReaderPage : ContentPage
     /// <summary>A plain tap on the page, which shows and hides the controls.</summary>
     private const string TapUrl = "abr://tap";
 
-    /// <summary>A press and hold on a single word, carrying it URL-encoded.</summary>
+    /// <summary>
+    /// A word or phrase selected in the reader, carried URL-encoded, with the button that was
+    /// pressed to choose translation over explanation.
+    /// </summary>
     private const string TranslateScheme = "abr://translate/";
+
+    private const string ExplainScheme = "abr://explain/";
 
     private readonly ReaderViewModel _viewModel;
     private readonly WordTranslator _translator;
@@ -244,10 +249,21 @@ public partial class ReaderPage : ContentPage
             return;
         }
 
-        if (!e.Url.StartsWith(TranslateScheme, StringComparison.OrdinalIgnoreCase)) return;
+        if (e.Url.StartsWith(TranslateScheme, StringComparison.OrdinalIgnoreCase))
+        {
+            e.Cancel = true;
+            _translator.Translate(
+                Uri.UnescapeDataString(e.Url[TranslateScheme.Length..].TrimEnd('/')),
+                Strings.Reader_TranslateChooser);
+            return;
+        }
+
+        if (!e.Url.StartsWith(ExplainScheme, StringComparison.OrdinalIgnoreCase)) return;
 
         e.Cancel = true;
-        _translator.Translate(Uri.UnescapeDataString(e.Url[TranslateScheme.Length..].TrimEnd('/')));
+        _translator.Translate(
+            Uri.UnescapeDataString(e.Url[ExplainScheme.Length..].TrimEnd('/')),
+            Strings.Reader_ExplainChooser);
     }
 
     /// <summary>

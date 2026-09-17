@@ -928,7 +928,19 @@
   </data>
   <data name="Reader_TranslateChooser" xml:space="preserve">
     <value>Translate with</value>
-    <comment>Title of the app chooser for translating a word.</comment>
+    <comment>Title of the app chooser for translating a word or phrase.</comment>
+  </data>
+  <data name="Reader_ExplainChooser" xml:space="preserve">
+    <value>Explain with</value>
+    <comment>Title of the app chooser for explaining a selected word or phrase.</comment>
+  </data>
+  <data name="Reader_TranslateAction" xml:space="preserve">
+    <value>Translate</value>
+    <comment>Button offered after selecting text in the reader.</comment>
+  </data>
+  <data name="Reader_ExplainAction" xml:space="preserve">
+    <value>Explain</value>
+    <comment>Button offered after selecting text in the reader.</comment>
   </data>
   <data name="Details_LiveAlignmentNote" xml:space="preserve">
     <value>Measures the passage you are reading, while you read it. Nothing to wait for.</value>

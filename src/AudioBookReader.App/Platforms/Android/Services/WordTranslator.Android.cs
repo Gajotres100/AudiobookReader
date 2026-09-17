@@ -5,7 +5,7 @@ namespace AudioBookReader.App.Services;
 
 public partial class WordTranslator
 {
-    public partial void Translate(string text)
+    public partial void Translate(string text, string chooserTitle)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
 
@@ -31,7 +31,7 @@ public partial class WordTranslator
             // apps actually show up here — a dictionary, a translator, an assistant that can
             // explain a passage — is entirely down to what is installed and what that app chose
             // to register for; this app has no say in the list and no way to add an entry to it.
-            activity.StartActivity(Intent.CreateChooser(request, Strings.Reader_TranslateChooser));
+            activity.StartActivity(Intent.CreateChooser(request, chooserTitle));
         }
         catch (ActivityNotFoundException)
         {
