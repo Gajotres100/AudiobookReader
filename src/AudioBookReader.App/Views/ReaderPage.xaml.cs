@@ -28,13 +28,15 @@ public partial class ReaderPage : ContentPage
     /// <summary>A plain tap on the page, which shows and hides the controls.</summary>
     private const string TapUrl = "abr://tap";
 
-    /// <summary>
-    /// A word or phrase selected in the reader, carried URL-encoded, with the button that was
-    /// pressed to choose translation over explanation.
-    /// </summary>
+    /// <summary>A word or phrase selected in the reader, carried URL-encoded.</summary>
     private const string TranslateScheme = "abr://translate/";
 
-    private const string ExplainScheme = "abr://explain/";
+    /// <summary>
+    /// The sentence a selection starts in, chosen from the reader's menu — the same coordinate
+    /// <see cref="SeekScheme"/> already carries, not a raw text offset the page has no reason to
+    /// know.
+    /// </summary>
+    private const string BookmarkScheme = "abr://bookmark/";
 
     private readonly ReaderViewModel _viewModel;
     private readonly WordTranslator _translator;
@@ -178,6 +180,21 @@ public partial class ReaderPage : ContentPage
         }
     }
 
+    private async void OnSelectionBookmarked(string sentenceIndexText)
+    {
+        if (!int.TryParse(sentenceIndexText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sentenceIndex))
+            return;
+
+        try
+        {
+            await _viewModel.SaveSelectionBookmarkAsync(sentenceIndex);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"bookmarking sentence {sentenceIndex}", ex);
+        }
+    }
+
     /// <summary>
     /// The page talks back by navigating to an <c>abr://</c> URL, which is cancelled here and read
     /// as a message. It is the one bridge that needs no platform-specific code.
@@ -252,18 +269,14 @@ public partial class ReaderPage : ContentPage
         if (e.Url.StartsWith(TranslateScheme, StringComparison.OrdinalIgnoreCase))
         {
             e.Cancel = true;
-            _translator.Translate(
-                Uri.UnescapeDataString(e.Url[TranslateScheme.Length..].TrimEnd('/')),
-                Strings.Reader_TranslateChooser);
+            _translator.Translate(Uri.UnescapeDataString(e.Url[TranslateScheme.Length..].TrimEnd('/')));
             return;
         }
 
-        if (!e.Url.StartsWith(ExplainScheme, StringComparison.OrdinalIgnoreCase)) return;
+        if (!e.Url.StartsWith(BookmarkScheme, StringComparison.OrdinalIgnoreCase)) return;
 
         e.Cancel = true;
-        _translator.Translate(
-            Uri.UnescapeDataString(e.Url[ExplainScheme.Length..].TrimEnd('/')),
-            Strings.Reader_ExplainChooser);
+        OnSelectionBookmarked(Uri.UnescapeDataString(e.Url[BookmarkScheme.Length..].TrimEnd('/')));
     }
 
     /// <summary>

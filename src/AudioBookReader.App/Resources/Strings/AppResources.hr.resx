@@ -873,14 +873,11 @@
   <data name="Reader_TranslateChooser" xml:space="preserve">
     <value>Prevedi s</value>
   </data>
-  <data name="Reader_ExplainChooser" xml:space="preserve">
-    <value>Objasni s</value>
-  </data>
   <data name="Reader_TranslateAction" xml:space="preserve">
-    <value>Prevedi</value>
+    <value>Prevedi / objasni</value>
   </data>
-  <data name="Reader_ExplainAction" xml:space="preserve">
-    <value>Objasni</value>
+  <data name="Reader_BookmarkAction" xml:space="preserve">
+    <value>Bookmark</value>
   </data>
   <data name="Details_LiveAlignmentNote" xml:space="preserve">
     <value>Mjeri dio koji čitaš, dok ga čitaš. Nema čekanja.</value>
@@ -905,6 +902,36 @@
   </data>
   <data name="Recognition_BaseDetail" xml:space="preserve">
     <value>Model jednu veličinu veći, oko 58 MB. Poravnanje traje otprilike tri puta dulje, a osjetno je bolji na jezicima koji nisu engleski. Skida se pri prvom poravnanju.</value>
+  </data>
+  <data name="Settings_SpacingSection" xml:space="preserve">
+    <value>Gustoća mjerenja</value>
+  </data>
+  <data name="Settings_SpacingBody" xml:space="preserve">
+    <value>Koliko često se knjiga osluškuje dok se poravnava unaprijed. Ne utječe na mjerenje dok čitaš -- ono uvijek radi na svoj način, neovisno o ovome.</value>
+  </data>
+  <data name="Spacing_60" xml:space="preserve">
+    <value>Najbrže</value>
+  </data>
+  <data name="Spacing_60Detail" xml:space="preserve">
+    <value>Mjeri svakih 60 s. Najmanje CPU vremena od ove četiri; kod sintetičkog naratora ovo je ostavljalo najveći razmak za nagađanje interpolacijom.</value>
+  </data>
+  <data name="Spacing_45" xml:space="preserve">
+    <value>Brže od zadanog</value>
+  </data>
+  <data name="Spacing_45Detail" xml:space="preserve">
+    <value>Mjeri svakih 45 s. Otprilike trećinu više posla nego Najbrže.</value>
+  </data>
+  <data name="Spacing_30" xml:space="preserve">
+    <value>Zadano</value>
+  </data>
+  <data name="Spacing_30Detail" xml:space="preserve">
+    <value>Mjeri svakih 30 s. Dvostruko više posla nego Najbrže. Ovo aplikacija trenutno koristi.</value>
+  </data>
+  <data name="Spacing_15" xml:space="preserve">
+    <value>Najgušće</value>
+  </data>
+  <data name="Spacing_15Detail" xml:space="preserve">
+    <value>Mjeri svakih 15 s. Četverostruko više posla nego Najbrže. Poboljšava li se točnost na pravoj knjizi ovoliko, nije izmjereno -- izmjeren je samo skok s 60 na 30 sekundi.</value>
   </data>
   <data name="Settings_WordTimes" xml:space="preserve">
     <value>Mjeri vrijeme svake riječi</value>

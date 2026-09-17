@@ -569,11 +569,9 @@ public static class Strings
     /// <summary>Title of the app chooser for translating a word.</summary>
     public static string Reader_TranslateChooser => Get(nameof(Reader_TranslateChooser));
 
-    public static string Reader_ExplainChooser => Get(nameof(Reader_ExplainChooser));
-
     public static string Reader_TranslateAction => Get(nameof(Reader_TranslateAction));
 
-    public static string Reader_ExplainAction => Get(nameof(Reader_ExplainAction));
+    public static string Reader_BookmarkAction => Get(nameof(Reader_BookmarkAction));
     /// <summary>Measures the passage you are reading, while you read it. Nothing to wait for.</summary>
     public static string Details_LiveAlignmentNote => Get(nameof(Details_LiveAlignmentNote));
     /// <summary>Works through the whole book in the background, so it is ready before you get there.</summary>
@@ -590,6 +588,26 @@ public static class Strings
     public static string Recognition_Base => Get(nameof(Recognition_Base));
     /// <summary>The next size up, about 58 MB. Around three times longer to align, and noticeably better at l…</summary>
     public static string Recognition_BaseDetail => Get(nameof(Recognition_BaseDetail));
+
+    public static string Settings_SpacingSection => Get(nameof(Settings_SpacingSection));
+
+    public static string Settings_SpacingBody => Get(nameof(Settings_SpacingBody));
+
+    public static string Spacing_60 => Get(nameof(Spacing_60));
+
+    public static string Spacing_60Detail => Get(nameof(Spacing_60Detail));
+
+    public static string Spacing_45 => Get(nameof(Spacing_45));
+
+    public static string Spacing_45Detail => Get(nameof(Spacing_45Detail));
+
+    public static string Spacing_30 => Get(nameof(Spacing_30));
+
+    public static string Spacing_30Detail => Get(nameof(Spacing_30Detail));
+
+    public static string Spacing_15 => Get(nameof(Spacing_15));
+
+    public static string Spacing_15Detail => Get(nameof(Spacing_15Detail));
     /// <summary>Time every word</summary>
     public static string Settings_WordTimes => Get(nameof(Settings_WordTimes));
     /// <summary>Asks the model when each word was spoken instead of assuming an even pace across a few second…</summary>

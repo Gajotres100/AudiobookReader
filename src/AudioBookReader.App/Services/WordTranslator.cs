@@ -15,11 +15,6 @@ namespace AudioBookReader.App.Services;
 /// </summary>
 public partial class WordTranslator
 {
-    /// <param name="text">The word or phrase selected in the reader.</param>
-    /// <param name="chooserTitle">
-    /// What the picker says while offering it. Android has no separate "translate" and "explain"
-    /// actions — both reach this same method and open the same list of apps — so the title is the
-    /// only place the reader's two buttons are actually different from each other.
-    /// </param>
-    public partial void Translate(string text, string chooserTitle);
+    /// <summary>Offers the word or phrase to every app on the phone that can act on selected text.</summary>
+    public partial void Translate(string text);
 }

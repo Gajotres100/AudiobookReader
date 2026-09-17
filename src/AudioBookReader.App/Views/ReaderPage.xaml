@@ -130,6 +130,17 @@
                 VerticalOptions="Center" />
         </HorizontalStackLayout>
 
+        <!--  Confirms a selection's bookmark actually saved something, the same way the player's held flag does.  -->
+        <Label
+            Grid.Row="1"
+            Padding="16,8"
+            BackgroundColor="{AppThemeBinding Light={StaticResource Chrome},
+                                              Dark={StaticResource ChromeDark}}"
+            HorizontalOptions="Center"
+            IsVisible="{Binding HasBookmarkNote}"
+            Style="{StaticResource Muted}"
+            Text="{Binding BookmarkNote}" />
+
         <ActivityIndicator
             Grid.Row="2"
             HorizontalOptions="Center"

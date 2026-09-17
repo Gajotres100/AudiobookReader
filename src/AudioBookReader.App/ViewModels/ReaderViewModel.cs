@@ -83,6 +83,65 @@ public partial class ReaderViewModel(
 
     public bool HasFollowStatus => FollowStatus.Length > 0;
 
+    /// <summary>
+    /// Confirms a bookmark actually saved something, the same way the player's held flag does.
+    /// Its own line rather than reusing <see cref="FollowStatus"/>: that one is rewritten by the
+    /// follow loop every time the narration moves on, and a confirmation that vanishes under the
+    /// next tick before anyone reads it is not a confirmation.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBookmarkNote))]
+    public partial string BookmarkNote { get; set; } = "";
+
+    public bool HasBookmarkNote => BookmarkNote.Length > 0;
+
+    /// <summary>
+    /// Bookmarks the passage a selection starts in — the same record the player writes from the
+    /// audio side, into the same list, so a book read from both ends shows one merged trail of
+    /// places rather than two the reader never sees together.
+    ///
+    /// Takes a sentence index rather than a raw character offset, the same coordinate every other
+    /// message from the page already uses (<see cref="OnSentenceTapped"/>, <see cref="PendingHighlight"/>)
+    /// — the page knows which sentence a tap landed in from its own <c>data-idx</c> markup, not
+    /// where that sentence starts in the book's text, which is this class's own bookkeeping.
+    ///
+    /// Carries the audio position too when the book is paired and this passage has already been
+    /// aligned, so a bookmark set with the eyes can still be jumped to from the player. Unaligned
+    /// or unpaired, it carries only the text offset, the same as one placed on the audio side
+    /// before that book had text at all.
+    /// </summary>
+    public async Task SaveSelectionBookmarkAsync(int sentenceIndex)
+    {
+        if (_text is null || sentenceIndex < 0 || sentenceIndex >= _text.Sentences.Count) return;
+
+        var textOffset = _text.Sentences[sentenceIndex].Start;
+
+        var existing = await database.GetBookmarksAsync(BookId);
+        if (existing.Count >= BookmarksViewModel.Limit)
+        {
+            BookmarkNote = string.Format(Strings.Bookmarks_LimitReachedBook, BookmarksViewModel.Limit);
+            await Task.Delay(2500);
+            BookmarkNote = "";
+            return;
+        }
+
+        var previewLength = Math.Min(90, _text.PlainText.Length - textOffset);
+
+        await database.AddBookmarkAsync(new Bookmark
+        {
+            BookId = BookId,
+            TextOffset = textOffset,
+            PositionMs = _sync?.AudioPositionAtChar(textOffset),
+            ChapterIndex = _libraryChapters?.LastOrDefault(c => c.HasTextRange && c.TextStart <= textOffset)?.Index ?? 0,
+            TextPreview = _text.PlainText.Substring(textOffset, previewLength).ReplaceLineEndings(" ").Trim(),
+            CreatedUtc = DateTime.UtcNow,
+        });
+
+        BookmarkNote = Strings.Bookmarks_Saved;
+        await Task.Delay(2500);
+        BookmarkNote = "";
+    }
+
     /// <summary>Whether to keep the highlight moving with playback. Off means plain reading.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FollowLabel))]
@@ -1396,7 +1455,7 @@ public partial class ReaderViewModel(
             .Replace("{{FOREGROUND}}", Theme.Foreground)
             .Replace("{{HIGHLIGHT}}", Theme.Highlight)
             .Replace("{{TRANSLATE_LABEL}}", Strings.Reader_TranslateAction)
-            .Replace("{{EXPLAIN_LABEL}}", Strings.Reader_ExplainAction)
+            .Replace("{{BOOKMARK_LABEL}}", Strings.Reader_BookmarkAction)
             // Last, so a book whose own text happens to contain one of the names above is left
             // alone rather than having it substituted out from under it.
             .Replace("{{BODY}}", bodyHtml);

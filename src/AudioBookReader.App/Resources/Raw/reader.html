@@ -58,6 +58,18 @@
   }
   .selmenu button:active { background: rgba(255, 255, 255, 0.18); }
   .selmenu button + button { border-left: 1px solid rgba(255, 255, 255, 0.25); }
+  /* The two adjustment handles a finalized selection gets, for widening or narrowing it after
+     the fact without starting the whole gesture over. Plain black bars rather than the teardrop
+     shape Android's own selection uses -- the boxes already say what is selected, so these only
+     need to say "drag here". Each is a wide invisible touch target with the visible bar centred
+     in it: a 3px line alone is not something a fingertip reliably lands on. */
+  .selhandle {
+    position: fixed; width: 32px; margin-left: -16px; z-index: 7; touch-action: none;
+  }
+  .selhandle::before {
+    content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px;
+    background: #000; border-radius: 2px;
+  }
 </style>
 <style id="hlrule">span.hl { background: {{HIGHLIGHT}}; border-radius: 3px; }</style>
 </head><body>
@@ -247,23 +259,84 @@
 
   // Ends the drag itself -- the finger lifting -- without touching whatever is still on
   // screen because of it. A lifted finger and a dismissed selection are different events:
-  // the boxes and the menu below are meant to outlive this one by as long as it takes to
-  // choose, or to tap elsewhere and cancel.
+  // the boxes, the handles and the menu below are meant to outlive this one by as long as
+  // it takes to adjust it, choose an action, or tap elsewhere and cancel.
   function stopDragging() {
     selecting = false;
     selectionAnchor = null;
     document.getElementById('content').classList.remove('no-scroll');
   }
 
+  // ---- Adjusting a finalized selection ----
+  //
+  // Two bars, one at each end, that can be dragged independently once the initial press and
+  // drag is over -- the same shape every phone's own text selection already trains people on.
+  // The initial gesture only has to get the selection roughly right; these are what get it
+  // exactly right without starting over.
+  var currentRange = null, handleStart = null, handleEnd = null, draggingHandle = null;
+
+  function positionHandle(el, x, rect) {
+    el.style.left = x + 'px';
+    el.style.top = rect.top + 'px';
+    el.style.height = rect.height + 'px';
+  }
+
+  function updateHandles(range) {
+    var rects = range.getClientRects();
+    if (rects.length === 0) { removeHandles(); return; }
+
+    if (!handleStart) {
+      handleStart = document.createElement('div');
+      handleStart.className = 'selhandle';
+      document.body.appendChild(handleStart);
+    }
+    if (!handleEnd) {
+      handleEnd = document.createElement('div');
+      handleEnd.className = 'selhandle';
+      document.body.appendChild(handleEnd);
+    }
+
+    positionHandle(handleStart, rects[0].left, rects[0]);
+    positionHandle(handleEnd, rects[rects.length - 1].right, rects[rects.length - 1]);
+  }
+
+  function removeHandles() {
+    if (handleStart) { handleStart.remove(); handleStart = null; }
+    if (handleEnd) { handleEnd.remove(); handleEnd = null; }
+  }
+
+  // Moves the dragged end to the word under the finger, keeping the other end exactly where
+  // it was. A handle dragged past its partner is ignored rather than followed -- inverting
+  // the range would flip which end is which, and the finger dragging "the end" would suddenly
+  // be moving the start instead, with nothing on screen to explain why.
+  function dragHandleTo(which, x, y) {
+    var here = wordRangeAtPoint(x, y);
+    if (!here || !currentRange) return;
+
+    var next = document.createRange();
+    if (which === 'start') {
+      next.setStart(here.startContainer, here.startOffset);
+      next.setEnd(currentRange.endContainer, currentRange.endOffset);
+    } else {
+      next.setStart(currentRange.startContainer, currentRange.startOffset);
+      next.setEnd(here.endContainer, here.endOffset);
+    }
+
+    if (!next.toString().trim()) return;
+
+    currentRange = next;
+    drawSelectionBoxes(currentRange);
+    updateHandles(currentRange);
+  }
+
   // ---- What to do with it ----
   //
-  // Two buttons rather than acting the instant a finger lifts: jumping straight into
+  // One button rather than acting the instant a finger lifts: jumping straight into
   // Android's chooser on release would fire it for a selection someone was still adjusting
-  // their mind about, and gave no way to change to more words after the fact without
-  // starting over. Both buttons open the same system chooser with the same installed apps --
-  // Android has no separate "translate" and "explain" actions, only the one this app has
-  // always used for a single word -- so the difference is entirely in which label the person
-  // reading wants to see while they pick.
+  // their mind about. Only one, because Android has no separate "translate" and "explain"
+  // actions -- both would open the exact same chooser with the exact same installed apps,
+  // the one this app has always used for a single word, so two buttons here would have been
+  // two names for one thing.
   var selMenu = null;
 
   function hideSelMenu() {
@@ -273,6 +346,18 @@
   function dismissSelection() {
     hideSelMenu();
     clearSelectionBoxes();
+    removeHandles();
+    currentRange = null;
+  }
+
+  // The sentence a range starts in, read off the data-idx span that already wraps it -- the
+  // same coordinate a tap or a double tap already reports, not a raw character offset the
+  // page has no reason to know about its own text.
+  function sentenceIndexOf(range) {
+    var node = range.startContainer;
+    var el = node.nodeType === 3 ? node.parentElement : node;
+    var span = el && el.closest ? el.closest('[data-idx]') : null;
+    return span ? span.getAttribute('data-idx') : null;
   }
 
   function showSelMenu(range, phrase) {
@@ -287,19 +372,28 @@
     var menu = document.createElement('div');
     menu.className = 'selmenu';
 
-    function addAction(label, scheme) {
-      var button = document.createElement('button');
-      button.textContent = label;
-      button.addEventListener('click', function (e) {
+    var translateButton = document.createElement('button');
+    translateButton.textContent = '{{TRANSLATE_LABEL}}';
+    translateButton.addEventListener('click', function (e) {
+      e.stopPropagation();
+      location.href = 'abr://translate/' + encodeURIComponent(phrase);
+      dismissSelection();
+    });
+    menu.appendChild(translateButton);
+
+    // Only when the selection actually lands inside the book's own sentences: the reader's
+    // own placeholder text, before a real chapter has loaded, carries no data-idx at all.
+    var sentenceIndex = sentenceIndexOf(range);
+    if (sentenceIndex !== null) {
+      var bookmarkButton = document.createElement('button');
+      bookmarkButton.textContent = '{{BOOKMARK_LABEL}}';
+      bookmarkButton.addEventListener('click', function (e) {
         e.stopPropagation();
-        location.href = scheme + encodeURIComponent(phrase);
+        location.href = 'abr://bookmark/' + sentenceIndex;
         dismissSelection();
       });
-      menu.appendChild(button);
+      menu.appendChild(bookmarkButton);
     }
-
-    addAction('{{TRANSLATE_LABEL}}', 'abr://translate/');
-    addAction('{{EXPLAIN_LABEL}}', 'abr://explain/');
 
     document.body.appendChild(menu);
     selMenu = menu;
@@ -315,6 +409,20 @@
     menu.style.top = y + 'px';
   }
 
+  // Finalizes a selection, from either the initial gesture or a handle drag: draws the boxes,
+  // plants or moves the two handles, and shows the menu naming what is selected. An empty
+  // result -- a drag that landed back where it started, or off the text entirely -- dismisses
+  // rather than showing a menu with nothing to act on.
+  function commitSelection(range) {
+    var phrase = range.toString().replace(/\s+/g, ' ').trim();
+    if (!phrase) { dismissSelection(); return; }
+
+    currentRange = range;
+    drawSelectionBoxes(range);
+    updateHandles(range);
+    showSelMenu(range, phrase);
+  }
+
   var suppressClick = false;
 
   document.addEventListener('touchstart', function (e) {
@@ -322,14 +430,25 @@
     startY = e.changedTouches[0].clientY;
     swiped = false;
     held = false;
-    stopDragging();
 
+    var handleHit = (handleStart || handleEnd) && e.target.closest
+      ? e.target.closest('.selhandle') : null;
     var onMenu = !!(selMenu && e.target.closest && e.target.closest('.selmenu'));
 
-    // A touch anywhere outside the menu dismisses it and does nothing else -- the same
-    // first-tap-just-closes-it behaviour any selection popup on the phone already has, so
-    // a stray tap while deciding never also turns the page or opens the chapter list.
-    if (selMenu && !onMenu) {
+    if (handleHit) {
+      draggingHandle = handleHit === handleStart ? 'start' : 'end';
+      hideSelMenu();
+      document.getElementById('content').classList.add('no-scroll');
+      suppressClick = true;
+      cancelHold();
+      return;
+    }
+
+    // A touch anywhere outside the handles and the menu dismisses the whole selection and
+    // does nothing else -- the same first-tap-just-closes-it behaviour any selection popup
+    // on the phone already has, so a stray tap while deciding never also turns the page or
+    // opens the chapter list.
+    if (currentRange && !onMenu) {
       dismissSelection();
       suppressClick = true;
       cancelHold();
@@ -337,6 +456,7 @@
     }
 
     suppressClick = false;
+    stopDragging();
 
     if (onMenu || e.touches.length !== 1) { cancelHold(); return; }
 
@@ -359,6 +479,11 @@
   document.addEventListener('touchmove', function (e) {
     var x = e.touches[0].clientX, y = e.touches[0].clientY;
 
+    if (draggingHandle) {
+      dragHandleTo(draggingHandle, x, y);
+      return;
+    }
+
     if (selecting) {
       drawSelectionBoxes(extendSelectionTo(x, y));
       return;
@@ -371,21 +496,23 @@
   document.addEventListener('touchend', function (e) {
     cancelHold();
 
+    if (draggingHandle) {
+      draggingHandle = null;
+      document.getElementById('content').classList.remove('no-scroll');
+      // The menu was hidden for the length of the drag; it comes back naming whatever the
+      // selection now is, or the selection is dropped if the drag emptied it out.
+      if (currentRange) commitSelection(currentRange);
+      return;
+    }
+
     if (suppressClick) return;
 
     if (selecting) {
       var x = e.changedTouches[0].clientX, y = e.changedTouches[0].clientY;
       var chosen = extendSelectionTo(x, y);
-      var phrase = chosen.toString().replace(/\s+/g, ' ').trim();
 
       stopDragging();
-
-      if (phrase) {
-        drawSelectionBoxes(chosen);
-        showSelMenu(chosen, phrase);
-      } else {
-        clearSelectionBoxes();
-      }
+      commitSelection(chosen);
       return;
     }
 
@@ -405,13 +532,15 @@
   }, { passive: true });
 
   document.addEventListener('touchcancel', function () {
+    draggingHandle = null;
     stopDragging();
     dismissSelection();
+    document.getElementById('content').classList.remove('no-scroll');
   }, { passive: true });
 
   document.addEventListener('click', function (e) {
-    // Neither a scroll, a completed hold, nor a tap that only dismissed the menu should
-    // also count as a tap on the page underneath it.
+    // Neither a scroll, a completed hold, nor a tap that only dismissed the menu or dragged
+    // a handle should also count as a tap on the page underneath it.
     if (suppressClick) { suppressClick = false; return; }
     if (swiped) { swiped = false; return; }
     if (held) { held = false; return; }
