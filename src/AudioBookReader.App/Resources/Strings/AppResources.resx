@@ -969,28 +969,28 @@
     <value>How often the book is sampled while aligning ahead of time. Does not affect measuring while you read -- that always works its own way regardless of this.</value>
   </data>
   <data name="Spacing_60" xml:space="preserve">
-    <value>Fastest</value>
-  </data>
-  <data name="Spacing_60Detail" xml:space="preserve">
-    <value>Samples every 60 s. The least CPU time of the four; on a synthetic narrator this left the widest gap for interpolation to guess across.</value>
-  </data>
-  <data name="Spacing_45" xml:space="preserve">
-    <value>Faster than default</value>
-  </data>
-  <data name="Spacing_45Detail" xml:space="preserve">
-    <value>Samples every 45 s. About a third more work than Fastest.</value>
-  </data>
-  <data name="Spacing_30" xml:space="preserve">
     <value>Default</value>
   </data>
+  <data name="Spacing_60Detail" xml:space="preserve">
+    <value>Samples every 60 s. What the app ships with, and the least CPU time of the four; on a synthetic narrator this left the widest gap for interpolation to guess across.</value>
+  </data>
+  <data name="Spacing_45" xml:space="preserve">
+    <value>Denser than default</value>
+  </data>
+  <data name="Spacing_45Detail" xml:space="preserve">
+    <value>Samples every 45 s. About a third more work than the default.</value>
+  </data>
+  <data name="Spacing_30" xml:space="preserve">
+    <value>Denser still</value>
+  </data>
   <data name="Spacing_30Detail" xml:space="preserve">
-    <value>Samples every 30 s. Twice the work of Fastest. What the app currently ships with.</value>
+    <value>Samples every 30 s. Twice the work of the default. The only step past it that has actually been measured on real hardware.</value>
   </data>
   <data name="Spacing_15" xml:space="preserve">
     <value>Densest</value>
   </data>
   <data name="Spacing_15Detail" xml:space="preserve">
-    <value>Samples every 15 s. Four times the work of Fastest. Whether a real book's accuracy actually improves this far has not been measured -- only the jump from 60 s to 30 s has.</value>
+    <value>Samples every 15 s. Four times the work of the default. Whether a real book's accuracy actually improves this far has not been measured -- only the jump from 60 s to 30 s has.</value>
   </data>
   <data name="Settings_WordTimes" xml:space="preserve">
     <value>Time every word</value>

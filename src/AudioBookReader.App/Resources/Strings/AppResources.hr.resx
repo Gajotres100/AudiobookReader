@@ -910,28 +910,28 @@
     <value>Koliko često se knjiga osluškuje dok se poravnava unaprijed. Ne utječe na mjerenje dok čitaš -- ono uvijek radi na svoj način, neovisno o ovome.</value>
   </data>
   <data name="Spacing_60" xml:space="preserve">
-    <value>Najbrže</value>
-  </data>
-  <data name="Spacing_60Detail" xml:space="preserve">
-    <value>Mjeri svakih 60 s. Najmanje CPU vremena od ove četiri; kod sintetičkog naratora ovo je ostavljalo najveći razmak za nagađanje interpolacijom.</value>
-  </data>
-  <data name="Spacing_45" xml:space="preserve">
-    <value>Brže od zadanog</value>
-  </data>
-  <data name="Spacing_45Detail" xml:space="preserve">
-    <value>Mjeri svakih 45 s. Otprilike trećinu više posla nego Najbrže.</value>
-  </data>
-  <data name="Spacing_30" xml:space="preserve">
     <value>Zadano</value>
   </data>
+  <data name="Spacing_60Detail" xml:space="preserve">
+    <value>Mjeri svakih 60 s. Ovo aplikacija koristi po zadanom, i najmanje je CPU vremena od ove četiri; kod sintetičkog naratora ovo je ostavljalo najveći razmak za nagađanje interpolacijom.</value>
+  </data>
+  <data name="Spacing_45" xml:space="preserve">
+    <value>Gušće od zadanog</value>
+  </data>
+  <data name="Spacing_45Detail" xml:space="preserve">
+    <value>Mjeri svakih 45 s. Otprilike trećinu više posla nego zadano.</value>
+  </data>
+  <data name="Spacing_30" xml:space="preserve">
+    <value>Još gušće</value>
+  </data>
   <data name="Spacing_30Detail" xml:space="preserve">
-    <value>Mjeri svakih 30 s. Dvostruko više posla nego Najbrže. Ovo aplikacija trenutno koristi.</value>
+    <value>Mjeri svakih 30 s. Dvostruko više posla nego zadano. Jedini korak dalje koji je stvarno izmjeren na uređaju.</value>
   </data>
   <data name="Spacing_15" xml:space="preserve">
     <value>Najgušće</value>
   </data>
   <data name="Spacing_15Detail" xml:space="preserve">
-    <value>Mjeri svakih 15 s. Četverostruko više posla nego Najbrže. Poboljšava li se točnost na pravoj knjizi ovoliko, nije izmjereno -- izmjeren je samo skok s 60 na 30 sekundi.</value>
+    <value>Mjeri svakih 15 s. Četverostruko više posla nego zadano. Poboljšava li se točnost na pravoj knjizi ovoliko, nije izmjereno -- izmjeren je samo skok s 60 na 30 sekundi.</value>
   </data>
   <data name="Settings_WordTimes" xml:space="preserve">
     <value>Mjeri vrijeme svake riječi</value>

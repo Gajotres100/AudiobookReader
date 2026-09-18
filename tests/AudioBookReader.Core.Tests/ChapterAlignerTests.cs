@@ -186,8 +186,8 @@ public class ChapterAlignerTests
 
         await aligner.AlignAsync(request);
 
-        // A third rather than a quarter: the shipped spacing is 30 s, not 60 s, per the measured
-        // table on AlignmentSettings.ProbeIntervalMs — the bound here tracks whatever that default
+        // A quarter rather than a third: the shipped spacing is 60 s, per the measured table on
+        // AlignmentSettings.ProbeIntervalMs — the bound here tracks whatever that default
         // actually is, not a number picked once and left behind by a later retune.
         var listenedMs = narration.TranscribeCalls * settings.ProbeDurationMs;
         var coverage = settings.ProbeDurationMs / (double)settings.ProbeIntervalMs;

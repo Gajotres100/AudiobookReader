@@ -92,11 +92,11 @@ public class AlignmentSettingsStore
     {
         get
         {
-            var stored = Preferences.Default.Get(ProbeIntervalKey, 30_000L);
-            return Array.IndexOf(ProbeIntervalOptionsMs, stored) >= 0 ? stored : 30_000L;
+            var stored = Preferences.Default.Get(ProbeIntervalKey, 60_000L);
+            return Array.IndexOf(ProbeIntervalOptionsMs, stored) >= 0 ? stored : 60_000L;
         }
         set => Preferences.Default.Set(
-            ProbeIntervalKey, Array.IndexOf(ProbeIntervalOptionsMs, value) >= 0 ? value : 30_000L);
+            ProbeIntervalKey, Array.IndexOf(ProbeIntervalOptionsMs, value) >= 0 ? value : 60_000L);
     }
 
     /// <summary>

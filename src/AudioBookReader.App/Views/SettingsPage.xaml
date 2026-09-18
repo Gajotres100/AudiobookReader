@@ -83,6 +83,59 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!--
+                ======== How closely it samples, when aligning ahead of time ========
+
+                Right below the load preset, since both answer the same question: how hard this
+                may work the phone. Kept apart from settings that answer a different one, such as
+                when it may run or where the app opens.
+
+                Read-along while reading has its own fixed spacing and is untouched by this: it
+                measures the paragraph under the eye, not the whole book, and the two settings
+                answer different questions.
+            -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+
+                    <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Settings_SpacingSection}" />
+
+                    <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Settings_SpacingBody}" />
+
+                    <CollectionView
+                        x:Name="ProbeSpacingList"
+                        ItemsSource="{Binding ProbeSpacings}"
+                        SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProbeSpacingOption">
+                                <Grid
+                                    Padding="0,10"
+                                    ColumnDefinitions="26,*"
+                                    ColumnSpacing="6">
+
+                                    <Grid.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnProbeSpacingTapped" />
+                                    </Grid.GestureRecognizers>
+
+                                    <Label
+                                        Grid.Column="0"
+                                        FontSize="16"
+                                        IsVisible="{Binding IsSelected}"
+                                        Text="✓"
+                                        TextColor="{AppThemeBinding Light={StaticResource Accent},
+                                                                    Dark={StaticResource AccentDark}}"
+                                        VerticalOptions="Center" />
+
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label FontFamily="OpenSansSemibold" Text="{Binding Name}" />
+                                        <Label Style="{StaticResource Muted}" Text="{Binding Detail}" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Border>
+
             <!--  ======== When it may work at all ========  -->
 
             <Border Style="{StaticResource Card}">
@@ -198,55 +251,6 @@
                     </Grid>
 
                     <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Settings_WordTimesNote}" />
-                </VerticalStackLayout>
-            </Border>
-
-            <!--
-                ======== How closely it samples, when aligning ahead of time ========
-
-                Read-along while reading has its own fixed spacing and is untouched by this: it
-                measures the paragraph under the eye, not the whole book, and the two settings
-                answer different questions.
-            -->
-            <Border Style="{StaticResource Card}">
-                <VerticalStackLayout Spacing="12">
-
-                    <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Settings_SpacingSection}" />
-
-                    <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Settings_SpacingBody}" />
-
-                    <CollectionView
-                        x:Name="ProbeSpacingList"
-                        ItemsSource="{Binding ProbeSpacings}"
-                        SelectionMode="None">
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ProbeSpacingOption">
-                                <Grid
-                                    Padding="0,10"
-                                    ColumnDefinitions="26,*"
-                                    ColumnSpacing="6">
-
-                                    <Grid.GestureRecognizers>
-                                        <TapGestureRecognizer Tapped="OnProbeSpacingTapped" />
-                                    </Grid.GestureRecognizers>
-
-                                    <Label
-                                        Grid.Column="0"
-                                        FontSize="16"
-                                        IsVisible="{Binding IsSelected}"
-                                        Text="✓"
-                                        TextColor="{AppThemeBinding Light={StaticResource Accent},
-                                                                    Dark={StaticResource AccentDark}}"
-                                        VerticalOptions="Center" />
-
-                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                        <Label FontFamily="OpenSansSemibold" Text="{Binding Name}" />
-                                        <Label Style="{StaticResource Muted}" Text="{Binding Detail}" />
-                                    </VerticalStackLayout>
-                                </Grid>
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
                 </VerticalStackLayout>
             </Border>
 

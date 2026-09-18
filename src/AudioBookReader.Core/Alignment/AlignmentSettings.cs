@@ -29,13 +29,14 @@ public record AlignmentSettings
     ///
     /// One minute was the measured knee, and past it the tail stops responding: tripling coverage
     /// from there moves the median by two tenths of a second and p95 not at all — on this synthetic
-    /// narrator, who paces evenly except for the one pause modelled at each probe. A real narrator's
-    /// unevenness is not confined to that, so a real book's tail may respond to closer probes in a
-    /// way this measurement could not see. Set to thirty seconds on that basis, accepting close to
-    /// double the alignment time for a tail this synthetic test cannot rule either way; the honest
-    /// answer needs the same measurement run against a real book, which has not happened yet.
+    /// narrator, who paces evenly except for the one pause modelled at each probe. Sixty seconds on
+    /// that basis, the cheapest spacing this measurement found no further benefit past. A real
+    /// narrator's unevenness is not confined to that one modelled pause, so a real book's tail may
+    /// still respond to closer probes in a way this measurement could not see — thirty seconds was
+    /// tried on exactly that chance, at close to double the alignment time, and reverted back to
+    /// sixty by request once that cost outweighed the unproven benefit.
     /// </summary>
-    public long ProbeIntervalMs { get; init; } = 30_000;
+    public long ProbeIntervalMs { get; init; } = 60_000;
 
     /// <summary>
     /// How many consecutive probes to spend finding where a chapter's narration actually begins,
