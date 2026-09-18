@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 namespace AudioBookReader.App.ViewModels;
 
 [QueryProperty(nameof(BookId), "id")]
+[QueryProperty(nameof(EntryOffset), "offset")]
 public partial class ReaderViewModel(
     LibraryDatabase database,
     SyncMapStore syncMaps,
@@ -18,6 +19,14 @@ public partial class ReaderViewModel(
     LiveSyncRunner liveSync) : ObservableObject, IDisposable
 {
     private Book? _book;
+
+    /// <summary>
+    /// A specific place to open at instead of the remembered one, carried from a bookmark chosen
+    /// on another page. -1 means none was asked for; consumed once by the load that follows, so
+    /// simply reappearing on this same page later resumes normally again.
+    /// </summary>
+    [ObservableProperty]
+    public partial int EntryOffset { get; set; } = -1;
 
     /// <summary>
     /// Whether this book measures the passage being read as it is read, rather than having been
@@ -413,8 +422,12 @@ public partial class ReaderViewModel(
     /// <summary>
     /// Which page a newly shown document opens on: its first, or its last when the reader arrived
     /// by swiping backwards out of the document after it.
+    ///
+    /// Null outside of that swipe, so a fresh document load falls through to restoring the
+    /// remembered sentence instead — which used to be skipped whenever this happened to be sitting
+    /// on its default value of 0 from an unrelated earlier visit.
     /// </summary>
-    public int EntryPage { get; private set; }
+    public int? EntryPage { get; private set; }
 
     public void OnPagesReported(int page, int count, int topSentence)
     {
@@ -580,16 +593,32 @@ public partial class ReaderViewModel(
     }
 
     /// <summary>
-    /// Opens wherever the reader should resume: the narrator's position when following, otherwise
-    /// wherever they last stopped reading.
+    /// Opens wherever the reader should resume: a bookmark chosen elsewhere when one was asked
+    /// for, the narrator's position when following, otherwise wherever they last stopped reading.
     /// </summary>
     private async Task ShowStartingDocumentAsync()
     {
-        var state = await database.GetReadingStateAsync(BookId);
+        // Cleared unconditionally rather than left to whichever swipe last set it: this method
+        // runs on every reappearance of the page, on the same view model instance, and a page
+        // request left over from an earlier visit — including one abandoned by cancelling the
+        // chapter picker — must not steal a fresh restore of the remembered sentence below.
+        EntryPage = null;
 
-        var offset = CanFollow && playback.PositionMs > 0
-            ? _sync!.CharOffsetAt(playback.PositionMs) ?? state?.TextOffset ?? 0
-            : state?.TextOffset ?? 0;
+        int offset;
+
+        if (EntryOffset >= 0)
+        {
+            offset = EntryOffset;
+            EntryOffset = -1;
+        }
+        else
+        {
+            var state = await database.GetReadingStateAsync(BookId);
+
+            offset = CanFollow && playback.PositionMs > 0
+                ? _sync!.CharOffsetAt(playback.PositionMs) ?? state?.TextOffset ?? 0
+                : state?.TextOffset ?? 0;
+        }
 
         ShowDocumentAt(offset);
         _narrationDocument = SpineIndex;
@@ -1179,7 +1208,7 @@ public partial class ReaderViewModel(
 
         // Playback outlives pages and can be on a different book entirely. Following it then would
         // walk this book's text to another book's playhead.
-        var playingThisBook = playback.BookId == BookId;
+        var loadedThisBook = playback.BookId == BookId;
 
         // Saved here rather than left to a sentence tap: tapping a sentence saves the text
         // position, not this, and someone listening with their eyes closed — the whole point of a
@@ -1187,13 +1216,20 @@ public partial class ReaderViewModel(
         // paired book read through this page at all, so a process killed while the phone slept lost
         // the entire session and came back wherever it last happened to be saved, which could be
         // nowhere later than the very start.
-        if (playingThisBook && playback.IsPlaying && DateTime.UtcNow - _lastPositionSaved > TimeSpan.FromSeconds(5))
+        //
+        // Deliberately not conditional on playback.IsPlaying: turning a page or tapping a sentence
+        // seeks the player (see TakeNarrationToAsync) whether or not anything is audibly playing,
+        // and someone reading in silence with the ebook open moves that seek just as much as
+        // someone listening does. Requiring IsPlaying here left the saved audio position stuck at
+        // wherever it was last actually played, so a paired book read without pressing play ever
+        // looked to have made no progress at all when its player was next opened.
+        if (loadedThisBook && DateTime.UtcNow - _lastPositionSaved > TimeSpan.FromSeconds(5))
         {
             _lastPositionSaved = DateTime.UtcNow;
             _ = database.SaveReadingStateAsync(BookId, audioPositionMs: playback.PositionMs, speed: playback.Speed);
         }
 
-        if (!IsFollowing || _sync is null || !playback.IsPlaying || !playingThisBook)
+        if (!IsFollowing || _sync is null || !playback.IsPlaying || !loadedThisBook)
         {
             if (DateTime.UtcNow - _lastMiss > TimeSpan.FromSeconds(10))
             {
@@ -1336,8 +1372,23 @@ public partial class ReaderViewModel(
     [RelayCommand]
     private void ToggleFollow() => IsFollowing = !IsFollowing;
 
+    /// <summary>
+    /// Leaves the reader.
+    ///
+    /// The player is directly underneath whenever it was opened from there (see
+    /// <see cref="OpenPlayerAsync"/>), the same alternating-view pair the player's own close button
+    /// accounts for. A single pop would only hop back across to the player instead of leaving the
+    /// book, so that case pops past it too.
+    /// </summary>
     [RelayCommand]
-    private Task CloseAsync() => Shell.Current.GoToAsync("..");
+    private Task CloseAsync()
+    {
+        var stack = Shell.Current.Navigation.NavigationStack;
+
+        return stack.Count >= 2 && stack[^1] is Views.ReaderPage && stack[^2] is Views.BookPage
+            ? Shell.Current.GoToAsync("../..")
+            : Shell.Current.GoToAsync("..");
+    }
 
     /// <summary>
     /// Opens the full player: cover, chapter list, scrubber, sleep timer, speed, bookmarks.

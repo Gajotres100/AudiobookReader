@@ -363,8 +363,25 @@ public partial class BookViewModel(
     /// </summary>
     public bool TracksPlayback { get; set; } = true;
 
+    /// <summary>
+    /// Leaves the player.
+    ///
+    /// A plain "back" is right for the details page, which sits on top of whichever view opened
+    /// it and should return there. It is wrong for the player itself when the reader is directly
+    /// underneath: the two are opened as alternating views of the same paired book (see
+    /// <see cref="OpenReaderAsync"/>), so a single pop would only hop across to the reader instead
+    /// of leaving the book — which is what the button is for. Popping past it too closes the book
+    /// completely, wherever it was opened from.
+    /// </summary>
     [RelayCommand]
-    private Task CloseAsync() => Shell.Current.GoToAsync("..");
+    private Task CloseAsync()
+    {
+        var stack = Shell.Current.Navigation.NavigationStack;
+
+        return stack.Count >= 2 && stack[^1] is Views.BookPage && stack[^2] is Views.ReaderPage
+            ? Shell.Current.GoToAsync("../..")
+            : Shell.Current.GoToAsync("..");
+    }
 
     private static readonly int[] SleepMinutes = [5, 10, 15, 20, 30, 45, 60, 90];
 

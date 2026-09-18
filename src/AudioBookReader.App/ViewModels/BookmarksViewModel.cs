@@ -183,10 +183,33 @@ public partial class BookmarksViewModel(
         return _text.PlainText.Substring(start, length).ReplaceLineEndings(" ").Trim();
     }
 
+    /// <summary>
+    /// Goes to a bookmark.
+    ///
+    /// A text position takes precedence and opens the reader there: this page is only ever reached
+    /// from the player, so a plain "back" landed on the player itself and left the book's text —
+    /// the whole point of a bookmark placed while reading — untouched. A position given in audio
+    /// alone stays on the player and just seeks it, since there is no text side to open.
+    /// </summary>
     [RelayCommand]
     private async Task OpenAsync(BookmarkRow? row)
     {
-        if (row?.Bookmark.PositionMs is { } at && playback.BookId == BookId) playback.SeekTo(at);
+        if (row is null) return;
+
+        if (row.Bookmark.TextOffset is { } offset && _text is not null)
+        {
+            // This page is reached from the player, so the reader may already be sitting further
+            // down the stack underneath it (opened before the player was) — pushing another copy
+            // on top left two readers stacked, and the second one's own close button then landed
+            // back on this page instead of leaving the book. Resetting to the library first
+            // guarantees a single, fresh reader on the stack, so closing it behaves the same as
+            // opening that same bookmark from anywhere else would.
+            await Shell.Current.GoToAsync("//library");
+            await Shell.Current.GoToAsync($"reader?id={BookId}&offset={offset}");
+            return;
+        }
+
+        if (row.Bookmark.PositionMs is { } at && playback.BookId == BookId) playback.SeekTo(at);
 
         await Shell.Current.GoToAsync("..");
     }

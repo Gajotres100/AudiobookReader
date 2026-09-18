@@ -281,7 +281,13 @@ public partial class ReaderPage : ContentPage
 
     /// <summary>
     /// Opens a freshly loaded document on the right page — its last one when the reader arrived by
-    /// swiping backwards, so the text carries on where the eye left it.
+    /// swiping backwards, so the text carries on where the eye left it, and otherwise wherever the
+    /// remembered sentence is, so a book that was never "following" (an ebook, or a paired one
+    /// simply being read rather than listened to) still resumes where it was left rather than at
+    /// the top of the chapter.
+    ///
+    /// EntryPage wins when set: it is only ever set for an explicit swipe between documents, and
+    /// that request must not be second-guessed by a highlight left over from before the swipe.
     /// </summary>
     private async void OnReaderNavigated(object? sender, WebNavigatedEventArgs e)
     {
@@ -289,10 +295,10 @@ public partial class ReaderPage : ContentPage
         {
             // Re-applied here because the highlight requested while the previous document was
             // still on screen was asked of a script that did not exist yet.
-            if (_viewModel.IsFollowing && _viewModel.PendingHighlight >= 0)
+            if (_viewModel.EntryPage is { } page)
+                await Reader.EvaluateJavaScriptAsync($"goToPage({page})");
+            else if (_viewModel.PendingHighlight >= 0)
                 await Reader.EvaluateJavaScriptAsync($"highlight({_viewModel.PendingHighlight})");
-            else if (_viewModel.EntryPage != 0)
-                await Reader.EvaluateJavaScriptAsync($"goToPage({_viewModel.EntryPage})");
         }
         catch (Exception)
         {
