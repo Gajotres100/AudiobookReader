@@ -247,6 +247,11 @@ public partial class ReaderViewModel(
     /// Each is a matched pair rather than a background with black text on it: the contrast that
     /// suits paper is not the contrast that suits a dark room, and a highlight bright enough to see
     /// on cream is glaring on black.
+    ///
+    /// Dim and Night were first tuned lower on exactly that reasoning, and turned out to have gone
+    /// too far the other way: an amber wash that faint over a near-black page barely lifts off it
+    /// at all, reported from a real evening of reading in both. Raised well past where a light
+    /// theme would need it, since the same opacity reads much weaker the darker the page is.
     /// </summary>
     public static readonly ReaderTheme[] Themes =
     [
@@ -255,8 +260,8 @@ public partial class ReaderViewModel(
         new(Strings.Reader_ThemePaper, "#FBF8F2", "#241F1A", "rgba(178, 106, 0, 0.22)"),
         new(Strings.Reader_ThemeSepia, "#EFE0C6", "#4A3A26", "rgba(168, 112, 0, 0.26)"),
         new(Strings.Reader_ThemeLight, "#FDFDFB", "#1B1B1F", "rgba(196, 148, 0, 0.30)"),
-        new(Strings.Reader_ThemeDim, "#1C212B", "#E9E4DA", "rgba(232, 169, 69, 0.20)"),
-        new(Strings.Reader_ThemeNight, "#0B0D11", "#A9A39A", "rgba(232, 169, 69, 0.16)"),
+        new(Strings.Reader_ThemeDim, "#1C212B", "#E9E4DA", "rgba(232, 169, 69, 0.34)"),
+        new(Strings.Reader_ThemeNight, "#0B0D11", "#A9A39A", "rgba(232, 169, 69, 0.40)"),
     ];
 
     /// <summary>
