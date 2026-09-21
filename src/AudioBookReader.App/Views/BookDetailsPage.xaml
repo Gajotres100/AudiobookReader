@@ -225,6 +225,40 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <!--  ======== Find a page from a photo, once there is text to search ========  -->
+
+                <Border IsVisible="{Binding HasText}" Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="10">
+
+                        <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Details_PageFinderSection}" />
+
+                        <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Details_PageFinderBody}" />
+
+                        <Button
+                            Command="{Binding LocatePageCommand}"
+                            IsEnabled="{Binding CanLocatePage}"
+                            Style="{StaticResource Secondary}"
+                            Text="{x:Static s:Strings.Details_LocatePage}" />
+
+                        <HorizontalStackLayout IsVisible="{Binding IsLocatingPage}" Spacing="10">
+                            <ActivityIndicator
+                                HeightRequest="16"
+                                IsRunning="{Binding IsLocatingPage}"
+                                VerticalOptions="Center"
+                                WidthRequest="16" />
+                            <Label
+                                FontSize="13"
+                                Text="{x:Static s:Strings.Details_LocatePageWorking}"
+                                VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+
+                        <Label
+                            IsVisible="{Binding HasPageLocatorNote}"
+                            Style="{StaticResource Muted}"
+                            Text="{Binding PageLocatorNote}" />
+                    </VerticalStackLayout>
+                </Border>
+
                 <!--  Apart from everything else, because it is not like anything else here.  -->
                 <Button
                     Command="{Binding DeleteBookCommand}"

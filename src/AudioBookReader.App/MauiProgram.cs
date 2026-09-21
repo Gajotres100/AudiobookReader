@@ -4,6 +4,7 @@ using AudioBookReader.App.Views;
 using AudioBookReader.Core.Books;
 using AudioBookReader.Core.Data;
 using Microsoft.Extensions.Logging;
+using Plugin.Maui.OCR;
 
 namespace AudioBookReader.App;
 
@@ -14,6 +15,7 @@ public static class MauiProgram
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
+			.UseOcr()
 			.ConfigureFonts(fonts =>
 			{
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

@@ -66,6 +66,28 @@ public static class Strings
     public static string Details_AddEbook => Get(nameof(Details_AddEbook));
     /// <summary>Remove ebook</summary>
     public static string Details_RemoveEbook => Get(nameof(Details_RemoveEbook));
+    /// <summary>Find a page, section heading</summary>
+    public static string Details_PageFinderSection => Get(nameof(Details_PageFinderSection));
+    /// <summary>Explains what a photo of a page does</summary>
+    public static string Details_PageFinderBody => Get(nameof(Details_PageFinderBody));
+    /// <summary>Locate a page from a photo, button</summary>
+    public static string Details_LocatePage => Get(nameof(Details_LocatePage));
+    /// <summary>Action sheet title, camera vs. gallery</summary>
+    public static string Details_LocatePageChoose => Get(nameof(Details_LocatePageChoose));
+    /// <summary>Take a photo, action sheet option</summary>
+    public static string Details_LocatePageCamera => Get(nameof(Details_LocatePageCamera));
+    /// <summary>Choose an existing photo, action sheet option</summary>
+    public static string Details_LocatePageGallery => Get(nameof(Details_LocatePageGallery));
+    /// <summary>Shown while the photo is being read and searched</summary>
+    public static string Details_LocatePageWorking => Get(nameof(Details_LocatePageWorking));
+    /// <summary>No text could be read from the photo</summary>
+    public static string Details_LocatePageNoText => Get(nameof(Details_LocatePageNoText));
+    /// <summary>The recognized text wasn't found anywhere in the book</summary>
+    public static string Details_LocatePageNotFound => Get(nameof(Details_LocatePageNotFound));
+    /// <summary>Camera permission was declined</summary>
+    public static string Details_LocatePageNoPermission => Get(nameof(Details_LocatePageNoPermission));
+    /// <summary>Generic failure reading or searching the photo</summary>
+    public static string Details_LocatePageError => Get(nameof(Details_LocatePageError));
     /// <summary>Delete book</summary>
     public static string Details_DeleteBook => Get(nameof(Details_DeleteBook));
     /// <summary>Chapters</summary>

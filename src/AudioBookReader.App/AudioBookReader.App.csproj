@@ -65,6 +65,8 @@
 
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 
+		<PackageReference Include="Plugin.Maui.OCR" Version="1.1.1" />
+
 		<!-- Playback: ExoPlayer for the engine, Session for the foreground service, lock screen
 		     controls and headset buttons. -->
 		<PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.10.1.1" />

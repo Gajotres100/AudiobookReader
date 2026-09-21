@@ -125,6 +125,39 @@
   <data name="Details_RemoveEbook" xml:space="preserve">
     <value>Remove ebook</value>
   </data>
+  <data name="Details_PageFinderSection" xml:space="preserve">
+    <value>Find a page</value>
+  </data>
+  <data name="Details_PageFinderBody" xml:space="preserve">
+    <value>Photograph a page from Kindle or the real book, and the app finds that spot in this ebook.</value>
+  </data>
+  <data name="Details_LocatePage" xml:space="preserve">
+    <value>Locate from a photo</value>
+  </data>
+  <data name="Details_LocatePageChoose" xml:space="preserve">
+    <value>How will you bring in the page?</value>
+  </data>
+  <data name="Details_LocatePageCamera" xml:space="preserve">
+    <value>Take a photo</value>
+  </data>
+  <data name="Details_LocatePageGallery" xml:space="preserve">
+    <value>Choose from gallery</value>
+  </data>
+  <data name="Details_LocatePageWorking" xml:space="preserve">
+    <value>Reading the page…</value>
+  </data>
+  <data name="Details_LocatePageNoText" xml:space="preserve">
+    <value>No text could be read from the photo. Try again with better lighting and the page held flat.</value>
+  </data>
+  <data name="Details_LocatePageNotFound" xml:space="preserve">
+    <value>This passage wasn't found in the book. It may be from a different edition or translation.</value>
+  </data>
+  <data name="Details_LocatePageNoPermission" xml:space="preserve">
+    <value>Camera access was declined. You can allow it from the phone's app settings.</value>
+  </data>
+  <data name="Details_LocatePageError" xml:space="preserve">
+    <value>Something went wrong reading that photo.</value>
+  </data>
   <data name="Details_DeleteBook" xml:space="preserve">
     <value>Delete book</value>
   </data>

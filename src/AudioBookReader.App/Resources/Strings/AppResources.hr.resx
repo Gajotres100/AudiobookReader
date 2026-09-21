@@ -120,6 +120,39 @@
   <data name="Details_RemoveEbook" xml:space="preserve">
     <value>Ukloni e-knjigu</value>
   </data>
+  <data name="Details_PageFinderSection" xml:space="preserve">
+    <value>Pronađi stranicu</value>
+  </data>
+  <data name="Details_PageFinderBody" xml:space="preserve">
+    <value>Fotografiraj stranicu s Kindlea ili prave knjige, i aplikacija pronalazi to mjesto u ovoj e-knjizi.</value>
+  </data>
+  <data name="Details_LocatePage" xml:space="preserve">
+    <value>Pronađi po fotografiji</value>
+  </data>
+  <data name="Details_LocatePageChoose" xml:space="preserve">
+    <value>Kako uneseš stranicu?</value>
+  </data>
+  <data name="Details_LocatePageCamera" xml:space="preserve">
+    <value>Fotografiraj</value>
+  </data>
+  <data name="Details_LocatePageGallery" xml:space="preserve">
+    <value>Odaberi iz galerije</value>
+  </data>
+  <data name="Details_LocatePageWorking" xml:space="preserve">
+    <value>Čitam stranicu…</value>
+  </data>
+  <data name="Details_LocatePageNoText" xml:space="preserve">
+    <value>Na fotografiji nije prepoznat tekst. Pokušaj ponovno uz bolje osvjetljenje i ravno položenu stranicu.</value>
+  </data>
+  <data name="Details_LocatePageNotFound" xml:space="preserve">
+    <value>Ovaj odlomak nije pronađen u knjizi. Možda je riječ o drugom izdanju ili prijevodu.</value>
+  </data>
+  <data name="Details_LocatePageNoPermission" xml:space="preserve">
+    <value>Pristup kameri je odbijen. Možeš ga dopustiti u postavkama aplikacije na telefonu.</value>
+  </data>
+  <data name="Details_LocatePageError" xml:space="preserve">
+    <value>Nešto je pošlo po krivu pri čitanju te fotografije.</value>
+  </data>
   <data name="Details_DeleteBook" xml:space="preserve">
     <value>Obriši knjigu</value>
   </data>

@@ -8,6 +8,7 @@ using AudioBookReader.Core.Data;
 using AudioBookReader.Core.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Plugin.Maui.OCR;
 
 namespace AudioBookReader.App.ViewModels;
 
@@ -20,7 +21,9 @@ public partial class BookViewModel(
     BookFilePicker picker,
     PlaybackController playback,
     AlignmentQueue alignment,
-    LiveSyncRunner liveSync) : ObservableObject, IDisposable
+    LiveSyncRunner liveSync,
+    BookTextExtractors extractors,
+    IOcrService ocr) : ObservableObject, IDisposable
 {
     /// <summary>The speeds the button cycles through. Nothing below 0.75 or above 2 is useful for narration.</summary>
     private static readonly float[] Speeds = [1f, 1.25f, 1.5f, 1.75f, 2f, 0.75f];
@@ -60,6 +63,7 @@ public partial class BookViewModel(
     [NotifyPropertyChangedFor(nameof(HasNoText))]
     [NotifyPropertyChangedFor(nameof(CanRemoveAudio))]
     [NotifyPropertyChangedFor(nameof(CanRemoveText))]
+    [NotifyPropertyChangedFor(nameof(CanLocatePage))]
     public partial bool HasText { get; set; }
 
     [ObservableProperty]
@@ -966,6 +970,112 @@ public partial class BookViewModel(
         await Shell.Current.Navigation.PushModalAsync(page);
 
         return await page.Answer;
+    }
+
+    // ---- Locate a page from a photo ----
+    //
+    // For a physical copy or a Kindle open on the same book: a photo of whatever page someone has
+    // reached tells the reader where to open, without them hunting for the spot by hand. Entirely
+    // on-device -- the OCR model is bundled rather than fetched from Play Services, and finding
+    // the page is the same phrase matching alignment already does against a spoken probe, run
+    // here against the photo's text instead. Only offered once the book has an ebook to search.
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanLocatePage))]
+    public partial bool IsLocatingPage { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPageLocatorNote))]
+    public partial string PageLocatorNote { get; set; } = "";
+
+    public bool HasPageLocatorNote => PageLocatorNote.Length > 0;
+
+    public bool CanLocatePage => HasText && !IsLocatingPage;
+
+    [RelayCommand]
+    private async Task LocatePageAsync()
+    {
+        if (_book is not { EbookPath: { } ebookPath }) return;
+
+        var choice = await Shell.Current.DisplayActionSheetAsync(
+            Strings.Details_LocatePageChoose, Strings.Common_Cancel, null,
+            Strings.Details_LocatePageCamera, Strings.Details_LocatePageGallery);
+
+        FileResult? photo;
+        try
+        {
+            if (choice == Strings.Details_LocatePageCamera)
+            {
+                photo = await MediaPicker.Default.CapturePhotoAsync();
+            }
+            else if (choice == Strings.Details_LocatePageGallery)
+            {
+                var picked = await MediaPicker.Default.PickPhotosAsync(new MediaPickerOptions { SelectionLimit = 1 });
+                photo = picked.FirstOrDefault();
+            }
+            else
+            {
+                return;
+            }
+        }
+        catch (PermissionException)
+        {
+            PageLocatorNote = Strings.Details_LocatePageNoPermission;
+            return;
+        }
+        catch (FeatureNotSupportedException)
+        {
+            // No camera on this device -- the gallery option in the same sheet still works, so
+            // this is only reachable by choosing the one option that cannot.
+            PageLocatorNote = Strings.Details_LocatePageNoPermission;
+            return;
+        }
+
+        if (photo is null) return;
+
+        IsLocatingPage = true;
+        PageLocatorNote = "";
+
+        try
+        {
+            byte[] imageData;
+            await using (var stream = await photo.OpenReadAsync())
+            await using (var buffer = new MemoryStream())
+            {
+                await stream.CopyToAsync(buffer);
+                imageData = buffer.ToArray();
+            }
+
+            await ocr.InitAsync();
+            var recognized = await ocr.RecognizeTextAsync(imageData, tryHard: true);
+
+            if (!recognized.Success || string.IsNullOrWhiteSpace(recognized.AllText))
+            {
+                PageLocatorNote = Strings.Details_LocatePageNoText;
+                return;
+            }
+
+            var extracted = await extractors.ExtractAsync(ebookPath);
+            var tokenized = TokenizedText.Create(extracted.Text.PlainText);
+            var location = PageLocator.Locate(tokenized, recognized.AllText);
+
+            if (location is null)
+            {
+                PageLocatorNote = Strings.Details_LocatePageNotFound;
+                return;
+            }
+
+            await Shell.Current.GoToAsync($"reader?id={BookId}&offset={location.Value.CharOffset}");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("locating a page from a photo", ex);
+            PageLocatorNote = Strings.Details_LocatePageError;
+        }
+        finally
+        {
+            IsLocatingPage = false;
+        }
     }
 
     // ---- Alignment ----

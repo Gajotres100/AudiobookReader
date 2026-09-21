@@ -20,6 +20,11 @@
 	<!-- Alignment runs long enough that the device would otherwise sleep through it. -->
 	<uses-permission android:name="android.permission.WAKE_LOCK" />
 
+	<!-- For photographing a page to locate it in an ebook already in the library. Not required:
+	     a device with no camera can still use the gallery picker the same feature offers. -->
+	<uses-permission android:name="android.permission.CAMERA" />
+	<uses-feature android:name="android.hardware.camera" android:required="false" />
+
 	<!-- Deliberately absent: MANAGE_EXTERNAL_STORAGE and READ_EXTERNAL_STORAGE. Books are chosen
 	     through the system file picker and copied into app storage, so the app never needs access
 	     to the user's whole filesystem — which Play restricts heavily and would demand a
