@@ -637,7 +637,8 @@ public partial class ReaderViewModel(
         // the correction loop to protect — it used to hold Play disabled for up to forty-five
         // seconds on a book nobody had listened to a second of yet, which could only ever time out,
         // since live measuring has nothing to have found near a passage that has never been heard.
-        if (!playback.IsPlaying) await TakeNarrationToAsync(offset, blockPlayWhileCorrecting: false);
+        if (!playback.IsPlaying)
+            await TakeNarrationToAsync(offset, blockPlayWhileCorrecting: false, userMoved: false);
 
         if (_text!.SentenceAt(offset) is { } sentence)
         {
@@ -710,7 +711,11 @@ public partial class ReaderViewModel(
     [RelayCommand]
     private async Task JumpToChapterAsync()
     {
-        EntryPage = 0;
+        // Cleared rather than set to the first page: a chapter does not have to begin where its
+        // document does — a TOC entry pointing at an anchor halfway down a large spine file is
+        // ordinary — and asking for page zero would land at the top of that file instead of at the
+        // chapter. The sentence highlighted below already says exactly where to go.
+        EntryPage = null;
 
         if (_readerChapters.Count == 0) return;
 
@@ -749,6 +754,17 @@ public partial class ReaderViewModel(
     private CancellationTokenSource? _holding;
 
     /// <summary>
+    /// Whether the reader has taken the narration somewhere on purpose during this visit.
+    ///
+    /// The distinction the saved audio position depends on. Every move through the text seeks the
+    /// player, including the one that merely opens the book — and that one seeks to whatever
+    /// <see cref="PositionForTextAsync"/> could guess, which for a book with no map is the start of
+    /// it. A guess is fine to listen from and fatal to save, so only a page turn, a chapter jump or
+    /// a tapped sentence counts as progress worth writing down.
+    /// </summary>
+    private bool _narrationTakenHere;
+
+    /// <summary>
     /// Takes the narration to where the reader has just gone, and holds it there until there is
     /// something to follow.
     ///
@@ -772,7 +788,12 @@ public partial class ReaderViewModel(
     /// Play for the better part of a minute over a book someone has only just opened to read is
     /// exactly the dead button this feature exists to avoid.
     /// </param>
-    private async Task TakeNarrationToAsync(int textStart, bool blockPlayWhileCorrecting = true)
+    /// <param name="userMoved">
+    /// Whether this is the reader going somewhere rather than the book merely being opened. Sets
+    /// <see cref="_narrationTakenHere"/>, which is what allows the position reached to be saved.
+    /// </param>
+    private async Task TakeNarrationToAsync(
+        int textStart, bool blockPlayWhileCorrecting = true, bool userMoved = true)
     {
         // Deliberately not conditional on IsFollowing. That is only true once a map exists, and a
         // book measured live has none until the first window lands — so on exactly the book this
@@ -781,6 +802,8 @@ public partial class ReaderViewModel(
         // learns which passage to work on, so it has to happen before there is anything to follow.
         if (_book?.HasAudio != true) return;
         if (!await EnsurePlaybackLoadedAsync()) return;
+
+        if (userMoved) _narrationTakenHere = true;
 
         // Anything still waiting is waiting for the wrong chapter now.
         StopHolding();
@@ -1222,13 +1245,15 @@ public partial class ReaderViewModel(
         // the entire session and came back wherever it last happened to be saved, which could be
         // nowhere later than the very start.
         //
-        // Deliberately not conditional on playback.IsPlaying: turning a page or tapping a sentence
-        // seeks the player (see TakeNarrationToAsync) whether or not anything is audibly playing,
-        // and someone reading in silence with the ebook open moves that seek just as much as
-        // someone listening does. Requiring IsPlaying here left the saved audio position stuck at
-        // wherever it was last actually played, so a paired book read without pressing play ever
-        // looked to have made no progress at all when its player was next opened.
-        if (loadedThisBook && DateTime.UtcNow - _lastPositionSaved > TimeSpan.FromSeconds(5))
+        // Not conditional on playback.IsPlaying, because turning a page or tapping a sentence seeks
+        // the player (see TakeNarrationToAsync) whether or not anything is audibly playing, and
+        // someone reading in silence moves that seek just as much as someone listening does — but
+        // conditional on one of those two things having actually happened. Merely opening the text
+        // also seeks, to a position PositionForTextAsync had to guess: for a paired book with no
+        // map that guess is the start of the book, and writing it here would overwrite hours of
+        // real listening with a zero a second after the reader was opened to glance at a name.
+        if (loadedThisBook && (playback.IsPlaying || _narrationTakenHere)
+            && DateTime.UtcNow - _lastPositionSaved > TimeSpan.FromSeconds(5))
         {
             _lastPositionSaved = DateTime.UtcNow;
             _ = database.SaveReadingStateAsync(BookId, audioPositionMs: playback.PositionMs, speed: playback.Speed);

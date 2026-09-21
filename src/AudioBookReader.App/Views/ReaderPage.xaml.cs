@@ -167,11 +167,24 @@ public partial class ReaderPage : ContentPage
         Reader.Source = new HtmlWebViewSource { Html = _viewModel.Html };
     }
 
+    /// <summary>
+    /// Brings a sentence to the eye, marked as the narrator's place only when there is a narrator.
+    ///
+    /// The amber wash means "this is being read aloud right now". A book with no audio, or one
+    /// whose text is simply being read rather than followed, has nothing for it to mean — and
+    /// painting it anyway left a sentence permanently highlighted in a plain ebook from the moment
+    /// it was opened, since nothing would ever call this again to clear it. keepInView does the
+    /// half that is always wanted, which is the scrolling.
+    /// </summary>
+    private Task ShowSentenceAsync(int sentenceIndex) =>
+        Reader.EvaluateJavaScriptAsync(
+            _viewModel.IsFollowing ? $"highlight({sentenceIndex})" : $"keepInView({sentenceIndex})");
+
     private async void OnHighlightRequested(object? sender, int sentenceIndex)
     {
         try
         {
-            await Reader.EvaluateJavaScriptAsync($"highlight({sentenceIndex})");
+            await ShowSentenceAsync(sentenceIndex);
         }
         catch (Exception ex)
         {
@@ -298,7 +311,7 @@ public partial class ReaderPage : ContentPage
             if (_viewModel.EntryPage is { } page)
                 await Reader.EvaluateJavaScriptAsync($"goToPage({page})");
             else if (_viewModel.PendingHighlight >= 0)
-                await Reader.EvaluateJavaScriptAsync($"highlight({_viewModel.PendingHighlight})");
+                await ShowSentenceAsync(_viewModel.PendingHighlight);
         }
         catch (Exception)
         {
