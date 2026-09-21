@@ -1055,9 +1055,20 @@ public partial class BookViewModel(
                 return;
             }
 
-            var extracted = await extractors.ExtractAsync(ebookPath);
-            var tokenized = TokenizedText.Create(extracted.Text.PlainText);
-            var location = PageLocator.Locate(tokenized, recognized.AllText);
+            // Off the UI thread, all three steps of it. Searching the whole book is a
+            // Smith-Waterman over every word in it against every word read off the photo: measured
+            // at 26 million cells and close to two seconds for an 800,000-character novel on a
+            // desktop, so several times that on a phone. Left on the main thread it froze the app
+            // — spinner included — for long enough to be an ANR rather than a wait. Parsing the
+            // ebook, which happens here whenever the reader has not already cached it, is the same
+            // story on a smaller scale.
+            var location = await Task.Run(async () =>
+            {
+                var extracted = await extractors.ExtractAsync(ebookPath);
+                var tokenized = TokenizedText.Create(extracted.Text.PlainText);
+
+                return PageLocator.Locate(tokenized, recognized.AllText);
+            });
 
             if (location is null)
             {
@@ -1065,6 +1076,12 @@ public partial class BookViewModel(
                 return;
             }
 
+            // To the library first, then into the reader. This page can itself be sitting on top of
+            // a reader — it is reached from one as readily as from the player — and pushing a
+            // second copy would leave two of them stacked, each holding the whole book, with the
+            // newer one's close button landing back here instead of leaving the book. The same
+            // reset is why opening a bookmark behaves itself (see BookmarksViewModel.OpenAsync).
+            await Shell.Current.GoToAsync("//library");
             await Shell.Current.GoToAsync($"reader?id={BookId}&offset={location.Value.CharOffset}");
         }
         catch (Exception ex)

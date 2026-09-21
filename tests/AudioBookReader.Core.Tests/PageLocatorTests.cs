@@ -82,4 +82,32 @@ public class PageLocatorTests
         Assert.Null(PageLocator.Locate(Book, ""));
         Assert.Null(PageLocator.Locate(Book, "   "));
     }
+
+    /// <summary>
+    /// The same two answers, asked of a book the size of a real one.
+    ///
+    /// Smith-Waterman is a local alignment, so the chance of some stretch of an unrelated book
+    /// scoring above the confidence bar by coincidence grows with the number of places there are
+    /// to look — and every other test here runs against a book roughly twenty times shorter than
+    /// the novel this feature is for. The bar that decides "not in this book" is worth proving at
+    /// the length where it is actually under pressure, since the cost of it giving way is the
+    /// reader opening confidently at a passage that has nothing to do with the photo.
+    /// </summary>
+    [Fact]
+    public void HoldsUpAgainstABookOfRealLength()
+    {
+        var novel = FakeNarration.GenerateProse(sentenceCount: 8000);
+        var full = TokenizedText.Create(novel);
+
+        Assert.InRange(novel.Length, 600_000, 1_000_000);
+
+        var unrelated = FakeNarration.GenerateProse(sentenceCount: 30, seed: 999);
+        Assert.Null(PageLocator.Locate(full, unrelated));
+
+        var page = novel.Substring(novel.Length / 3, 1_800);
+        var found = PageLocator.Locate(full, page);
+
+        Assert.NotNull(found);
+        Assert.InRange(found!.Value.CharOffset, novel.Length / 3 - 40, novel.Length / 3 + 40);
+    }
 }
