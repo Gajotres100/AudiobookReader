@@ -70,15 +70,31 @@
     content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px;
     background: #000; border-radius: 2px;
   }
+  /* The loupe shown while extending a selection or dragging one of its handles: the same
+     idea every phone's own text selection already uses, because a fingertip covers the exact
+     letter it is trying to land on. A zoomed copy of the text, not the real thing -- moving
+     the genuine #content this much this often would fight its own scrolling. */
+  #magnifier {
+    position: fixed; width: 150px; height: 60px; border-radius: 14px; overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.28); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+    pointer-events: none; z-index: 9; display: none;
+  }
+  #magnifier .maglens { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  #magnifier .magline {
+    position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px;
+    background: rgba(255, 64, 0, 0.85);
+  }
 </style>
 <style id="hlrule">span.hl { background: {{HIGHLIGHT}}; border-radius: 3px; }</style>
 </head><body>
 <div id="size"></div>
+<div id="magnifier"><div class="maglens" id="maglens"></div><div class="magline"></div></div>
 <div id="content">
 {{BODY}}
 </div>
 <script>
   var content = document.getElementById('content');
+  var magnifier = document.getElementById('magnifier'), maglens = document.getElementById('maglens');
   var pageCount = 1, current = -1, reported = '';
 
   // A "page" is one screenful. The text scrolls freely, but the slider and the counter
@@ -209,6 +225,62 @@
     word.setStart(point.startContainer, start);
     word.setEnd(point.startContainer, end);
     return word;
+  }
+
+  // ---- The loupe shown while dragging ----
+  //
+  // A fingertip covers the exact letter it is trying to land on, so both the initial drag
+  // that extends a selection and the two handles that refine it afterwards show a zoomed
+  // copy of the line above the finger, with a line marking the precise point that will be
+  // used. The copy is a plain clone of #content's current HTML: it inherits the page's own
+  // font and theme colours for free by sitting in the same document, and matching its width
+  // and padding makes the text wrap exactly the same way the real page does, so the zoomed
+  // line lines up with the point the finger is actually over.
+  var MagnifierScale = 2.4, MagnifierWidth = 150, MagnifierHeight = 60;
+
+  function startMagnifier() {
+    var contentStyle = getComputedStyle(content);
+
+    maglens.innerHTML = content.innerHTML;
+
+    // Stripped rather than left alone: these ids are meant to be unique, and functions
+    // like highlight() search the whole document for them, not just the real #content --
+    // left in place, a live narration highlight arriving mid-drag could find this static
+    // copy first and measure its position instead of the real, scrolling one.
+    var clonedIdx = maglens.querySelectorAll('[data-idx]');
+    for (var i = 0; i < clonedIdx.length; i++) clonedIdx[i].removeAttribute('data-idx');
+
+    maglens.style.width = content.clientWidth + 'px';
+    maglens.style.boxSizing = 'border-box';
+    // Only the sides that affect where a line of text sits horizontally and where the
+    // document starts vertically -- matched individually because a browser's computed
+    // style for the "padding" shorthand itself is not something to depend on.
+    maglens.style.paddingLeft = contentStyle.paddingLeft;
+    maglens.style.paddingRight = contentStyle.paddingRight;
+    maglens.style.paddingTop = contentStyle.paddingTop;
+    magnifier.style.background = getComputedStyle(document.body).backgroundColor;
+  }
+
+  function moveMagnifier(x, y) {
+    var rect = content.getBoundingClientRect();
+    var docX = x - rect.left, docY = y - rect.top + content.scrollTop;
+
+    maglens.style.transform = 'translate(' + (MagnifierWidth / 2 - docX * MagnifierScale) + 'px,'
+      + (MagnifierHeight / 2 - docY * MagnifierScale) + 'px) scale(' + MagnifierScale + ')';
+
+    // Above the finger by default, since that is the direction a thumb does not block; only
+    // flipped below when there is no room above, close to the top of the screen.
+    var top = y - MagnifierHeight - 32;
+    if (top < 4) top = y + 32;
+
+    magnifier.style.left = Math.max(4, Math.min(x - MagnifierWidth / 2, window.innerWidth - MagnifierWidth - 4)) + 'px';
+    magnifier.style.top = top + 'px';
+    magnifier.style.display = 'block';
+  }
+
+  function stopMagnifier() {
+    magnifier.style.display = 'none';
+    maglens.innerHTML = '';
   }
 
   // ---- Press, hold, and drag to extend ----
@@ -441,6 +513,8 @@
       document.getElementById('content').classList.add('no-scroll');
       suppressClick = true;
       cancelHold();
+      startMagnifier();
+      moveMagnifier(startX, startY);
       return;
     }
 
@@ -473,6 +547,8 @@
       // the selection does not also carry the text away underneath it.
       document.getElementById('content').classList.add('no-scroll');
       drawSelectionBoxes(anchor);
+      startMagnifier();
+      moveMagnifier(startX, startY);
     }, 450);
   }, { passive: true });
 
@@ -481,11 +557,13 @@
 
     if (draggingHandle) {
       dragHandleTo(draggingHandle, x, y);
+      moveMagnifier(x, y);
       return;
     }
 
     if (selecting) {
       drawSelectionBoxes(extendSelectionTo(x, y));
+      moveMagnifier(x, y);
       return;
     }
 
@@ -498,6 +576,7 @@
 
     if (draggingHandle) {
       draggingHandle = null;
+      stopMagnifier();
       document.getElementById('content').classList.remove('no-scroll');
       // The menu was hidden for the length of the drag; it comes back naming whatever the
       // selection now is, or the selection is dropped if the drag emptied it out.
@@ -512,6 +591,7 @@
       var chosen = extendSelectionTo(x, y);
 
       stopDragging();
+      stopMagnifier();
       commitSelection(chosen);
       return;
     }
@@ -534,6 +614,7 @@
   document.addEventListener('touchcancel', function () {
     draggingHandle = null;
     stopDragging();
+    stopMagnifier();
     dismissSelection();
     document.getElementById('content').classList.remove('no-scroll');
   }, { passive: true });
