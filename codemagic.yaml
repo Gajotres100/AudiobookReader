@@ -1,0 +1,138 @@
+workflows:
+  # Runs on every push. Builds net10.0-ios for the iOS *simulator* specifically — a simulator
+  # binary never needs code signing, so this workflow needs no Apple Developer account and no
+  # secrets at all. It exists purely as the "does the iOS platform code even compile" signal
+  # (iOS-0 through iOS-5 in the port plan), since there is no Mac available locally to check that.
+  ios-build:
+    name: iOS build check (simulator, unsigned)
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: '*'
+          include: true
+    scripts:
+      - name: Install .NET SDK
+        script: |
+          curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
+          chmod +x dotnet-install.sh
+          ./dotnet-install.sh --channel 10.0 --install-dir "$HOME/.dotnet"
+          echo "PATH=$HOME/.dotnet:$PATH" >> $CM_ENV
+      - name: Install MAUI/iOS workloads
+        script: |
+          dotnet workload restore src/AudioBookReader.App/AudioBookReader.App.csproj
+      - name: Core tests
+        script: |
+          dotnet test tests/AudioBookReader.Core.Tests
+      - name: Build net10.0-ios for the simulator (no signing needed)
+        script: |
+          dotnet build src/AudioBookReader.App/AudioBookReader.App.csproj \
+            -f net10.0-ios -c Release -r iossimulator-arm64 --self-contained
+
+  # A device .ipa signed only ad-hoc (locally, with no Apple account of any kind) — for sideloading
+  # via Sideloadly or AltStore on your own PC, using nothing but your normal free Apple ID and a
+  # USB cable. Both tools completely replace this signature with their own before installing, so
+  # it only has to be a structurally valid IPA for an arm64 device; it does not need to be signed
+  # by an identity that iOS itself would ever trust to run.
+  #
+  # Best-effort, genuinely not verified end to end (no Mac to test on) — the manual codesign/zip
+  # steps below are the standard technique other .NET/Xamarin sideloading guides use, but expect to
+  # read the actual Codemagic error output and adjust if something here does not match this SDK
+  # version exactly.
+  ios-sideload:
+    name: iOS unsigned device build (for Sideloadly/AltStore)
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    triggering:
+      events: []  # manual only — "Start new build" in the Codemagic UI
+    scripts:
+      - name: Install .NET SDK
+        script: |
+          curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
+          chmod +x dotnet-install.sh
+          ./dotnet-install.sh --channel 10.0 --install-dir "$HOME/.dotnet"
+          echo "PATH=$HOME/.dotnet:$PATH" >> $CM_ENV
+      - name: Install MAUI/iOS workloads
+        script: |
+          dotnet workload restore src/AudioBookReader.App/AudioBookReader.App.csproj
+      - name: Build the .app for a real device, no Apple signing identity involved
+        script: |
+          # A plain build (no -p:ArchiveOnBuild/-p:BuildIpa) does not enforce a real codesign
+          # identity the way archiving does — it produces an ordinary unsigned .app bundle.
+          dotnet build src/AudioBookReader.App/AudioBookReader.App.csproj \
+            -f net10.0-ios -c Release -r ios-arm64
+      - name: Ad-hoc sign it locally and pack a plain .ipa by hand
+        script: |
+          APP_DIR=$(find src/AudioBookReader.App/bin/Release/net10.0-ios/ios-arm64 -maxdepth 1 -name "*.app")
+          echo "App bundle: $APP_DIR"
+
+          # "-" is codesign's own ad-hoc identity — a real macOS feature needing no Apple account
+          # at all. Sideloadly/AltStore discard this and re-sign with your Apple ID anyway; it only
+          # has to be present so the .app is a well-formed signed bundle to begin with.
+          codesign --force --deep --sign - "$APP_DIR"
+
+          mkdir -p ipa_out/Payload
+          cp -r "$APP_DIR" ipa_out/Payload/
+          cd ipa_out && zip -r ../AudioBookReader.ipa Payload
+    artifacts:
+      - AudioBookReader.ipa
+
+  # Signed device build, uploaded to TestFlight. Needs the Apple Developer Program account and an
+  # App Store Connect API key added as a Codemagic integration first — this workflow will fail
+  # loudly until that's done, which is the point: it must never run unconfigured by accident.
+  #
+  # One-time setup once the Apple account exists (done by the user, in each tool's own web UI —
+  # not something this file can do):
+  #   1. developer.apple.com: register the bundle id com.gajotres.audiobookreader.
+  #   2. appstoreconnect.apple.com: create the app record, same bundle id.
+  #   3. appstoreconnect.apple.com > Users and Access > Keys: generate an API key (App Manager
+  #      role is enough), download the .p8 once (Apple only shows it once).
+  #   4. Codemagic > Team settings > Integrations > App Store Connect: add it, name it
+  #      "audiobookreader" (or update the name below to match whatever you called it).
+  #   5. Codemagic > this app > Environment variables: nothing else needed — automatic signing
+  #      below pulls certificates/profiles through the integration itself.
+  ios-testflight:
+    name: iOS signed build -> TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: audiobookreader
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.gajotres.audiobookreader
+    triggering:
+      events: []  # manual only — "Start new build" in the Codemagic UI, never on push
+    scripts:
+      - name: Install .NET SDK
+        script: |
+          curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
+          chmod +x dotnet-install.sh
+          ./dotnet-install.sh --channel 10.0 --install-dir "$HOME/.dotnet"
+          echo "PATH=$HOME/.dotnet:$PATH" >> $CM_ENV
+      - name: Install MAUI/iOS workloads
+        script: |
+          dotnet workload restore src/AudioBookReader.App/AudioBookReader.App.csproj
+      - name: Fetch signing certificate and profile
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Build and archive the signed .ipa
+        script: |
+          dotnet publish src/AudioBookReader.App/AudioBookReader.App.csproj \
+            -f net10.0-ios -c Release -r ios-arm64 \
+            -p:ArchiveOnBuild=true -p:BuildIpa=true \
+            -p:CodesignKey="$(cat $CM_CODESIGN_IDENTITY_NAME 2>/dev/null || echo 'Apple Distribution')" \
+            -p:CodesignProvisioningProfile="$(cat $CM_PROVISIONING_PROFILE_UUID 2>/dev/null)"
+    artifacts:
+      - src/AudioBookReader.App/bin/Release/net10.0-ios/ios-arm64/publish/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups: []  # add tester group names once set up in App Store Connect

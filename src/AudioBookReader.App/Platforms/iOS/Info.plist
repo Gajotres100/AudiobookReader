@@ -28,5 +28,28 @@
 	</array>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
+
+	<!-- Camera: page-photo locate (BookViewModel.LocatePageAsync) and MediaPicker.CapturePhotoAsync.
+	     No photo-library usage description: PHPickerViewController mediates access itself and needs
+	     none, same reasoning as the Android photo picker needing no storage permission. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Za fotografiranje stranice knjige radi pronalaska pozicije u tekstu.</string>
+
+	<!-- audio: lets playback continue and keeps AVAudioSession alive in the background (AVPlayer +
+	     MPNowPlayingInfoCenter, iOS-1). processing: BGProcessingTask for continuing whole-book
+	     alignment after the app is backgrounded (iOS-4) — best-effort, not a guarantee like the
+	     Android foreground service. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>processing</string>
+	</array>
+
+	<!-- Must list every BGTaskScheduler identifier the app registers, or Register() in
+	     BackgroundAlignmentScheduler.cs silently refuses it at runtime. -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.gajotres.audiobookreader.alignment</string>
+	</array>
 </dict>
 </plist>

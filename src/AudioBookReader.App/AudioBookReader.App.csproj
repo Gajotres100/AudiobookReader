@@ -1,10 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<!-- Android only for now. iOS is written for but cannot be built without a Mac, and the
-		     Whisper runtime does ship ios-device binaries, so adding it later is a target change
-		     rather than a rewrite. -->
-		<TargetFrameworks>net10.0-android</TargetFrameworks>
+		<!-- iOS builds only on a Mac (Codemagic CI, since there is none locally), and Whisper.net.Runtime
+		     ships ios-device/ios-simulator binaries already, so this is a target addition, not a rewrite. -->
+		<TargetFrameworks>net10.0-android;net10.0-ios</TargetFrameworks>
 
 		<OutputType>Exe</OutputType>
 		<RootNamespace>AudioBookReader.App</RootNamespace>
@@ -27,7 +26,11 @@
 
 		<!-- Android 10. The thermal-status API that drives CPU backoff arrives in 29, so this floor
 		     removes a pile of version guards for devices that are long gone anyway. -->
-		<SupportedOSPlatformVersion>29.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="'$(TargetFramework)'=='net10.0-android'">29.0</SupportedOSPlatformVersion>
+
+		<!-- iOS 15. BGProcessingTask (background alignment continuation) needs 13+; PHPickerViewController
+		     needs 14+. 15 is a round floor comfortably above both. -->
+		<SupportedOSPlatformVersion Condition="'$(TargetFramework)'=='net10.0-ios'">15.0</SupportedOSPlatformVersion>
 
 		<!-- Whisper.net.Runtime ships android-arm64-v8a, android-x86_64 and android-x86 only, with
 		     no armeabi-v7a. Naming the architectures explicitly keeps the build from producing a
@@ -37,7 +40,12 @@
 		     These are the exact strings Whisper.net.Runtime.targets tests against to decide which
 		     .so files to pack, so they are not interchangeable with the older AndroidSupportedAbis
 		     spelling — which this SDK has dropped anyway. -->
-		<RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+		<RuntimeIdentifiers Condition="'$(TargetFramework)'=='net10.0-android'">android-arm64;android-x64</RuntimeIdentifiers>
+
+		<!-- Same reasoning as the Android RuntimeIdentifiers above, for Whisper.net.Runtime's
+		     ios-device/ios-simulator native binaries. iossimulator carries the arm64 Apple Silicon
+		     simulator slice; ios-arm64 is the only real-device architecture Apple ships today. -->
+		<RuntimeIdentifiers Condition="'$(TargetFramework)'=='net10.0-ios'">ios-arm64;iossimulator-arm64</RuntimeIdentifiers>
 
 		<!-- The Media3 bindings declare tight upper bounds on AndroidX Lifecycle (< 2.9.3) while
 		     MAUI brings 2.11. Google ships these libraries as one coordinated release and 2.11 is
@@ -68,9 +76,10 @@
 		<PackageReference Include="Plugin.Maui.OCR" Version="1.1.1" />
 
 		<!-- Playback: ExoPlayer for the engine, Session for the foreground service, lock screen
-		     controls and headset buttons. -->
-		<PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.10.1.1" />
-		<PackageReference Include="Xamarin.AndroidX.Media3.Session" Version="1.10.1.2" />
+		     controls and headset buttons. Android-only — iOS plays through AVFoundation directly,
+		     which needs no NuGet package at all. -->
+		<PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.10.1.1" Condition="'$(TargetFramework)'=='net10.0-android'" />
+		<PackageReference Include="Xamarin.AndroidX.Media3.Session" Version="1.10.1.2" Condition="'$(TargetFramework)'=='net10.0-android'" />
 
 		<!-- On-device recognition for alignment. The model itself is downloaded at first use rather
 		     than shipped, to keep the package small and satisfy Play's size expectations. -->
@@ -86,8 +95,8 @@
 		     libraries, so the mismatched pairs ship the same classes twice and dexing fails with
 		     "Type ... is defined multiple times". Pinning each -ktx to its base library's version
 		     is what keeps a single copy of each class in the package. -->
-		<PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="1.19.0.1" />
-		<PackageReference Include="Xamarin.AndroidX.Collection.Ktx" Version="1.6.0.1" />
+		<PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="1.19.0.1" Condition="'$(TargetFramework)'=='net10.0-android'" />
+		<PackageReference Include="Xamarin.AndroidX.Collection.Ktx" Version="1.6.0.1" Condition="'$(TargetFramework)'=='net10.0-android'" />
 	</ItemGroup>
 
 	<ItemGroup>
