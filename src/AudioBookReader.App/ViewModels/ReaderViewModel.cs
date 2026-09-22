@@ -611,7 +611,11 @@ public partial class ReaderViewModel(
 
         int offset;
 
-        if (EntryOffset >= 0)
+        // Whether somebody named this spot — a bookmark, or a photographed page the search placed
+        // — as opposed to the book simply being reopened where it was left.
+        var asked = EntryOffset >= 0;
+
+        if (asked)
         {
             offset = EntryOffset;
             EntryOffset = -1;
@@ -638,7 +642,8 @@ public partial class ReaderViewModel(
         // seconds on a book nobody had listened to a second of yet, which could only ever time out,
         // since live measuring has nothing to have found near a passage that has never been heard.
         if (!playback.IsPlaying)
-            await TakeNarrationToAsync(offset, blockPlayWhileCorrecting: false, userMoved: false);
+            await TakeNarrationToAsync(
+                offset, blockPlayWhileCorrecting: false, userMoved: false, exactPlace: asked);
 
         if (_text!.SentenceAt(offset) is { } sentence)
         {
@@ -792,8 +797,14 @@ public partial class ReaderViewModel(
     /// Whether this is the reader going somewhere rather than the book merely being opened. Sets
     /// <see cref="_narrationTakenHere"/>, which is what allows the position reached to be saved.
     /// </param>
+    /// <param name="exactPlace">
+    /// Whether <paramref name="textStart"/> is a place somebody actually named, rather than just
+    /// the document being entered. Stops the remembered position for that document standing in for
+    /// it — see <see cref="PositionForTextAsync"/>.
+    /// </param>
     private async Task TakeNarrationToAsync(
-        int textStart, bool blockPlayWhileCorrecting = true, bool userMoved = true)
+        int textStart, bool blockPlayWhileCorrecting = true, bool userMoved = true,
+        bool exactPlace = false)
     {
         // Deliberately not conditional on IsFollowing. That is only true once a map exists, and a
         // book measured live has none until the first window lands — so on exactly the book this
@@ -817,7 +828,7 @@ public partial class ReaderViewModel(
         var arriving = SpineIndex;
 
         playback.Pause();
-        playback.SeekTo(await PositionForTextAsync(textStart, arriving));
+        playback.SeekTo(await PositionForTextAsync(textStart, arriving, exactPlace));
 
         _narrationDocument = arriving;
 
@@ -1075,11 +1086,17 @@ public partial class ReaderViewModel(
     /// recorded were often taken while playback was somewhere the map only guessed at — so being
     /// dropped a third of the way into a chapter you asked for reads as the app ignoring you.
     /// </summary>
-    private async Task<long> PositionForTextAsync(int textStart, int documentIndex)
+    private async Task<long> PositionForTextAsync(int textStart, int documentIndex, bool exactPlace)
     {
         var chapterIndex = ChapterIndexAtChar(textStart);
 
-        if (!MeasuresWhileReading && documentIndex >= 0
+        // Skipped when the place was named rather than merely arrived at. The remembered position
+        // answers "I am back in this document" and deliberately ignores textStart — which is the
+        // right answer for a swipe into a chapter and the wrong one for a bookmark, or for a page
+        // found from a photograph: both of those say exactly where to be, and returning the spot
+        // the document was last left at instead sent the voice, and then the text following it,
+        // straight back to where the reader had already been.
+        if (!exactPlace && !MeasuresWhileReading && documentIndex >= 0
             && Preferences.Default.Get(PositionKey(documentIndex), 0L) is > 0 and var remembered)
             return remembered;
 
@@ -1371,8 +1388,11 @@ public partial class ReaderViewModel(
 
         if (_text is null || sentenceIndex < 0 || sentenceIndex >= _text.Sentences.Count) return;
 
+        // A tapped sentence is as named as a place gets: the same substitution that sent a
+        // photographed page back to where the document was last left would do it here too, for
+        // any sentence the map does not already cover.
         var start = _text.Sentences[sentenceIndex].Start;
-        await TakeNarrationToAsync(start);
+        await TakeNarrationToAsync(start, exactPlace: true);
     }
 
     /// <summary>Runs work started by a gesture, so a failure lands in the log instead of the process.</summary>
