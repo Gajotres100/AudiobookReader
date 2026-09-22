@@ -237,7 +237,7 @@
                         <Button
                             Command="{Binding LocatePageCommand}"
                             IsEnabled="{Binding CanLocatePage}"
-                            Style="{StaticResource Secondary}"
+                            Style="{StaticResource Primary}"
                             Text="{x:Static s:Strings.Details_LocatePage}" />
 
                         <HorizontalStackLayout IsVisible="{Binding IsLocatingPage}" Spacing="10">

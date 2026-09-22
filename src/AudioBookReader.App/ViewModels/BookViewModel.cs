@@ -23,6 +23,7 @@ public partial class BookViewModel(
     AlignmentQueue alignment,
     LiveSyncRunner liveSync,
     BookTextExtractors extractors,
+    PhotoPicker photos,
     IOcrService ocr) : ObservableObject, IDisposable
 {
     /// <summary>The speeds the button cycles through. Nothing below 0.75 or above 2 is useful for narration.</summary>
@@ -997,57 +998,64 @@ public partial class BookViewModel(
     {
         if (_book is not { EbookPath: { } ebookPath }) return;
 
-        var choice = await Shell.Current.DisplayActionSheetAsync(
-            Strings.Details_LocatePageChoose, Strings.Common_Cancel, null,
-            Strings.Details_LocatePageCamera, Strings.Details_LocatePageGallery);
+        var source = new PhotoSourcePage();
+        await Shell.Current.Navigation.PushModalAsync(source);
 
-        FileResult? photo;
+        if (await source.Answer is not { } chosen) return;
+
+        byte[]? imageData;
         try
         {
-            if (choice == Strings.Details_LocatePageCamera)
-            {
-                photo = await MediaPicker.Default.CapturePhotoAsync();
-            }
-            else if (choice == Strings.Details_LocatePageGallery)
-            {
-                var picked = await MediaPicker.Default.PickPhotosAsync(new MediaPickerOptions { SelectionLimit = 1 });
-                photo = picked.FirstOrDefault();
-            }
-            else
-            {
-                return;
-            }
+            // Two different pickers for two different questions. The camera goes through
+            // MediaPicker, which is what the camera permission is declared for. An existing
+            // photograph goes through the system photo picker instead of MediaPicker's gallery:
+            // that one insists on a storage permission this app deliberately does not declare (see
+            // the manifest) and so threw before anything opened, while the photo picker shows the
+            // gallery, with thumbnails, and asks for nothing.
+            imageData = chosen is PhotoSource.Camera
+                ? await CapturedPhotoAsync()
+                : await photos.PickFromGalleryAsync();
         }
-        catch (PermissionException)
+        catch (PermissionException ex)
         {
+            AppLog.Error($"permission for the {chosen} photo source", ex);
             PageLocatorNote = Strings.Details_LocatePageNoPermission;
             return;
         }
-        catch (FeatureNotSupportedException)
+        catch (FeatureNotSupportedException ex)
         {
-            // No camera on this device -- the gallery option in the same sheet still works, so
-            // this is only reachable by choosing the one option that cannot.
+            // No camera on this device — choosing an existing photo still works, so this is only
+            // reachable by picking the one source that cannot.
+            AppLog.Error($"the {chosen} photo source is unavailable", ex);
             PageLocatorNote = Strings.Details_LocatePageNoPermission;
             return;
         }
 
-        if (photo is null) return;
+        if (imageData is null)
+        {
+            AppLog.Info($"page photo: nothing came back from {chosen}");
+            return;
+        }
 
         IsLocatingPage = true;
         PageLocatorNote = "";
 
         try
         {
-            byte[] imageData;
-            await using (var stream = await photo.OpenReadAsync())
-            await using (var buffer = new MemoryStream())
-            {
-                await stream.CopyToAsync(buffer);
-                imageData = buffer.ToArray();
-            }
-
             await ocr.InitAsync();
             var recognized = await ocr.RecognizeTextAsync(imageData, tryHard: true);
+
+            // Logged because the ways this fails are invisible on screen and tell very different
+            // stories: a photograph that read as nothing, one that read plenty but matched
+            // nothing, and one that matched all end up as a single line to the user. The word
+            // count is what separates them. Deliberately counts only — what was read is the
+            // book's own text, and a diagnostic is no reason to copy it into a file that gets
+            // sent along with a bug report.
+            var words = TextNormalizer.NormalizeTranscript(recognized.AllText ?? "");
+
+            AppLog.Info(
+                $"page photo: {chosen}, {imageData.Length} bytes, ocr={recognized.Success}, " +
+                $"{recognized.AllText?.Length ?? 0} chars, {words.Count} words");
 
             if (!recognized.Success || string.IsNullOrWhiteSpace(recognized.AllText))
             {
@@ -1062,13 +1070,22 @@ public partial class BookViewModel(
             // — spinner included — for long enough to be an ANR rather than a wait. Parsing the
             // ebook, which happens here whenever the reader has not already cached it, is the same
             // story on a smaller scale.
-            var location = await Task.Run(async () =>
+            // The size of what was searched comes back with the answer rather than being asked for
+            // separately: a failure is worth being able to tell apart from a book that extracted
+            // to almost nothing, and running the search twice to learn that would double the wait
+            // on exactly the attempt that already disappointed someone.
+            var (location, chars, tokens) = await Task.Run(async () =>
             {
                 var extracted = await extractors.ExtractAsync(ebookPath);
                 var tokenized = TokenizedText.Create(extracted.Text.PlainText);
 
-                return PageLocator.Locate(tokenized, recognized.AllText);
+                return (PageLocator.Locate(tokenized, recognized.AllText),
+                    extracted.Text.PlainText.Length, tokenized.Count);
             });
+
+            AppLog.Info(location is { } found
+                ? $"page photo: matched at char {found.CharOffset}, confidence {found.Confidence:0.00}"
+                : $"page photo: no match for {words.Count} words in {chars} chars / {tokens} tokens");
 
             if (location is null)
             {
@@ -1093,6 +1110,18 @@ public partial class BookViewModel(
         {
             IsLocatingPage = false;
         }
+    }
+
+    /// <summary>Takes a photograph and hands back its bytes, or null when nobody took one.</summary>
+    private static async Task<byte[]?> CapturedPhotoAsync()
+    {
+        if (await MediaPicker.Default.CapturePhotoAsync() is not { } photo) return null;
+
+        await using var stream = await photo.OpenReadAsync();
+        using var buffer = new MemoryStream();
+
+        await stream.CopyToAsync(buffer);
+        return buffer.ToArray();
     }
 
     // ---- Alignment ----

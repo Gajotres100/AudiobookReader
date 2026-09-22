@@ -15,6 +15,7 @@ public class MainActivity : MauiAppCompatActivity
 
     private const int PickDocumentRequest = 0x_B0_0C;
     private const int PickFolderRequest = 0x_B0_0D;
+    private const int PickImageRequest = 0x_B0_0E;
 
     private static TaskCompletionSource<AndroidUri?>? _pending;
 
@@ -92,6 +93,50 @@ public class MainActivity : MauiAppCompatActivity
         return _pending.Task;
     }
 
+    /// <summary>
+    /// Shows the phone's own photo gallery and returns the picture chosen.
+    ///
+    /// The system photo picker, not the document picker the two above use. Those are for keeping a
+    /// lasting reference to a book, and they look like a file manager because that is what they
+    /// are; this is for finding a photograph among photographs, where thumbnails are the whole
+    /// point. It also asks for nothing: the photo picker hands back one image with a read grant of
+    /// its own, which is exactly why it exists and why this app needs no permission to see photos.
+    ///
+    /// Before Android 13 there is no such picker, so the document picker stands in, narrowed to
+    /// images — which at least lists the gallery among its sources.
+    /// </summary>
+    public static Task<AndroidUri?> PickImageAsync()
+    {
+        _pending?.TrySetResult(null);
+        _pending = new TaskCompletionSource<AndroidUri?>();
+
+        var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
+        if (activity is null)
+        {
+            _pending.TrySetResult(null);
+            return _pending.Task;
+        }
+
+        Intent intent;
+
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu)
+        {
+            intent = new Intent(Android.Provider.MediaStore.ActionPickImages);
+            intent.SetType("image/*");
+        }
+        else
+        {
+            intent = new Intent(Intent.ActionOpenDocument);
+            intent.AddCategory(Intent.CategoryOpenable);
+            intent.SetType("image/*");
+        }
+
+        // No persistable flag, unlike a book: the picture is read once, turned into text and
+        // forgotten, so there is nothing to come back to after a reboot.
+        activity.StartActivityForResult(intent, PickImageRequest);
+        return _pending.Task;
+    }
+
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
@@ -148,7 +193,7 @@ public class MainActivity : MauiAppCompatActivity
     {
         base.OnActivityResult(requestCode, resultCode, data);
 
-        if (requestCode is not (PickDocumentRequest or PickFolderRequest)) return;
+        if (requestCode is not (PickDocumentRequest or PickFolderRequest or PickImageRequest)) return;
 
         var pending = _pending;
         _pending = null;

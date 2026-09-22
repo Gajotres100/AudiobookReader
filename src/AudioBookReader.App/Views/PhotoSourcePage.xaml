@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="AudioBookReader.App.Views.PhotoSourcePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:s="clr-namespace:AudioBookReader.App.Resources.Strings"
+    Shell.NavBarIsVisible="False"
+    Title="{x:Static s:Strings.Details_LocatePageChoose}">
+
+    <!--
+        Where the photograph of a page comes from.
+
+        A page with the app's own buttons rather than the system action sheet the other pickers use.
+        Those are lists — forty chapters, eight timer lengths — and a list is what a sheet is good
+        at. This is two actions, and an action wants to look like the buttons everything else here
+        is pressed with, brass and all.
+    -->
+
+    <Grid Padding="18,16,18,18" RowDefinitions="Auto,*,Auto" RowSpacing="16">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="6">
+            <Label Style="{StaticResource Heading}" Text="{x:Static s:Strings.Details_LocatePageChoose}" />
+            <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Details_PageFinderBody}" />
+        </VerticalStackLayout>
+
+        <!--
+            Filled for the camera because it is the one that reads a page best — a photo taken for
+            this is square on and in focus, where one already in the gallery was taken for something
+            else. The other stays outlined rather than filled: two filled controls on one screen
+            means neither is the answer, which is the rule the whole palette is built on.
+        -->
+        <VerticalStackLayout
+            Grid.Row="1"
+            Spacing="10"
+            VerticalOptions="Start">
+
+            <Button
+                Clicked="OnCamera"
+                Style="{StaticResource Primary}"
+                Text="{x:Static s:Strings.Details_LocatePageCamera}" />
+
+            <Button
+                Clicked="OnGallery"
+                Style="{StaticResource Secondary}"
+                Text="{x:Static s:Strings.Details_LocatePageGallery}" />
+        </VerticalStackLayout>
+
+        <Button
+            Grid.Row="2"
+            Clicked="OnCancel"
+            Style="{StaticResource Secondary}"
+            Text="{x:Static s:Strings.Common_Cancel}" />
+    </Grid>
+</ContentPage>

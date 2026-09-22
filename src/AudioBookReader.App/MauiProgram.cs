@@ -51,6 +51,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<BookImporter>();
 		builder.Services.AddSingleton<AlignmentSettingsStore>();
 		builder.Services.AddSingleton<BookFilePicker>();
+		builder.Services.AddSingleton<PhotoPicker>();
 		builder.Services.AddSingleton<ServerAccount>();
 		builder.Services.AddSingleton<DownloadFolder>();
 		builder.Services.AddSingleton<Language>();
