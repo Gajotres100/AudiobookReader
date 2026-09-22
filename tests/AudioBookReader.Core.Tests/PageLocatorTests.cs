@@ -76,6 +76,41 @@ public class PageLocatorTests
         Assert.Null(location);
     }
 
+    /// <summary>
+    /// The failure this feature was reported with, reduced to its cause.
+    ///
+    /// A photograph catches more than the page: the facing page, the reading app's own status bar
+    /// and file name, a thumb, the desk. None of it is in the book. Scoring the match as a share
+    /// of everything the camera saw let that surplus outvote a passage that had lined up
+    /// perfectly — on the phone, a page whose opening matched at 0.95 was rejected outright, while
+    /// cleaner shots of the same book scraped through at 0.70.
+    /// </summary>
+    [Fact]
+    public void FindsThePageEvenWhenThePhotoCaughtMoreThanThePage()
+    {
+        var page = ExcerptAround(TargetOffset, 400);
+        var surplus = string.Join(' ', FakeNarration.GenerateProse(sentenceCount: 12, seed: 7).Split(' ').Take(120));
+
+        var location = PageLocator.Locate(Book, page + " " + surplus);
+
+        Assert.NotNull(location);
+        Assert.InRange(location!.Value.CharOffset, TargetOffset - 20, TargetOffset + 20);
+    }
+
+    /// <summary>
+    /// The other half of the same change: scoring on the matched run rather than the whole photo
+    /// must not turn a few words that happen to line up into a confident answer.
+    /// </summary>
+    [Fact]
+    public void StillRefusesWhenOnlyAHandfulOfWordsLineUp()
+    {
+        // Long enough to be searched at all, and made of the book's own vocabulary so that short
+        // coincidental runs are as likely as they ever get — but not a passage from it.
+        var scrambled = string.Join(' ', Prose.Split(' ').Reverse().Take(60));
+
+        Assert.Null(PageLocator.Locate(Book, scrambled));
+    }
+
     [Fact]
     public void ReturnsNullOnEmptyRecognition()
     {

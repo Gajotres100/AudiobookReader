@@ -27,6 +27,13 @@ public static class PageLocator
     /// </summary>
     public const int MinimumWords = 12;
 
+    /// <summary>
+    /// How long the run that actually lines up has to be. This, rather than the share of the photo
+    /// that lined up, is what keeps a coincidence out: a camera sees whatever is in front of it,
+    /// but no stretch of a book turns up twenty consecutive words of another page by accident.
+    /// </summary>
+    public const int MinimumMatchedWords = 20;
+
     /// <param name="book">The book being searched, already tokenized once by the caller.</param>
     /// <param name="recognizedText">Whatever the OCR pass read off the photo, raw and unnormalized.</param>
     /// <returns>Null when there was too little text to trust, or nothing matched well enough.</returns>
@@ -36,7 +43,26 @@ public static class PageLocator
         var words = TextNormalizer.NormalizeTranscript(recognizedText);
         if (words.Count < MinimumWords) return null;
 
-        var match = TranscriptMatcher.Match(book, words, 0, book.Count, minConfidence);
-        return match is { } m ? new PageLocation(m.CharOffset, m.EndCharOffset, m.Confidence) : null;
+        // Scored on the run that lined up, not on everything the camera happened to see.
+        //
+        // The matcher reports the share of the whole transcript it placed, which is the right
+        // measure for a speech probe: a probe is ten seconds of nothing but narration, so anything
+        // it fails to place is a failure. A photograph is not like that. It catches the facing
+        // page, the reader's own chrome, a thumb, the edge of the desk — none of which is in the
+        // book and all of which counts against the share. Measured on a real one: a page whose
+        // opening matched the book at 0.95 scored under the bar for the whole photo and was
+        // rejected, while cleaner shots of the same book scraped through at 0.70. Taking the
+        // matched span as the denominator asks the question that actually matters — does a solid
+        // run of this page appear in this book — and leaves the surrounding junk out of it.
+        if (TranscriptMatcher.Match(book, words, 0, book.Count, minConfidence: 0f) is not { } m)
+            return null;
+
+        var matched = m.TranscriptEnd - m.TranscriptStart + 1;
+        if (matched < MinimumMatchedWords) return null;
+
+        var confidence = Math.Clamp(m.Confidence * words.Count / matched, 0f, 1f);
+        if (confidence < minConfidence) return null;
+
+        return new PageLocation(m.CharOffset, m.EndCharOffset, confidence);
     }
 }
