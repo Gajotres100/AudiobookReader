@@ -151,6 +151,14 @@ internal static class SecurityScopedBookmarks
         Preferences.Default.Set(FoldersKey, string.Join('\n', folders));
     }
 
+    /// <summary>
+    /// Compared without the /private prefix: iOS hands out the same file as /private/var/… from one
+    /// API and /var/… from another (a picker, then a resolved bookmark), and a folder chosen in one
+    /// session must still cover the files written into it in the next.
+    /// </summary>
     private static bool IsInside(string path, string folder) =>
-        path.StartsWith(folder.TrimEnd('/') + "/", StringComparison.Ordinal);
+        Plain(path).StartsWith(Plain(folder).TrimEnd('/') + "/", StringComparison.Ordinal);
+
+    private static string Plain(string path) =>
+        path.StartsWith("/private/var/", StringComparison.Ordinal) ? path["/private".Length..] : path;
 }

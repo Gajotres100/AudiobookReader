@@ -409,8 +409,8 @@ public class ServerConnection(
     /// <summary>Removes something this wrote, wherever it wrote it.</summary>
     private void Discard(string location)
     {
-        if (location.StartsWith("content://", StringComparison.OrdinalIgnoreCase)) folder.Delete(location);
-        else TryDelete(location);
+        if (IsStaging(location)) TryDelete(location);
+        else folder.Delete(location);
     }
 
     /// <summary>
@@ -422,8 +422,19 @@ public class ServerConnection(
     /// </summary>
     private static void DiscardIfTemporary(string location)
     {
-        if (!location.StartsWith("content://", StringComparison.OrdinalIgnoreCase)) TryDelete(location);
+        if (IsStaging(location)) TryDelete(location);
     }
+
+    /// <summary>
+    /// Whether a location is the app's own staging copy rather than the user's folder.
+    ///
+    /// Asked by where it is, not by what it looks like. The test used to be "not a content:// URI",
+    /// which is what the user's folder happens to be on Android — and on iOS a file in the user's
+    /// folder is an ordinary path, so every book downloaded there was deleted the moment its import
+    /// succeeded: an empty folder, and a library entry pointing at audio that was no longer there.
+    /// </summary>
+    private static bool IsStaging(string location) =>
+        location.StartsWith(AppPaths.Downloads, StringComparison.Ordinal);
 
     /// <summary>Keeps a server's filename from escaping the downloads folder or upsetting the disk.</summary>
     private static string Sanitise(string fileName)
