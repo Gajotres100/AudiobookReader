@@ -44,8 +44,23 @@
 
 		<!-- Same reasoning as the Android RuntimeIdentifiers above, for Whisper.net.Runtime's
 		     ios-device/ios-simulator native binaries. iossimulator carries the arm64 Apple Silicon
-		     simulator slice; ios-arm64 is the only real-device architecture Apple ships today. -->
-		<RuntimeIdentifiers Condition="'$(TargetFramework)'=='net10.0-ios'">ios-arm64;iossimulator-arm64</RuntimeIdentifiers>
+		     simulator slice; ios-arm64 is the only real-device architecture Apple ships today.
+
+		     Only ios-arm64 by default, deliberately — not both. Xamarin.Shared.Sdk.targets checks
+		     this literal property for more than one value and refuses to build at all if it finds
+		     one ("Building for all the runtime identifiers ... isn't possible"), regardless of
+		     whether a single RuntimeIdentifier has separately been resolved; a conditional default
+		     for the singular property (tried first) did not help, since that check runs against
+		     RuntimeIdentifiers before such a default is evaluated. -r on the command line (used
+		     throughout codemagic.yaml, and by every local compile-check in this repo's history)
+		     still overrides this cleanly to build for the simulator instead when asked — this
+		     default only matters to Visual Studio's own device-target picker, which was found, on
+		     this project, not to pass an override either, hitting the same error when it built for
+		     "Remote Device". Defaulting to the real device RID rather than the simulator one because
+		     Windows cannot run the iOS Simulator at all (no Mac) — a device is the only target this
+		     default is ever actually used for. -->
+		<RuntimeIdentifiers Condition="'$(TargetFramework)'=='net10.0-ios'">ios-arm64</RuntimeIdentifiers>
+
 
 		<!-- The Media3 bindings declare tight upper bounds on AndroidX Lifecycle (< 2.9.3) while
 		     MAUI brings 2.11. Google ships these libraries as one coordinated release and 2.11 is
@@ -55,6 +70,28 @@
 		     matter. -->
 		<NoWarn>$(NoWarn);NU1608</NoWarn>
 	</PropertyGroup>
+
+	<!-- Without an explicit -p:Platform, the SDK defaults PlatformTarget to this machine's own
+	     architecture (x64, on an ordinary Windows PC), and its own _CheckForMismatchingPlatform
+	     target then refuses to build because arm64 (the RuntimeIdentifier above) and x64 (that
+	     default) don't match (NETSDK1032) — hit both from the command line with no RID override
+	     and from Visual Studio's own iOS device/simulator pickers, neither of which passes one on
+	     this project either. Irrelevant for iOS regardless: the RuntimeIdentifier alone already
+	     says which architecture to build.
+
+	     A plain PropertyGroup assignment does not survive to that check — some later step resets
+	     PlatformTarget back to the machine default before _CheckForMismatchingPlatform runs, which
+	     is exactly what defeated an earlier attempt at this same fix. That check's condition
+	     exempts PlatformTarget only when it is the literal string "AnyCPU" (not merely empty), so
+	     this target sets exactly that, timed via BeforeTargets to land immediately ahead of the
+	     one check it needs to satisfy — the only ordering that is actually guaranteed regardless of
+	     whatever else runs in between. -->
+	<Target Name="_ClearIosPlatformTarget" BeforeTargets="_CheckForMismatchingPlatform"
+	        Condition="'$(TargetFramework)'=='net10.0-ios'">
+		<PropertyGroup>
+			<PlatformTarget>AnyCPU</PlatformTarget>
+		</PropertyGroup>
+	</Target>
 
 	<ItemGroup>
 		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#B26A00" />
