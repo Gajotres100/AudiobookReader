@@ -14,6 +14,7 @@ public class AppDelegate : MauiUIApplicationDelegate
         // Must happen before this method returns — Apple refuses a BGTaskScheduler registration
         // made any later than app launch.
         BackgroundAlignmentScheduler.Register();
+        ContinuedAlignment.Register();
 
         return base.FinishedLaunching(application, launchOptions);
     }

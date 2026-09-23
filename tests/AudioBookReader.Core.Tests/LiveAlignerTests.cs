@@ -265,6 +265,42 @@ public class LiveAlignerTests
     }
 
     [Fact]
+    public async Task FindsChapterOneOnTheFirstWindowPastFrontMatterTheAudioSkips()
+    {
+        // The text opens with contents, maps, notes and a recap that nobody reads aloud — far more
+        // of it than the widest windowed search reaches from where the book's proportions put the
+        // narrator. On a real book stepping the radius out cost four windows, a minute of voice
+        // with the text nowhere near it; searching the whole book finds it in the first.
+        var frontMatter = FakeNarration.GenerateProse(sentenceCount: 1_400, seed: 99);
+        var prose = FakeNarration.GenerateProse(sentenceCount: 400);
+        var text = frontMatter + "\n" + prose;
+
+        var narration = new FakeNarration(prose, ChapterMs, paceVariation: 0.12);
+        var chapters = new List<Chapter> { new() { Index = 0, StartMs = 0, EndMs = ChapterMs } };
+        var map = new SyncMap();
+
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var transcriber = new StopAfter(narration, windows: 1, cancellation);
+
+        var aligner = new LiveAligner(TokenizedText.Create(text), chapters, transcriber, text.Length)
+        {
+            IdleRest = TimeSpan.FromMilliseconds(1),
+        };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            aligner.RunAsync("book.m4b", map, () => 0, () => Task.CompletedTask, null, cancellation.Token));
+
+        var chapter = map.ForChapter(0);
+        Assert.NotNull(chapter);
+        Assert.NotEmpty(chapter.Anchors);
+
+        var offset = frontMatter.Length + 1;
+
+        foreach (var anchor in chapter.Anchors)
+            Assert.InRange(Math.Abs(anchor.CharOffset - (offset + narration.CharAt(anchor.AudioMs))), 0, 40);
+    }
+
+    [Fact]
     public async Task FindsItsPlaceOnTheFirstWindowAfterAJump()
     {
         // Nothing known about where the chapter's text begins, which is the state a book is in

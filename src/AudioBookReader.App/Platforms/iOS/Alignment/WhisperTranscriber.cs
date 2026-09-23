@@ -38,7 +38,13 @@ public sealed class WhisperTranscriber : ITranscriber, IAsyncDisposable
         string language = "auto",
         bool wordTimestamps = true)
     {
-        var factory = WhisperFactory.FromPath(modelPath);
+        // On the CPU, not the GPU. The iOS runtime ships whisper's Metal backend and uses it by
+        // default, but iOS forbids submitting GPU work from the background — and both kinds of
+        // alignment carry on there: reading-along while the book plays with the screen locked, and
+        // the whole-book run once iOS lets it continue. The GPU path failed in exactly those moments
+        // and alignment only worked with the screen on. Android was always CPU-only, and the tiny
+        // model is quick enough on these cores.
+        var factory = WhisperFactory.FromPath(modelPath, new WhisperFactoryOptions { UseGpu = false });
 
         var builder = factory.CreateBuilder()
             .WithLanguage(language)

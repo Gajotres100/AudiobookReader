@@ -122,96 +122,44 @@ public class ChapterAligner(
 
             if (words.Count > 0)
             {
-                // Located one timed phrase at a time rather than as a single block. A probe found
-                // only at its two ends is a straight line drawn across everything in between, and
-                // the longer the probe the worse that line fits — which is what kept probes short
-                // and therefore expensive, since recognition costs the same for ten seconds as for
-                // thirty. Phrase by phrase, a long probe is a run of anchors instead of a guess.
-                var located = 0;
+                var wasPinned = lastAccepted is not null;
+                var located = LocatePhrases(transcript, predictedChar, radius);
 
-                foreach (var phrase in transcript.Phrases)
+                // Nothing near where it was expected. Search the whole book with what was heard
+                // rather than widen the window a step at a time — at once when this chapter has not
+                // yet found its place, since the estimate it started from is then only the book's
+                // proportions, and after several misses at the widest radius otherwise, when the
+                // text evidently does not run in the order the audio does.
+                //
+                // Measured on a real book: the text opened with a contents page, maps, notes and a
+                // recap that the audio skips, so chapter one began thousands of words past the
+                // estimate, and stepping the radius out spent three run-in probes missing it —
+                // while the start of the chapter was left interpolated across all that front
+                // matter, which in the reader is the highlight racing through pages nobody reads.
+                if (located == 0
+                    && (!wasPinned || blindMisses >= _settings.MissesBeforeSearchingEverywhere)
+                    && TranscriptMatcher.MatchAnywhere(
+                        book, transcript, _settings.MinWordsToSearchEverywhere, _settings.SearchEverywhereConfidence)
+                        is { } anywhere)
                 {
-                    ct.ThrowIfCancellationRequested();
+                    log?.Invoke(
+                        $"ch{request.ChapterIndex} probe@{probe.StartMs}ms: found by searching the whole book " +
+                        $"at char {anywhere.CharOffset}, expected {predictedChar}");
 
-                    var expected = lastAccepted is { } anchor
-                        ? (int)Math.Round(anchor.CharOffset + charsPerMs * (phrase.StartMs - anchor.AudioMs))
-                        : predictedChar;
+                    // Whatever rate and position were carried here came from a guess about where
+                    // the book even was. Start again from what was just found.
+                    charsPerMs = EstimateInitialRate(request);
+                    lastAccepted = null;
 
-                    // Once a phrase in this probe has been placed, the next one is seconds away and
-                    // must be searched for accordingly. A ten-word phrase is short enough to occur
-                    // plausibly elsewhere in a novel, so hunting for it across hundreds of words
-                    // finds confident nonsense — measurably worse than not looking at all, because
-                    // a wrong anchor drags the interpolation around it.
-                    var reach = located > 0 ? _settings.PhraseRadiusTokens : radius;
-
-                    var found = TranscriptMatcher.MatchNear(
-                        book,
-                        [.. phrase.Words.Select(w => w.Value)],
-                        book.TokenIndexAtChar(expected),
-                        reach,
-                        _settings.MinConfidence);
-
-                    // Nothing near where it was expected, and the search has already grown as wide
-                    // as it may. Look at the whole book rather than keep missing: the position is
-                    // not drifting, it is somewhere else entirely, and no amount of widening
-                    // within the cap will reach it.
-                    //
-                    // Only for the first phrase of a probe, and only after several such failures,
-                    // so a book that is merely difficult does not pay for this on every phrase.
-                    if (found is null
-                        && located == 0
-                        && blindMisses >= _settings.MissesBeforeSearchingEverywhere)
-                    {
-                        found = TranscriptMatcher.MatchNear(
-                            book,
-                            [.. phrase.Words.Select(w => w.Value)],
-                            book.Count / 2,
-                            book.Count,
-                            _settings.MinConfidence);
-
-                        if (found is not null)
-                        {
-                            log?.Invoke(
-                                $"ch{request.ChapterIndex} probe@{probe.StartMs}ms: found by searching the " +
-                                $"whole book at char {found.Value.CharOffset}, expected {expected} " +
-                                $"— the text does not run in the order the audio does");
-
-                            // The rate was learned from a prediction that was wrong about where the
-                            // book even was. Start it again from the chapter's own proportions.
-                            charsPerMs = EstimateInitialRate(request);
-                            lastAccepted = null;
-                        }
-                    }
-
-                    if (found is null) continue;
-
-                    // Weighting this by the recognizer's own segment probability was tried and
-                    // reverted: WhisperTranscriber never calls .WithProbabilities(), so
-                    // phrase.Probability is always 0 in practice, which zeroed every real anchor's
-                    // confidence. FromAnchors then picks the run with the highest confidence SUM,
-                    // so a chapter of forty real anchors at 0 lost to the two boundary guesses at
-                    // 0.2 each — every whole-book run kept nothing but its own starting guesses.
-                    // If recognizer confidence is worth using later, it needs its own field on
-                    // Anchor and .WithProbabilities() actually turned on, not a multiply here.
-                    var opening = new Anchor(
-                        phrase.Words[found.Value.TranscriptStart].AtMs,
-                        found.Value.CharOffset,
-                        found.Value.Confidence);
-
-                    var closing = new Anchor(
-                        phrase.Words[found.Value.TranscriptEnd].AtMs,
-                        found.Value.EndCharOffset,
-                        found.Value.Confidence);
-
-                    anchors.Add(opening);
-
-                    if (closing.AudioMs > opening.AudioMs && closing.CharOffset > opening.CharOffset)
-                        anchors.Add(closing);
-
-                    charsPerMs = UpdateRate(charsPerMs, lastAccepted, opening);
-                    lastAccepted = anchors[^1];
-                    located++;
+                    located = LocatePhrases(transcript, anywhere.CharOffset, _settings.SearchRadiusTokens);
                 }
+
+                // The chapter's opening pinned within its run-in: the boundary guess at its start
+                // came from the book's proportions and is now known to be wrong, and kept it would
+                // draw a line from the guess to the first real anchor — the highlight sweeping
+                // through contents pages and maps in the few seconds before the first line.
+                // Replaced by the place the narration leads back to at the chapter's own pace.
+                if (!wasPinned && located > 0 && probe.IsRunIn) RestartOpening();
 
                 if (located > 0)
                 {
@@ -252,6 +200,90 @@ public class ChapterAligner(
         }
 
         return ChapterSyncMap.FromAnchors(request.ChapterIndex, anchors);
+
+        // Located one timed phrase at a time rather than as a single block. A probe found only at
+        // its two ends is a straight line drawn across everything in between, and the longer the
+        // probe the worse that line fits — which is what kept probes short and therefore
+        // expensive, since recognition costs the same for ten seconds as for thirty. Phrase by
+        // phrase, a long probe is a run of anchors instead of a guess.
+        int LocatePhrases(Transcript transcript, int firstExpected, int firstReach)
+        {
+            var located = 0;
+
+            foreach (var phrase in transcript.Phrases)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var expected = lastAccepted is { } anchor
+                    ? (int)Math.Round(anchor.CharOffset + charsPerMs * (phrase.StartMs - anchor.AudioMs))
+                    : firstExpected;
+
+                // Once a phrase in this probe has been placed, the next one is seconds away and
+                // must be searched for accordingly. A ten-word phrase is short enough to occur
+                // plausibly elsewhere in a novel, so hunting for it across hundreds of words finds
+                // confident nonsense — measurably worse than not looking at all, because a wrong
+                // anchor drags the interpolation around it.
+                var reach = located > 0 ? _settings.PhraseRadiusTokens : firstReach;
+
+                var found = TranscriptMatcher.MatchNear(
+                    book,
+                    [.. phrase.Words.Select(w => w.Value)],
+                    book.TokenIndexAtChar(expected),
+                    reach,
+                    _settings.MinConfidence);
+
+                if (found is null) continue;
+
+                // Weighting this by the recognizer's own segment probability was tried and
+                // reverted: WhisperTranscriber never calls .WithProbabilities(), so
+                // phrase.Probability is always 0 in practice, which zeroed every real anchor's
+                // confidence. FromAnchors then picks the run with the highest confidence SUM, so a
+                // chapter of forty real anchors at 0 lost to the two boundary guesses at 0.2 each —
+                // every whole-book run kept nothing but its own starting guesses. If recognizer
+                // confidence is worth using later, it needs its own field on Anchor and
+                // .WithProbabilities() actually turned on, not a multiply here.
+                var opening = new Anchor(
+                    phrase.Words[found.Value.TranscriptStart].AtMs,
+                    found.Value.CharOffset,
+                    found.Value.Confidence);
+
+                var closing = new Anchor(
+                    phrase.Words[found.Value.TranscriptEnd].AtMs,
+                    found.Value.EndCharOffset,
+                    found.Value.Confidence);
+
+                anchors.Add(opening);
+
+                if (closing.AudioMs > opening.AudioMs && closing.CharOffset > opening.CharOffset)
+                    anchors.Add(closing);
+
+                charsPerMs = UpdateRate(charsPerMs, lastAccepted, opening);
+                lastAccepted = anchors[^1];
+                located++;
+            }
+
+            return located;
+        }
+
+        void RestartOpening()
+        {
+            var measured = anchors.Where(a => a.Confidence > _settings.BoundaryConfidence).ToList();
+            if (measured.Count == 0) return;
+
+            var earliest = measured.MinBy(a => a.AudioMs);
+
+            // At a typical narrating pace rather than the chapter's estimated one: that estimate
+            // divides a text range which may still include the front matter, and would lead back
+            // into it. Never less than a character, so the two anchors never share an offset.
+            const double typicalCharsPerMs = 0.015;
+            var leadIn = Math.Max(1, (long)Math.Round(typicalCharsPerMs * (earliest.AudioMs - request.AudioStartMs)));
+            var startChar = (int)Math.Clamp(earliest.CharOffset - leadIn, 0, earliest.CharOffset);
+
+            if (startChar >= earliest.CharOffset || earliest.AudioMs <= request.AudioStartMs) return;
+
+            anchors.RemoveAll(a => a.AudioMs == request.AudioStartMs && a.Confidence <= _settings.BoundaryConfidence);
+            anchors.Add(new Anchor(request.AudioStartMs, startChar, _settings.BoundaryConfidence));
+        }
     }
 
     /// <summary>Enough of a transcript to recognise it, without filling the log with a chapter.</summary>

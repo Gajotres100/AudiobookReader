@@ -710,7 +710,7 @@ public partial class ReaderViewModel(
                 liveSync.Measured -= OnLiveSyncMeasured;
                 liveSync.Measured += OnLiveSyncMeasured;
 
-                await liveSync.StartAsync(BookId);
+                await liveSync.StartAsync(BookId, owner: this);
             }
 
             await ShowStartingDocumentAsync();
@@ -1683,6 +1683,20 @@ public partial class ReaderViewModel(
 
     public void Dispose()
     {
+        Leave();
+        _ = StopMeasuringAsync();
+    }
+
+    /// <summary>
+    /// Everything the reader does on its way off the screen, except ending reading-along.
+    ///
+    /// Kept apart because leaving the screen is not always leaving the book: locking the phone
+    /// takes the page away too, and the book goes on playing. Stopping the measuring then was why
+    /// reading-along only worked with the screen on — everything heard in a pocket was unmeasured
+    /// by the time the reader came back to it.
+    /// </summary>
+    public void Leave()
+    {
         StopSpeaking();
         StopHolding();
         _ticker?.Stop();
@@ -1690,8 +1704,10 @@ public partial class ReaderViewModel(
         liveSync.Progress -= OnLiveSyncProgress;
         liveSync.Failed -= OnLiveSyncFailed;
         liveSync.Measured -= OnLiveSyncMeasured;
-        _ = liveSync.StopAsync();
     }
+
+    /// <summary>Ends reading-along, unless a newer reader has taken it over since.</summary>
+    public Task StopMeasuringAsync() => liveSync.StopAsync(owner: this);
 
     /// <summary>
     /// The reader page's shell, read once from the app package and kept for the life of the process.

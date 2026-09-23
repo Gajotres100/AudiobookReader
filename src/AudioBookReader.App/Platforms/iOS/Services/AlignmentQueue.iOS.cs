@@ -46,6 +46,10 @@ public partial class AlignmentQueue
             if (previous is not null) { try { await previous; } catch { } }
             await RunAsync(bookId, cancellation.Token);
         });
+
+        // Asked for now, while the person who pressed the button is still looking at the app —
+        // the only moment iOS will grant it.
+        ContinuedAlignment.Submit(Strings.Progress_StartingAlignment);
     }
 
     public partial void Stop() => _cancellation?.Cancel();

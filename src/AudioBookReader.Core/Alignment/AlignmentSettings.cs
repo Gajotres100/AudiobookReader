@@ -98,6 +98,18 @@ public record AlignmentSettings
     public int MissesBeforeSearchingEverywhere { get; init; } = 3;
 
     /// <summary>
+    /// Fewest words worth searching the whole book for. Shorter runs turn up by chance somewhere in
+    /// a novel; around ten is where a match stops being a coincidence.
+    /// </summary>
+    public int MinWordsToSearchEverywhere { get; init; } = 10;
+
+    /// <summary>
+    /// How well a whole-book match must line up to be believed — above <see cref="MinConfidence"/>,
+    /// because a search with no position to stay near has nothing else keeping it honest.
+    /// </summary>
+    public float SearchEverywhereConfidence { get; init; } = 0.6f;
+
+    /// <summary>
     /// Weight given to the newest observed narration rate when updating the running estimate.
     /// Smoothing keeps one bad probe from throwing off every prediction that follows.
     /// </summary>

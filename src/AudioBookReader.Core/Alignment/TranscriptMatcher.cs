@@ -134,6 +134,64 @@ public static class TranscriptMatcher
             : new Cell(delta, freshBook, freshTranscript);
 
     /// <summary>
+    /// Searches the whole book for what was heard, for when there is no trustworthy idea of where
+    /// the narrator is.
+    ///
+    /// That is the normal state at the start of a book: the audio opens with the publisher's
+    /// imprint and the credits, and the text opens with a table of contents, maps, notes and a
+    /// recap that nobody reads aloud — so "chapter one" is thousands of words away from where the
+    /// book's proportions put it. Measured on a real pair, widening the window step by step spent
+    /// four windows, about a minute of listening, before it reached the first line. The search
+    /// itself is a few milliseconds even over a long novel; recognition is what costs, and this
+    /// spends none.
+    ///
+    /// Stricter than a windowed match, because a wrong answer here is a confident answer anywhere
+    /// in the book: only a transcript long enough to be distinctive is tried, it has to line up
+    /// better than usual, and it is refused when a second place elsewhere fits almost as well.
+    /// The whole window is tried first — thirty words are far harder to find by accident than
+    /// ten — and then each long phrase on its own, since a window straddling the end of the
+    /// credits holds words the book does not.
+    /// </summary>
+    public static TranscriptMatch? MatchAnywhere(
+        TokenizedText book,
+        Transcript transcript,
+        int minWords,
+        float minConfidence)
+    {
+        if (transcript.Words.Count >= minWords
+            && Unambiguous(book, [.. transcript.Words.Select(w => w.Value)], minConfidence) is { } whole)
+        {
+            return whole;
+        }
+
+        foreach (var phrase in transcript.Phrases)
+        {
+            if (phrase.Words.Count < minWords) continue;
+
+            if (Unambiguous(book, [.. phrase.Words.Select(w => w.Value)], minConfidence) is { } found)
+                return found;
+        }
+
+        return null;
+    }
+
+    /// <summary>How close a second place may score before the best one stops being believable.</summary>
+    private const float AmbiguityMargin = 0.1f;
+
+    private static TranscriptMatch? Unambiguous(TokenizedText book, IReadOnlyList<string> words, float minConfidence)
+    {
+        if (Match(book, words, 0, book.Count, minConfidence) is not { } best) return null;
+
+        // Everywhere except the stretch the best match itself occupies.
+        var margin = words.Count * 2;
+        var before = Match(book, words, 0, best.TokenIndex - margin, minConfidence);
+        var after = Match(book, words, best.TokenIndex + words.Count + margin, book.Count, minConfidence);
+
+        var rival = Math.Max(before?.Confidence ?? 0, after?.Confidence ?? 0);
+        return rival >= best.Confidence - AmbiguityMargin ? null : best;
+    }
+
+    /// <summary>
     /// Searches around an expected position, which is how alignment actually calls this: the
     /// previous anchors and a constant narration rate predict where the probe should land, and
     /// the radius is the margin allowed for that prediction being off.

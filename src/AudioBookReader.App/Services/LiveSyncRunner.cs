@@ -65,6 +65,10 @@ public partial class LiveSyncRunner(
 
     public bool IsRunning => _running is { IsCompleted: false };
 
+    /// <summary>Which book the current run follows, and on whose behalf.</summary>
+    private int _bookId = -1;
+    private object? _owner;
+
     /// <summary>
     /// Begins following, after making sure the previous run has actually finished.
     ///
@@ -73,13 +77,27 @@ public partial class LiveSyncRunner(
     /// means two whisper models loaded at once, two hardware decoders, and both writing the same
     /// sync map — the later save silently discarding the earlier one's work.
     /// </summary>
-    public async Task StartAsync(int bookId)
+    /// <param name="owner">
+    /// The reader asking. A run already following this book is handed over rather than restarted —
+    /// which is what coming back after the screen was locked looks like, and reloading the model
+    /// for it would only cost a second of catching up.
+    /// </param>
+    public async Task StartAsync(int bookId, object? owner = null)
     {
         await _turn.WaitAsync();
 
         try
         {
+            if (IsRunning && _bookId == bookId)
+            {
+                _owner = owner;
+                return;
+            }
+
             await StopWhileHoldingTurnAsync();
+
+            _bookId = bookId;
+            _owner = owner;
 
             // The token is read into a local before the lambda captures it. Reading the field from
             // inside the lambda defers it to whenever the pool gets round to running it, and a stop
@@ -100,12 +118,18 @@ public partial class LiveSyncRunner(
     }
 
     /// <summary>Cancels the run and waits for it to leave, so nothing overlaps the next one.</summary>
-    public async Task StopAsync()
+    /// <param name="owner">
+    /// When given, stops only a run that reader still owns. A reader closed and reopened quickly
+    /// hands the run to the new page, and the old page's late stop must not end it.
+    /// </param>
+    public async Task StopAsync(object? owner = null)
     {
         await _turn.WaitAsync();
 
         try
         {
+            if (owner is not null && !ReferenceEquals(owner, _owner)) return;
+
             await StopWhileHoldingTurnAsync();
         }
         finally
@@ -139,6 +163,8 @@ public partial class LiveSyncRunner(
             // probe is still in flight.
             _cancellation = null;
             _running = null;
+            _bookId = -1;
+            _owner = null;
         }
     }
 

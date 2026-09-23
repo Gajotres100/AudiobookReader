@@ -249,6 +249,59 @@ public class ChapterAlignerTests
     }
 
     [Fact]
+    public async Task PinsChapterOneOnItsFirstProbePastFrontMatterTheAudioSkips()
+    {
+        // Contents, maps and notes open the text; the narration starts at chapter one. The
+        // estimate is the start of the text, well beyond reach of the windowed search, and both
+        // stepping the radius out and the old "search everything after three misses" left the
+        // first run-in probes unanchored — and the opening drawn as a line from the start of the
+        // contents page to the first real match, which reads as the highlight racing through it.
+        var frontMatter = FakeNarration.GenerateProse(sentenceCount: 1_400, seed: 99);
+        var prose = FakeNarration.GenerateProse(sentenceCount: 600);
+        var text = frontMatter + "\n" + prose;
+        var offset = frontMatter.Length + 1;
+
+        var narration = new FakeNarration(prose, ChapterMs);
+        var aligner = new ChapterAligner(TokenizedText.Create(text), narration);
+
+        var map = await aligner.AlignAsync(new ChapterAlignmentRequest("book.m4b", 0, 0, ChapterMs, 0, text.Length));
+
+        var real = map.Anchors.Where(a => a.Confidence > 0.5f).ToList();
+        Assert.NotEmpty(real);
+
+        // Found by the very first probe, not after a string of misses.
+        Assert.True(real.Min(a => a.AudioMs) < 10_000, $"first real anchor at {real.Min(a => a.AudioMs)} ms");
+
+        foreach (var anchor in real)
+            Assert.InRange(Math.Abs(anchor.CharOffset - (offset + narration.CharAt(anchor.AudioMs))), 0, 40);
+
+        // And the chapter's first moment points at chapter one, not at the contents page.
+        Assert.True(map.TryGetCharOffset(0, out var atStart));
+        Assert.InRange(atStart, offset - 200, offset + 200);
+    }
+
+    [Fact]
+    public void RefusesAWholeBookMatchThatFitsTwoPlacesAlmostEqually()
+    {
+        // A passage that occurs twice is exactly the case where searching everywhere would place
+        // the narrator confidently and wrongly. Better to find nothing and keep listening.
+        var passage = FakeNarration.GenerateProse(sentenceCount: 3, seed: 5);
+        var text =
+            FakeNarration.GenerateProse(sentenceCount: 200, seed: 1) + " " + passage + " " +
+            FakeNarration.GenerateProse(sentenceCount: 200, seed: 2) + " " + passage + " " +
+            FakeNarration.GenerateProse(sentenceCount: 200, seed: 3);
+
+        var heard = Transcript.FromText(passage, 0, 10_000);
+
+        Assert.Null(TranscriptMatcher.MatchAnywhere(TokenizedText.Create(text), heard, minWords: 10, minConfidence: 0.6f));
+
+        var once = FakeNarration.GenerateProse(sentenceCount: 200, seed: 1) + " " + passage + " " +
+                   FakeNarration.GenerateProse(sentenceCount: 200, seed: 2);
+
+        Assert.NotNull(TranscriptMatcher.MatchAnywhere(TokenizedText.Create(once), heard, minWords: 10, minConfidence: 0.6f));
+    }
+
+    [Fact]
     public async Task DiscardsProbesThatDoNotMatchInsteadOfTrustingThem()
     {
         var prose = FakeNarration.GenerateProse(sentenceCount: 300);

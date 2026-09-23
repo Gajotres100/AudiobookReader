@@ -133,6 +133,26 @@ public class LiveAligner(
                 // located only at its two ends is a straight line drawn across everything between.
                 var located = Record(map, chapter.Index, transcript, predicted, radius);
 
+                // Nothing near the prediction: look for what was just heard in the whole book,
+                // using this same window rather than spending more of them widening the search.
+                //
+                // Measured on a real book, from the start: the credits matched the title page, the
+                // radius narrowed on the strength of it, and chapter one — past a contents page,
+                // maps, notes and a recap the audio never reads — then took four more windows of
+                // tripling to reach. A minute of the voice with the text nowhere near it. The
+                // whole-book search costs milliseconds; the windows it saves cost the minute.
+                if (located == 0
+                    && TranscriptMatcher.MatchAnywhere(
+                        book, transcript, _settings.MinWordsToSearchEverywhere, _settings.SearchEverywhereConfidence)
+                        is { } anywhere)
+                {
+                    log?.Invoke(
+                        $"live ch{chapter.Index} @{next}ms: found by searching the whole book at char " +
+                        $"{anywhere.CharOffset}, predicted {predicted}");
+
+                    located = Record(map, chapter.Index, transcript, anywhere.CharOffset, _settings.SearchRadiusTokens);
+                }
+
                 if (located > 0)
                 {
                     // Narrowed only now that the run knows where it is.

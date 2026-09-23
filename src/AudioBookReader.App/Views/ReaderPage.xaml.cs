@@ -148,7 +148,8 @@ public partial class ReaderPage : ContentPage
         // teardown afterwards risks a stale continuation dismantling a page the user has already
         // come back to, which is the exact fault this pairing exists to prevent.
         Detach();
-        _viewModel.Dispose();
+        _viewModel.Leave();
+        _ = StopMeasuringUnlessStillShownAsync();
 
         try
         {
@@ -157,6 +158,31 @@ public partial class ReaderPage : ContentPage
         catch (Exception ex)
         {
             AppLog.Error("saving the reading position", ex);
+        }
+    }
+
+    /// <summary>
+    /// Ends reading-along when the reader was closed, and keeps it when only the screen went off.
+    ///
+    /// The two look the same from here — locking the phone takes the page away just as going back
+    /// does — so the difference is read from what is on screen once the moment has passed: after a
+    /// lock the reader is still the shell's page, after closing it is not. The book goes on playing
+    /// in a pocket, and measuring it there is what lets the text be in step the moment the screen
+    /// comes back, instead of only while someone is watching it.
+    /// </summary>
+    private async Task StopMeasuringUnlessStillShownAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1));
+
+            if (Shell.Current?.CurrentPage == this) return;
+
+            await _viewModel.StopMeasuringAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("stopping reading-along", ex);
         }
     }
 
