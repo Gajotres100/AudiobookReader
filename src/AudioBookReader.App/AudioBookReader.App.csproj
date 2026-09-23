@@ -28,9 +28,13 @@
 		     removes a pile of version guards for devices that are long gone anyway. -->
 		<SupportedOSPlatformVersion Condition="'$(TargetFramework)'=='net10.0-android'">29.0</SupportedOSPlatformVersion>
 
-		<!-- iOS 15. BGProcessingTask (background alignment continuation) needs 13+; PHPickerViewController
-		     needs 14+. 15 is a round floor comfortably above both. -->
-		<SupportedOSPlatformVersion Condition="'$(TargetFramework)'=='net10.0-ios'">15.0</SupportedOSPlatformVersion>
+		<!-- iOS 18.5, set by Whisper.net.Runtime rather than by anything this app calls. Its iOS static
+		     libraries are built with a minimum of 18.5, and libggml-blas references Accelerate's
+		     cblas_sgemm$NEWLAPACK$ILP64, which only exists from iOS 16.4 — linked statically, so a
+		     device below that fails at launch, before a line of this app runs. That is exactly what an
+		     iPad on 16.3.1 did: opened and closed at once, with a declared floor of 15 promising it
+		     would work. Declaring the real floor makes iOS refuse the install with a reason instead. -->
+		<SupportedOSPlatformVersion Condition="'$(TargetFramework)'=='net10.0-ios'">18.5</SupportedOSPlatformVersion>
 
 		<!-- Whisper.net.Runtime ships android-arm64-v8a, android-x86_64 and android-x86 only, with
 		     no armeabi-v7a. Naming the architectures explicitly keeps the build from producing a
