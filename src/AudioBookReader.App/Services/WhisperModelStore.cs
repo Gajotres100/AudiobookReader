@@ -61,17 +61,48 @@ public class WhisperModelStore(string directory, HttpClient? http = null)
         return File.Exists(path) && new FileInfo(path).Length > model.ApproximateBytes / 2;
     }
 
+    private readonly Lock _gate = new();
+    private readonly Dictionary<string, Task<string>> _inFlight = [];
+
     /// <summary>
     /// Returns the model's path, downloading it first if necessary.
+    ///
+    /// One download per model however many ask. Turning on reading-along starts one from the book's
+    /// page, and opening the reader straight after asks again — two downloads into the same .part
+    /// file would each overwrite the other's bytes. A second caller joins the first download instead;
+    /// only the caller that started it hears its progress.
     /// </summary>
     /// <param name="progress">Fraction downloaded, 0..1.</param>
-    public async Task<string> EnsureAsync(
+    public Task<string> EnsureAsync(
         WhisperModel model,
         IProgress<double>? progress = null,
         CancellationToken ct = default)
     {
+        if (IsDownloaded(model)) return Task.FromResult(PathFor(model));
+
+        lock (_gate)
+        {
+            if (_inFlight.TryGetValue(model.FileName, out var running)) return running.WaitAsync(ct);
+
+            var download = DownloadAsync(model, progress, ct);
+            _inFlight[model.FileName] = download;
+
+            _ = download.ContinueWith(
+                _ => { lock (_gate) _inFlight.Remove(model.FileName); },
+                TaskScheduler.Default);
+
+            return download;
+        }
+    }
+
+    public bool IsDownloading(WhisperModel model)
+    {
+        lock (_gate) return _inFlight.ContainsKey(model.FileName);
+    }
+
+    private async Task<string> DownloadAsync(WhisperModel model, IProgress<double>? progress, CancellationToken ct)
+    {
         var path = PathFor(model);
-        if (IsDownloaded(model)) return path;
 
         Directory.CreateDirectory(directory);
         var temp = path + ".part";

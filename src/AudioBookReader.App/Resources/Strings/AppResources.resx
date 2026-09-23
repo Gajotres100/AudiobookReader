@@ -475,7 +475,7 @@
     <value>The speech model has not been downloaded yet.</value>
   </data>
   <data name="Live_NoModelHint" xml:space="preserve">
-    <value>The speech model has not been downloaded yet — start aligning from the book's page.</value>
+    <value>The speech model could not be downloaded — check the internet connection and open the book again.</value>
   </data>
   <data name="Live_MeasuredAhead" xml:space="preserve">
     <value>Aligning on the go — measured {0} s ahead</value>
@@ -1040,5 +1040,11 @@
   </data>
   <data name="Settings_ShareLog" xml:space="preserve">
     <value>Share log</value>
+  </data>
+  <data name="Model_DownloadFailed" xml:space="preserve">
+    <value>Couldn’t download the speech model: {0}</value>
+  </data>
+  <data name="Model_Ready" xml:space="preserve">
+    <value>Speech model ready.</value>
   </data>
 </root>

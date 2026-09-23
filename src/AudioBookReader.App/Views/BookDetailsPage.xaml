@@ -95,21 +95,29 @@
                             is actually about.
                         -->
                         <Border Style="{StaticResource Choice}">
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                                <VerticalStackLayout Grid.Column="0" Spacing="3">
-                                    <Label
-                                        FontFamily="OpenSansSemibold"
-                                        Text="{x:Static s:Strings.Details_LiveAlignment}" />
-                                    <Label
-                                        Style="{StaticResource Muted}"
-                                        Text="{x:Static s:Strings.Details_LiveAlignmentNote}" />
-                                </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="10">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="3">
+                                        <Label
+                                            FontFamily="OpenSansSemibold"
+                                            Text="{x:Static s:Strings.Details_LiveAlignment}" />
+                                        <Label
+                                            Style="{StaticResource Muted}"
+                                            Text="{x:Static s:Strings.Details_LiveAlignmentNote}" />
+                                    </VerticalStackLayout>
 
-                                <Switch
-                                    Grid.Column="1"
-                                    IsToggled="{Binding MeasuresWhileReading}"
-                                    VerticalOptions="Center" />
-                            </Grid>
+                                    <Switch
+                                        Grid.Column="1"
+                                        IsToggled="{Binding MeasuresWhileReading}"
+                                        VerticalOptions="Center" />
+                                </Grid>
+
+                                <!--  The speech model this choice needs, fetching as soon as it is made.  -->
+                                <Label
+                                    IsVisible="{Binding HasModelStatus}"
+                                    Style="{StaticResource Muted}"
+                                    Text="{Binding ModelStatus}" />
+                            </VerticalStackLayout>
                         </Border>
 
                         <Border Style="{StaticResource Choice}">

@@ -451,7 +451,7 @@
     <value>Model za prepoznavanje još nije preuzet.</value>
   </data>
   <data name="Live_NoModelHint" xml:space="preserve">
-    <value>Model za prepoznavanje još nije preuzet — pokreni poravnanje sa stranice knjige.</value>
+    <value>Model za prepoznavanje nije preuzet — provjeri vezu s internetom i ponovno otvori knjigu.</value>
   </data>
   <data name="Live_MeasuredAhead" xml:space="preserve">
     <value>Poravnavam u hodu — izmjereno {0} s unaprijed</value>
@@ -980,5 +980,11 @@
   </data>
   <data name="Settings_ShareLog" xml:space="preserve">
     <value>Podijeli log</value>
+  </data>
+  <data name="Model_DownloadFailed" xml:space="preserve">
+    <value>Model za prepoznavanje nije preuzet: {0}</value>
+  </data>
+  <data name="Model_Ready" xml:space="preserve">
+    <value>Model za prepoznavanje je spreman.</value>
   </data>
 </root>

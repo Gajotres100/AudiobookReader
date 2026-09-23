@@ -24,7 +24,9 @@ public partial class BookViewModel(
     LiveSyncRunner liveSync,
     BookTextExtractors extractors,
     PhotoPicker photos,
-    IOcrService ocr) : ObservableObject, IDisposable
+    IOcrService ocr,
+    AlignmentSettingsStore alignmentSettings,
+    WhisperModelStore models) : ObservableObject, IDisposable
 {
     /// <summary>The speeds the button cycles through. Nothing below 0.75 or above 2 is useful for narration.</summary>
     private static readonly float[] Speeds = [1f, 1.25f, 1.5f, 1.75f, 2f, 0.75f];
@@ -233,10 +235,59 @@ public partial class BookViewModel(
 
             _book.MeasureWhileReading = live;
             _ = database.UpdateBookAsync(_book);
+
+            if (live) _ = FetchModelAsync();
         }
         finally
         {
             _switchingMode = false;
+        }
+    }
+
+    /// <summary>What the speech model is doing, for the line under the reading-along choice.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasModelStatus))]
+    public partial string ModelStatus { get; set; } = "";
+
+    public bool HasModelStatus => ModelStatus.Length > 0;
+
+    /// <summary>
+    /// Fetches the speech model as soon as reading-along is chosen.
+    ///
+    /// The reader deliberately used to leave this alone, on the grounds that opening a book is no
+    /// reason to spend thirty megabytes of someone's data. Choosing reading-along is — it is the
+    /// user asking for exactly the thing that needs the model. Waiting until the reader opened only
+    /// meant the first read-along session began with nothing to follow and a hint pointing at a
+    /// button this mode switches off.
+    /// </summary>
+    private async Task FetchModelAsync()
+    {
+        var model = alignmentSettings.Model;
+        if (models.IsDownloaded(model)) return;
+
+        var lastPercent = -1;
+
+        // Whole percents only: progress arrives every 80 KB, and each report crosses to the UI.
+        var progress = new Progress<double>(fraction =>
+        {
+            var percent = (int)(fraction * 100);
+            if (percent == lastPercent) return;
+
+            lastPercent = percent;
+            ModelStatus = string.Format(Strings.Progress_DownloadingModelPercent, percent);
+        });
+
+        ModelStatus = Strings.Progress_DownloadingModel;
+
+        try
+        {
+            await models.EnsureAsync(model, progress);
+            ModelStatus = Strings.Model_Ready;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("downloading the speech model", ex);
+            ModelStatus = string.Format(Strings.Model_DownloadFailed, ex.Message);
         }
     }
 
@@ -435,6 +486,10 @@ public partial class BookViewModel(
         MeasuresWhileReading = _book.MeasureWhileReading;
         AlignsInAdvance = !_book.MeasureWhileReading;
         _switchingMode = false;
+
+        // A book switched to reading-along before the model could be fetched — offline at the time,
+        // or set up by an earlier version that never fetched it — gets it now rather than never.
+        if (_book.MeasureWhileReading && _book.IsPaired) _ = FetchModelAsync();
 
         OnPropertyChanged(nameof(CanStartAlignment));
         OnPropertyChanged(nameof(CanClearAlignment));

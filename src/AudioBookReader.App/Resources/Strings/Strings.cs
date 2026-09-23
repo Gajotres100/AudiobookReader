@@ -290,6 +290,8 @@ public static class Strings
     public static string Live_NoModel => Get(nameof(Live_NoModel));
     /// <summary>The speech model has not been downloaded yet — start aligning from the book's page.</summary>
     public static string Live_NoModelHint => Get(nameof(Live_NoModelHint));
+    public static string Model_DownloadFailed => Get(nameof(Model_DownloadFailed));
+    public static string Model_Ready => Get(nameof(Model_Ready));
     /// <summary>{0} is a whole number of seconds.</summary>
     public static string Live_MeasuredAhead => Get(nameof(Live_MeasuredAhead));
     /// <summary>Aligning on the go…</summary>

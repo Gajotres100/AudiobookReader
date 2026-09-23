@@ -23,7 +23,8 @@ public partial class LiveSyncRunner(
     SyncMapStore syncMaps,
     BookTextExtractors extractors,
     PlaybackController playback,
-    AlignmentSettingsStore settings)
+    AlignmentSettingsStore settings,
+    WhisperModelStore models)
 {
     private CancellationTokenSource? _cancellation;
     private Task? _running;
@@ -172,6 +173,8 @@ public partial class LiveSyncRunner(
             var book = await database.GetBookAsync(bookId);
             if (book?.IsPaired != true) return true;
 
+            if (!await EnsureSomeModelAsync(ct)) return true;
+
             var transcriber = await CreateTranscriberAsync(settings.Budget, book.Language, ct);
             if (transcriber is null)
             {
@@ -237,6 +240,58 @@ public partial class LiveSyncRunner(
         catch (Exception ex)
         {
             AppLog.Error($"sync on the fly (attempt {attempt} of {Attempts})", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Makes sure some speech model is on the device, fetching the chosen one when none is.
+    ///
+    /// This used never to download: opening a book is no reason to spend someone's data. But this
+    /// only runs for a book the user has put into reading-along, which is them asking for the model —
+    /// and refusing left the reader saying "start aligning from the book's page", about a button
+    /// reading-along switches off. The book page already fetches it when the choice is made; this
+    /// covers a choice made offline, or before that page learned to.
+    /// </summary>
+    /// <returns>False when there is still no model, with the reason already on the status line.</returns>
+    private async Task<bool> EnsureSomeModelAsync(CancellationToken ct)
+    {
+        if (models.IsDownloaded(settings.Model)
+            || models.IsDownloaded(WhisperModelStore.Tiny)
+            || models.IsDownloaded(WhisperModelStore.Base))
+        {
+            return true;
+        }
+
+        var lastPercent = -1;
+
+        var progress = new Progress<double>(fraction =>
+        {
+            var percent = (int)(fraction * 100);
+            if (percent == lastPercent) return;
+
+            lastPercent = percent;
+            Report(string.Format(Strings.Progress_DownloadingModelPercent, percent));
+        });
+
+        Report(Strings.Progress_DownloadingModel);
+
+        try
+        {
+            await models.EnsureAsync(settings.Model, progress, ct);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Offline, most likely. Said once and left there, rather than retried three times and
+            // then reported as following having stopped, which reads as a fault in the reader.
+            AppLog.Error("downloading the speech model for reading-along", ex);
+            Report(Strings.Live_NoModel);
+            Fail(Strings.Live_NoModelHint);
             return false;
         }
     }
