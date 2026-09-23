@@ -26,7 +26,7 @@ public partial class DownloadFolder
 
             if (url is null) { tcs.TrySetResult(null); return; }
 
-            SecurityScopedBookmarks.Save(url);
+            SecurityScopedBookmarks.Save(url, isFolder: true);
             tcs.TrySetResult(url.Path);
         };
 
@@ -40,7 +40,7 @@ public partial class DownloadFolder
     }
 
     /// <summary>Resolves the chosen folder's bookmark, starting access. Null when nothing is chosen or the folder can no longer be reached.</summary>
-    private NSUrl? ResolveFolder() => Location is { } path ? SecurityScopedBookmarks.Resolve(path) : null;
+    private NSUrl? ResolveFolder() => Location is { } path ? SecurityScopedBookmarks.Access(path) : null;
 
     public partial Task<(Stream Stream, string Location)> CreateAsync(
         IReadOnlyList<string> folders, string fileName)

@@ -1,7 +1,6 @@
 using AudioBookReader.App.Resources.Strings;
 using AudioBookReader.App.Services;
 using AudioBookReader.Core.Alignment;
-using UIKit;
 
 namespace AudioBookReader.App.Platforms.iOS.Alignment;
 
@@ -73,5 +72,22 @@ public sealed class EnvironmentGate(AlignmentSettingsStore settings, IWorkThrott
         }
     }
 
-    private static bool IsScreenOn() => UIApplication.SharedApplication.ApplicationState == UIApplicationState.Active;
+    /// <summary>
+    /// Read from a flag the app delegate keeps, not from UIApplication directly: this runs on the
+    /// alignment's own thread, and UIKit refuses to be asked anything off the main one — in a debug
+    /// build .NET turns that into an exception, which would end the run the first time the check ran.
+    /// </summary>
+    private static bool IsScreenOn() => AppForeground.IsActive;
+}
+
+/// <summary>Whether the app is the one on screen, maintained by <see cref="AppDelegate"/> from UIKit's own lifecycle calls.</summary>
+public static class AppForeground
+{
+    private static volatile bool _active = true;
+
+    public static bool IsActive
+    {
+        get => _active;
+        set => _active = value;
+    }
 }

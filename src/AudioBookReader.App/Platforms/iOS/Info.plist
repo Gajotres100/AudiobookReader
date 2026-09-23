@@ -33,7 +33,29 @@
 	     No photo-library usage description: PHPickerViewController mediates access itself and needs
 	     none, same reasoning as the Android photo picker needing no storage permission. -->
 	<key>NSCameraUsageDescription</key>
-	<string>Za fotografiranje stranice knjige radi pronalaska pozicije u tekstu.</string>
+	<string>To photograph a page of the book and find that place in its text.</string>
+
+	<!-- Audiobookshelf servers are almost always on the user's own network, on a plain port with no
+	     certificate — the same reasoning as Android's network_security_config.xml, which permits
+	     cleartext for exactly this. Without it iOS refuses every http:// address outright. Typing
+	     https:// still gets https, with its certificate checked as normal. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+
+	<!-- Reaching a server on the local network needs the user's permission from iOS 14 on, and
+	     without this description iOS never asks — the connection just fails. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>To connect to your Audiobookshelf server on this network.</string>
+
+	<!-- Lets iOS use the Croatian strings in hr.lproj (app name, permission prompts). -->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>hr</string>
+	</array>
 
 	<!-- audio: lets playback continue and keeps AVAudioSession alive in the background (AVPlayer +
 	     MPNowPlayingInfoCenter, iOS-1). processing: BGProcessingTask for continuing whole-book

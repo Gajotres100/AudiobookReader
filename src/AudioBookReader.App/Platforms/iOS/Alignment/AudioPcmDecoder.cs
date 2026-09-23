@@ -55,10 +55,7 @@ internal static class AudioPcmDecoder
         public void Dispose() { }
     }
 
-    private static NSUrl ResolveUrl(string path) =>
-        path.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
-            ? NSUrl.FromString(path)!
-            : NSUrl.FromFilename(path);
+    private static NSUrl ResolveUrl(string path) => AudioBookReader.App.Services.SecurityScopedBookmarks.UrlFor(path);
 
     public static float[] Decode(string path, long startMs, long durationMs, CancellationToken ct)
     {

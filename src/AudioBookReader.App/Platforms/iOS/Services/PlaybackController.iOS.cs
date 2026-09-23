@@ -17,12 +17,17 @@ public partial class PlaybackController
 
     /// <summary>
     /// Builds the singleton if it is not there yet. Unlike Android there is no service to start and
-    /// wait on — construction is synchronous and audio session setup either succeeds immediately or
-    /// logs and carries on, so this never actually needs to await anything. The async signature is
-    /// kept only because the shared partial contract requires one.
+    /// wait on — but it is built on the main thread, because its timers only ever fire on the main
+    /// run loop: built from a pool thread, they would be scheduled on a loop nobody runs, and the
+    /// position would silently never be saved.
     /// </summary>
-    public partial Task<bool> ConnectAsync(CancellationToken ct) =>
-        Task.FromResult(PlaybackService.EnsureRunning() is not null);
+    public partial async Task<bool> ConnectAsync(CancellationToken ct)
+    {
+        if (Service is not null) return true;
+
+        await MainThread.InvokeOnMainThreadAsync(PlaybackService.EnsureRunning);
+        return Service is not null;
+    }
 
     private partial void LoadCore(
         int bookId,

@@ -1,0 +1,4 @@
+/* Croatian carries its own name for the app, as on Android (values-hr/strings.xml). */
+"CFBundleDisplayName" = "Čitko";
+"NSCameraUsageDescription" = "Za fotografiranje stranice knjige radi pronalaska tog mjesta u tekstu.";
+"NSLocalNetworkUsageDescription" = "Za spajanje na tvoj Audiobookshelf server na ovoj mreži.";

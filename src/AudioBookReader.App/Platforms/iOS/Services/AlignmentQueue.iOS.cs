@@ -27,7 +27,7 @@ public partial class AlignmentQueue
     /// a run genuinely begins and cleared on every terminal state (finished, stopped, failed) so a
     /// run the user cancelled, or one that broke, is never silently resumed behind their back.
     /// </summary>
-    private const string LastBookKey = "ios.alignment.lastBookId";
+    internal const string LastBookKey = "ios.alignment.lastBookId";
 
     private CancellationTokenSource? _cancellation;
     private Task? _running;
@@ -55,7 +55,31 @@ public partial class AlignmentQueue
     /// was last backgrounded — see BackgroundAlignmentScheduler.cs. Same method StartCore uses,
     /// under a name that says why something outside this class is allowed to call it.
     /// </summary>
-    internal Task ResumeInBackgroundAsync(int bookId, CancellationToken ct) => RunAsync(bookId, ct);
+    internal async Task ResumeInBackgroundAsync(int bookId, CancellationToken ct)
+    {
+        // A run started in the foreground is not cancelled when the app is backgrounded — it is
+        // frozen, and thaws the moment iOS wakes the app for this very task. Starting a second run
+        // then would load two whisper models and have both writing the same map, the exact overlap
+        // Android's service took a generation counter to prevent. So an existing run is allowed to
+        // carry on in this window instead, and stopped when the window closes, so it checkpoints
+        // rather than being frozen mid-probe again.
+        if (_running is { IsCompleted: false } running)
+        {
+            await using (ct.Register(() => _cancellation?.Cancel()))
+            {
+                try { await running; } catch { }
+            }
+
+            return;
+        }
+
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _cancellation = cancellation;
+
+        var run = RunAsync(bookId, cancellation.Token);
+        _running = run;
+        await run;
+    }
 
     private async Task RunAsync(int bookId, CancellationToken ct)
     {

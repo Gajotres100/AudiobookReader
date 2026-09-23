@@ -19,11 +19,7 @@ public static partial class AudioMetadata
     {
         try
         {
-            var url = location.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
-                ? NSUrl.FromString(location)!
-                : NSUrl.FromFilename(location);
-
-            var asset = new AVUrlAsset(url);
+            var asset = new AVUrlAsset(SecurityScopedBookmarks.UrlFor(location));
 
             var durationMs = asset.Duration is { IsInvalid: false, IsIndefinite: false } duration
                 ? (long)(duration.Seconds * 1000)

@@ -52,7 +52,7 @@ internal static class BackgroundAlignmentScheduler
     private static async Task RunAsync(BGProcessingTask task, CancellationToken ct)
     {
         var services = IPlatformApplication.Current?.Services;
-        var bookId = Preferences.Default.Get("ios.alignment.lastBookId", -1);
+        var bookId = Preferences.Default.Get(AlignmentQueue.LastBookKey, -1);
 
         if (services is null || bookId < 0)
         {

@@ -23,7 +23,10 @@ public partial class DownloadQueue
         var cancellation = new CancellationTokenSource();
         _cancellation = cancellation;
 
-        _ = RunAsync(itemId, title, toAppStorage, wantAudio, wantEbook, attachTo, cancellation.Token);
+        // Task.Run for the reason Android's DownloadService gives: this is called from the UI
+        // thread, and without it every continuation in the import — tag reading and hashing a
+        // file of hundreds of megabytes included — would resume there and freeze the screen.
+        _ = Task.Run(() => RunAsync(itemId, title, toAppStorage, wantAudio, wantEbook, attachTo, cancellation.Token));
     }
 
     public partial void Stop() => _cancellation?.Cancel();

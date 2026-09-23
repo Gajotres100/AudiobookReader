@@ -18,12 +18,23 @@ public class AppDelegate : MauiUIApplicationDelegate
         return base.FinishedLaunching(application, launchOptions);
     }
 
+    public override void OnActivated(UIApplication application)
+    {
+        AppForeground.IsActive = true;
+        base.OnActivated(application);
+    }
+
+    public override void OnResignActivation(UIApplication application)
+    {
+        AppForeground.IsActive = false;
+        base.OnResignActivation(application);
+    }
+
     public override void DidEnterBackground(UIApplication application)
     {
         // Asks for a future opportunity to continue alignment unconditionally — harmless when
-        // nothing was running (BackgroundAlignmentScheduler.Handle completes at once when there is
-        // no book to resume), and the one place guaranteed to fire whenever the app backgrounds,
-        // regardless of when or how alignment was started.
+        // nothing was running (the handler completes at once when there is no book to resume), and
+        // the one place guaranteed to fire whenever the app backgrounds.
         BackgroundAlignmentScheduler.ScheduleNext();
 
         base.DidEnterBackground(application);
