@@ -40,6 +40,9 @@ public static class CoreStrings
 
     /// <summary>The sign-in to the server is no longer valid.</summary>
     public static string Server_SignInExpired => Get(nameof(Server_SignInExpired));
+    public static string Server_WrongCredentials => Get(nameof(Server_WrongCredentials));
+    public static string Server_TokenRejected => Get(nameof(Server_TokenRejected));
+    public static string Server_CheckAddress => Get(nameof(Server_CheckAddress));
 
     /// <summary>This account has no access to that on the server.</summary>
     public static string Server_Forbidden => Get(nameof(Server_Forbidden));

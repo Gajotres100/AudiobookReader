@@ -100,35 +100,89 @@ public class AudiobookshelfClient(HttpClient http)
         return trimmed;
     }
 
+    /// <summary>
+    /// How long signing in may take before the address is taken to be wrong.
+    ///
+    /// The HttpClient this is handed waits half an hour, because a whole audiobook downloads through
+    /// it. A sign-in is a few hundred bytes — but to an address where nothing answers at all, a
+    /// mistyped IP on the home network, the connection neither succeeds nor fails, and the screen
+    /// said "Connecting…" for as long as anyone was willing to watch it. That read as the app
+    /// ignoring a wrong address rather than reporting it.
+    /// </summary>
+    public static readonly TimeSpan QuickTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>Runs a small request under <see cref="QuickTimeout"/>, saying which address did not answer.</summary>
+    private async Task<T> QuicklyAsync<T>(Func<CancellationToken, Task<T>> call, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(QuickTimeout);
+
+        try
+        {
+            return await call(timeout.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new ServerException(string.Format(CoreStrings.Server_CheckAddress, _baseUrl));
+        }
+    }
+
     /// <summary>Signs in and keeps the tokens. Returns them so the caller can store them.</summary>
-    public async Task<ServerTokens> SignInAsync(
+    public Task<ServerTokens> SignInAsync(
         string username,
         string password,
-        CancellationToken ct = default)
+        CancellationToken ct = default) => QuicklyAsync(async quick =>
     {
-        var response = await SendAsync(
-            () =>
-            {
-                var request = new HttpRequestMessage(HttpMethod.Post, Url("/login"))
+        HttpResponseMessage response;
+
+        try
+        {
+            response = await SendAsync(
+                () =>
                 {
-                    Content = JsonContent.Create(
-                        new Credentials(username, password), ServerJsonContext.Default.Credentials),
-                };
+                    var request = new HttpRequestMessage(HttpMethod.Post, Url("/login"))
+                    {
+                        Content = JsonContent.Create(
+                            new Credentials(username, password), ServerJsonContext.Default.Credentials),
+                    };
 
-                // Without this the server keeps the refresh token to itself, in a cookie, and hands
-                // back only an access token good for an hour. This is the header its own mobile app
-                // sends, and it is the difference between signing in once and signing in hourly.
-                request.Headers.Add("x-return-tokens", "true");
-                return request;
-            },
-            authenticated: false,
-            ct);
+                    // Without this the server keeps the refresh token to itself, in a cookie, and
+                    // hands back only an access token good for an hour. This is the header its own
+                    // mobile app sends, and it is the difference between signing in once and hourly.
+                    request.Headers.Add("x-return-tokens", "true");
+                    return request;
+                },
+                authenticated: false,
+                quick);
+        }
+        catch (ServerException ex) when (ex.Status == HttpStatusCode.Unauthorized)
+        {
+            // The same 401 that means "your sign-in has lapsed" everywhere else means "that was the
+            // wrong password" here, and saying the former to someone who just typed it is baffling.
+            throw new ServerException(CoreStrings.Server_WrongCredentials, HttpStatusCode.Unauthorized, ex);
+        }
 
-        var login = await ReadAsync(response, ServerJsonContext.Default.LoginResponse, ct);
+        var login = await ReadAsync(response, ServerJsonContext.Default.LoginResponse, quick);
 
         return Adopt(login?.User)
                ?? throw new ServerException(CoreStrings.Server_NoToken);
-    }
+    }, ct);
+
+    /// <summary>
+    /// Checks a pasted API token by asking for something only a signed-in client may see, under the
+    /// same short wait as signing in.
+    /// </summary>
+    public Task VerifyTokenAsync(CancellationToken ct = default) => QuicklyAsync(async quick =>
+    {
+        try
+        {
+            return await GetLibrariesAsync(quick);
+        }
+        catch (ServerException ex) when (ex.NeedsSignIn)
+        {
+            throw new ServerException(CoreStrings.Server_TokenRejected, ex.Status, ex);
+        }
+    }, ct);
 
     /// <summary>
     /// Takes whatever the server offered, newest scheme first.

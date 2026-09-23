@@ -154,6 +154,32 @@
                     Style="{StaticResource Primary}"
                     Text="{x:Static s:Strings.Server_Connect}" />
 
+                <!--
+                    Right under the button that started it, and in full: the page's own status line is
+                    one truncated row at the foot of the screen, and a failed sign-in there went unseen.
+                -->
+                <HorizontalStackLayout
+                    HorizontalOptions="Center"
+                    IsVisible="{Binding IsConnecting}"
+                    Spacing="10">
+                    <ActivityIndicator
+                        HeightRequest="24"
+                        IsRunning="{Binding IsConnecting}"
+                        VerticalOptions="Center"
+                        WidthRequest="24"
+                        Color="{AppThemeBinding Light={StaticResource Accent},
+                                                Dark={StaticResource AccentDark}}" />
+                    <Label
+                        Style="{StaticResource Muted}"
+                        Text="{x:Static s:Strings.Server_Connecting}"
+                        VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
+                <Label
+                    IsVisible="{Binding HasConnectError}"
+                    Style="{StaticResource Failure}"
+                    Text="{Binding ConnectError}" />
+
                 <Label
                     Style="{StaticResource Muted}"
                     Text="{x:Static s:Strings.Server_SecurityNote}" />

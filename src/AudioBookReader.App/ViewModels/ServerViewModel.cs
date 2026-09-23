@@ -130,6 +130,21 @@ public partial class ServerViewModel(ServerConnection server, ServerAccount acco
 
     public bool HasStatus => Status.Length > 0;
 
+    /// <summary>
+    /// Signing in, specifically — shown beside the Connect button rather than on the shared status
+    /// line at the foot of the page, which is a single truncated line far from where the user is
+    /// looking and was read as the app doing nothing.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsConnecting { get; set; }
+
+    /// <summary>Why the last sign-in failed, shown in full under the button until the next attempt.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasConnectError))]
+    public partial string ConnectError { get; set; } = "";
+
+    public bool HasConnectError => ConnectError.Length > 0;
+
     [ObservableProperty]
     public partial double Progress { get; set; }
 
@@ -151,7 +166,22 @@ public partial class ServerViewModel(ServerConnection server, ServerAccount acco
     }
 
     [RelayCommand]
-    private Task ConnectAsync() => GuardAsync(async () =>
+    private async Task ConnectAsync()
+    {
+        ConnectError = "";
+        IsConnecting = true;
+
+        try
+        {
+            await GuardAsync(SignInAsync, onError: message => ConnectError = message);
+        }
+        finally
+        {
+            IsConnecting = false;
+        }
+    }
+
+    private async Task SignInAsync()
     {
         if (string.IsNullOrWhiteSpace(Url)) throw new InvalidOperationException(Strings.Server_EnterAddress);
 
@@ -176,7 +206,7 @@ public partial class ServerViewModel(ServerConnection server, ServerAccount acco
 
         IsConnected = true;
         await RefreshAsync();
-    });
+    }
 
     [RelayCommand]
     private Task CloseAsync() => Shell.Current.GoToAsync("..");
@@ -313,7 +343,7 @@ public partial class ServerViewModel(ServerConnection server, ServerAccount acco
     /// Runs a command, turning a failure into a line on screen rather than a crash — and naming the
     /// one failure the user can do something about.
     /// </summary>
-    private async Task GuardAsync(Func<Task> action)
+    private async Task GuardAsync(Func<Task> action, Action<string>? onError = null)
     {
         _depth++;
         IsBusy = true;
@@ -327,12 +357,14 @@ public partial class ServerViewModel(ServerConnection server, ServerAccount acco
             AppLog.Error("server", ex);
 
             Status = ex.Message;
+            onError?.Invoke(ex.Message);
             if (ex.NeedsSignIn) IsConnected = false;
         }
         catch (Exception ex)
         {
             AppLog.Error("server", ex);
             Status = ex.Message;
+            onError?.Invoke(ex.Message);
         }
         finally
         {

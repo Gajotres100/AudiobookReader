@@ -115,4 +115,13 @@
     <value>Section {0}</value>
     <comment>Fallback name for a part of an ebook that has no chapter marks.</comment>
   </data>
+  <data name="Server_WrongCredentials" xml:space="preserve">
+    <value>Wrong username or password.</value>
+  </data>
+  <data name="Server_TokenRejected" xml:space="preserve">
+    <value>The server didn’t accept this token.</value>
+  </data>
+  <data name="Server_CheckAddress" xml:space="preserve">
+    <value>No answer from {0}. Check the address, and that the server is running and on this network.</value>
+  </data>
 </root>

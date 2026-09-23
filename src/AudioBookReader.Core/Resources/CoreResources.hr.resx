@@ -108,4 +108,13 @@
   <data name="Section_Numbered" xml:space="preserve">
     <value>Dio {0}</value>
   </data>
+  <data name="Server_WrongCredentials" xml:space="preserve">
+    <value>Pogrešno korisničko ime ili lozinka.</value>
+  </data>
+  <data name="Server_TokenRejected" xml:space="preserve">
+    <value>Server nije prihvatio ovaj token.</value>
+  </data>
+  <data name="Server_CheckAddress" xml:space="preserve">
+    <value>{0} ne odgovara. Provjeri adresu, i je li server upaljen i na ovoj mreži.</value>
+  </data>
 </root>

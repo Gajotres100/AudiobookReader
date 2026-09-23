@@ -165,7 +165,7 @@ public class ServerConnection(
         KeepTokens();
         _client.Connect(url, token);
 
-        await _client.GetLibrariesAsync(ct);
+        await _client.VerifyTokenAsync(ct);
 
         // A pasted API token is the long-lived kind and has nothing to refresh with.
         await account.SaveAsync(AudiobookshelfClient.Normalise(url), token, refresh: null);
