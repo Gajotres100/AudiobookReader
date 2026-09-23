@@ -8,6 +8,8 @@ workflows:
     name: iOS build check (simulator, unsigned)
     instance_type: mac_mini_m2
     max_build_duration: 30
+    environment:
+      xcode: latest
     scripts:
       - name: Install .NET SDK
         script: |
@@ -39,7 +41,12 @@ workflows:
   ios-sideload:
     name: iOS unsigned device build (for Sideloadly/AltStore)
     instance_type: mac_mini_m2
-    max_build_duration: 30
+    # A Release device build AOT-compiles every assembly, on top of installing the SDK and the
+    # workload from scratch — thirty minutes was cutting it close.
+    max_build_duration: 60
+    environment:
+      # .NET for iOS 26.x needs Xcode 26; named rather than left to whatever the image defaults to.
+      xcode: latest
     scripts:
       - name: Install .NET SDK
         script: |
@@ -52,10 +59,12 @@ workflows:
           dotnet workload restore src/AudioBookReader.App/AudioBookReader.App.csproj
       - name: Build the .app for a real device, no Apple signing identity involved
         script: |
-          # A plain build (no -p:ArchiveOnBuild/-p:BuildIpa) does not enforce a real codesign
-          # identity the way archiving does — it produces an ordinary unsigned .app bundle.
+          # EnableCodeSigning defaults to true in the iOS SDK, and on a Mac it then goes looking for
+          # a signing identity in the keychain — of which this machine has none — and fails the
+          # build. Turned off here; the next step ad-hoc signs the bundle instead, which is all
+          # Sideloadly and AltStore need before they re-sign it with the user's own Apple ID.
           dotnet build src/AudioBookReader.App/AudioBookReader.App.csproj \
-            -f net10.0-ios -c Release -r ios-arm64
+            -f net10.0-ios -c Release -r ios-arm64 -p:EnableCodeSigning=false
       - name: Ad-hoc sign it locally and pack a plain .ipa by hand
         script: |
           APP_DIR=$(find src/AudioBookReader.App/bin/Release/net10.0-ios/ios-arm64 -maxdepth 1 -name "*.app")
