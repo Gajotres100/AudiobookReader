@@ -1047,4 +1047,7 @@
   <data name="Model_Ready" xml:space="preserve">
     <value>Speech model ready.</value>
   </data>
+  <data name="Reader_BookPageOf" xml:space="preserve">
+    <value>{0} / {1} overall</value>
+  </data>
 </root>

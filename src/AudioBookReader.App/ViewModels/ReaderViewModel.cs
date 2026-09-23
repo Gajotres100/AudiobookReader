@@ -412,6 +412,13 @@ public partial class ReaderViewModel(
             if (_text is null) return "";
 
             var pages = PageCount > 1 ? string.Format(Strings.Reader_PageOf, PageNumber, PageCount) : "";
+
+            if (BookPages() is { } book)
+            {
+                var overall = string.Format(Strings.Reader_BookPageOf, book.Page, book.Count);
+                pages = pages.Length > 0 ? $"{pages}   ·   {overall}" : overall;
+            }
+
             var chapter = CurrentChapterTitle;
 
             return (chapter, pages) switch
@@ -442,7 +449,64 @@ public partial class ReaderViewModel(
         _topSentence = topSentence;
         CurrentChapterTitle = ChapterTitleAtSentence(topSentence);
 
+        LearnPageSize();
         NoteReadingProgress(topSentence);
+    }
+
+    // ---- The page in the whole book ----
+
+    /// <summary>
+    /// The page in the whole book, and how many there are.
+    ///
+    /// Estimated, the way every reader app does it: the page only ever lays out the document on
+    /// screen, so the rest of the book is counted at the density this one showed. Counted outwards
+    /// from this document rather than from the top of the book, so turning a page moves the figure
+    /// by exactly one instead of by whatever the estimate rounds to.
+    /// </summary>
+    private (int Page, int Count)? BookPages()
+    {
+        if (_text is null || SpineIndex < 0 || SpineIndex >= _text.Spine.Count || PageCount < 1) return null;
+
+        var perPage = CharsPerPage;
+        if (perPage <= 0) return null;
+
+        var document = _text.Spine[SpineIndex];
+        var before = (int)Math.Round(document.TextStart / perPage);
+        var after = (int)Math.Round((_text.PlainText.Length - document.TextEnd) / perPage);
+
+        return (before + Math.Clamp(PageNumber, 1, PageCount), before + PageCount + after);
+    }
+
+    /// <summary>Per size, since that is what decides how much fits. Remembered, so the figure is there from the first page next time.</summary>
+    private string CharsPerPageKey => $"reader.charsPerPage.{FontSize}";
+
+    private double CharsPerPage => Preferences.Default.Get(CharsPerPageKey, 0.0);
+
+    private (int Document, int Pages, int Size) _learnedFrom = (-1, 0, 0);
+
+    /// <summary>
+    /// Learns how much text a page holds from the document on screen.
+    ///
+    /// Only from one that fills a few pages — a title page or a one-line epigraph says nothing about
+    /// a chapter — and blended into what was known, so one dense or airy chapter does not swing the
+    /// whole book's count.
+    /// </summary>
+    private void LearnPageSize()
+    {
+        if (_text is null || PageCount < 3 || SpineIndex < 0 || SpineIndex >= _text.Spine.Count) return;
+
+        var sampleOf = (SpineIndex, PageCount, FontSize);
+        if (sampleOf == _learnedFrom) return;
+        _learnedFrom = sampleOf;
+
+        var document = _text.Spine[SpineIndex];
+        var sample = (document.TextEnd - document.TextStart) / (double)PageCount;
+        if (sample <= 0) return;
+
+        var known = CharsPerPage;
+        Preferences.Default.Set(CharsPerPageKey, known <= 0 ? sample : (known * 3 + sample) / 4);
+
+        OnPropertyChanged(nameof(DocumentLabel));
     }
 
     private int _lastNotedSentence = -1;
@@ -796,6 +860,17 @@ public partial class ReaderViewModel(
         var chapter = _readerChapters[index];
         if (chapter.TextStart is not { } start) return;
 
+        // Moving to another chapter notes where this one was left and resumes that one where it
+        // was; picking the chapter already open means its start.
+        if (CurrentReadingOffset() is { } here && ChapterIndexAtChar(here) is var leaving && leaving != index)
+        {
+            ChapterPositions.Leave(
+                ChapterPositions.Text, BookId, leaving, here,
+                _readerChapters[leaving].TextStart ?? 0, ChapterTextEnd(leaving), ChapterFinishedWithinChars);
+
+            if (ChapterPositions.Enter(ChapterPositions.Text, BookId, index) is { } resume) start = (int)resume;
+        }
+
         ShowDocumentAt(start);
 
         if (_text?.SentenceAt(start) is { } sentence)
@@ -804,8 +879,32 @@ public partial class ReaderViewModel(
             HighlightRequested?.Invoke(this, sentence.Index);
         }
 
-        await TakeNarrationToAsync(start);
+        // An exact place either way — the chapter's start or where it was left — so the narration
+        // goes there too, rather than to wherever it was last heard in that document.
+        await TakeNarrationToAsync(start, exactPlace: true);
     }
+
+    /// <summary>
+    /// How close to its end a chapter may be left and still count as read — roughly the last page
+    /// on a phone — so it opens at the top next time rather than on its closing lines.
+    /// </summary>
+    private const int ChapterFinishedWithinChars = 1_500;
+
+    /// <summary>Where the eye is: the sentence at the top of the page, or the last one marked.</summary>
+    private int? CurrentReadingOffset()
+    {
+        if (_text is null) return null;
+
+        var index = _topSentence >= 0 && _topSentence < _text.Sentences.Count ? _topSentence : _lastSentence;
+        return index >= 0 && index < _text.Sentences.Count ? _text.Sentences[index].Start : null;
+    }
+
+    /// <summary>Where one of the ebook's chapters ends: its own end, the next chapter's start, or the book's.</summary>
+    private int ChapterTextEnd(int chapterIndex) =>
+        _readerChapters[chapterIndex].TextEnd
+        ?? _readerChapters.Skip(chapterIndex + 1).FirstOrDefault(c => c.TextStart is not null)?.TextStart
+        ?? _text?.PlainText.Length
+        ?? 0;
 
     /// <summary>
     /// How far past a requested offset to look for one the map covers. About a paragraph — far

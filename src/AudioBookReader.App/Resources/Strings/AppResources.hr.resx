@@ -987,4 +987,7 @@
   <data name="Model_Ready" xml:space="preserve">
     <value>Model za prepoznavanje je spreman.</value>
   </data>
+  <data name="Reader_BookPageOf" xml:space="preserve">
+    <value>{0} / {1} ukupno</value>
+  </data>
 </root>

@@ -710,7 +710,9 @@ public partial class BookViewModel(
             ? current
             : _chapters.LastOrDefault(c => c.Index < current.Index) ?? current;
 
-        playback.SeekTo(target.StartMs ?? 0);
+        // Restarting the chapter you are in is asked for by name; only moving to another resumes.
+        if (target.Index == current.Index) playback.SeekTo(target.StartMs ?? 0);
+        else GoToChapter(target);
     }
 
     [RelayCommand]
@@ -719,7 +721,35 @@ public partial class BookViewModel(
         if (CurrentChapter() is not { } current) return;
 
         var next = _chapters.FirstOrDefault(c => c.Index > current.Index);
-        playback.SeekTo(next?.StartMs ?? DurationMs);
+
+        if (next is null) playback.SeekTo(DurationMs);
+        else GoToChapter(next);
+    }
+
+    /// <summary>
+    /// How close to its end a chapter may be left and still count as finished — so it is started
+    /// from the top next time rather than resumed for a closing line or two.
+    /// </summary>
+    private const long ChapterFinishedWithinMs = 20_000;
+
+    /// <summary>
+    /// Moves to another chapter: notes where the one being left had got to, and resumes the one
+    /// being entered where it was last left, or at its start.
+    /// </summary>
+    private void GoToChapter(Chapter target)
+    {
+        if (CurrentChapter() is { StartMs: { } from } leaving && leaving.Index != target.Index)
+        {
+            var to = leaving.EndMs
+                     ?? _chapters.FirstOrDefault(c => c.Index > leaving.Index)?.StartMs
+                     ?? DurationMs;
+
+            ChapterPositions.Leave(
+                ChapterPositions.Audio, BookId, leaving.Index, PositionMs, from, to, ChapterFinishedWithinMs);
+        }
+
+        var resume = ChapterPositions.Enter(ChapterPositions.Audio, BookId, target.Index);
+        playback.SeekTo(resume ?? target.StartMs ?? 0);
     }
 
     [RelayCommand]
@@ -738,7 +768,9 @@ public partial class BookViewModel(
     {
         if (row?.Chapter.StartMs is not { } start) return;
 
-        playback.SeekTo(start);
+        // Picking the chapter already playing means its start; picking another resumes it.
+        if (CurrentChapter()?.Index == row.Chapter.Index) playback.SeekTo(start);
+        else GoToChapter(row.Chapter);
 
         // The list covers the player while it is open, and having picked a chapter the user wants
         // to see the thing they just moved.

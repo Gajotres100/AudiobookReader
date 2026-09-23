@@ -94,6 +94,7 @@ public static class Strings
     public static string Reader_NoVoice => Get(nameof(Reader_NoVoice));
 
     public static string Reader_Chapters => Get(nameof(Reader_Chapters));
+    public static string Reader_BookPageOf => Get(nameof(Reader_BookPageOf));
     /// <summary>Bookmarks</summary>
     public static string Bookmarks_Title => Get(nameof(Bookmarks_Title));
     /// <summary>No bookmarks yet. Press and hold the ⚑ flag in the player to keep the spot you are on.</summary>
