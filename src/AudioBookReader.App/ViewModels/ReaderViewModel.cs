@@ -441,6 +441,67 @@ public partial class ReaderViewModel(
 
         _topSentence = topSentence;
         CurrentChapterTitle = ChapterTitleAtSentence(topSentence);
+
+        NoteReadingProgress(topSentence);
+    }
+
+    private int _lastNotedSentence = -1;
+    private DateTime _lastPositionNoted = DateTime.MinValue;
+
+    /// <summary>
+    /// Turning pages while reading silently is progress too, and until now only crossing a
+    /// document boundary, jumping to a chapter, or tapping a sentence counted as such — see
+    /// <see cref="_narrationTakenHere"/>. Paging forward through a chapter sets none of those, so
+    /// a paired, aligned book read the ordinary way — one page at a time, without listening —
+    /// never advanced past wherever the chapter it was opened on began, and reopening it landed
+    /// back at that chapter's start regardless of how many pages had actually been read.
+    ///
+    /// A quiet seek rather than <see cref="TakeNarrationToAsync"/>: nothing is playing to settle
+    /// or correct here, so all that is needed is moving the playhead to where the map already
+    /// says this page is read, which is what <see cref="Follow"/>'s own save gate then picks up.
+    /// Skipped entirely while actually playing — that path already saves correctly, and seeking
+    /// mid-playback here would audibly jump the narration around on every page turn.
+    /// </summary>
+    private void NoteReadingProgress(int topSentence)
+    {
+        if (_book?.IsPaired != true || !CanFollow || playback.IsPlaying) return;
+
+        // A chapter jump or a tapped sentence is still placing the voice; its own seeks and
+        // corrections must not be overridden by the page reports its document load produces.
+        if (_holding is not null) return;
+
+        if (topSentence == _lastNotedSentence) return;
+        if (DateTime.UtcNow - _lastPositionNoted < TimeSpan.FromSeconds(3)) return;
+
+        _lastNotedSentence = topSentence;
+        _lastPositionNoted = DateTime.UtcNow;
+
+        if (AudioPositionForSentence(topSentence) is not { } at) return;
+
+        playback.SeekTo(at);
+        _narrationTakenHere = true;
+        _narrationDocument = SpineIndex;
+    }
+
+    /// <summary>
+    /// Where the voice should move to because the eye has read on past it, or null when it should
+    /// stay where it is.
+    ///
+    /// Only ever forwards. The page reports the sentence at its top, and a voice paused halfway down
+    /// the page is ahead of that — moving it "to the page" would rewind up to a minute of listening
+    /// every time someone paused mid-page and closed the book. The case this exists for is the other
+    /// one: reading on in silence, pages beyond where the voice last was. Paging back to re-read
+    /// leaves the voice alone; a tapped sentence is still how it is moved by hand.
+    /// </summary>
+    private long? AudioPositionForSentence(int sentenceIndex)
+    {
+        if (_text is null || sentenceIndex < 0 || sentenceIndex >= _text.Sentences.Count) return null;
+        if (playback.BookId != BookId) return null;
+
+        var start = _text.Sentences[sentenceIndex].Start;
+        if (_sync?.AudioPositionAtOrAfterChar(start, LookAheadChars) is not { } at) return null;
+
+        return at - playback.PositionMs > CloseEnoughMs ? at : null;
     }
 
     /// <summary>
@@ -1416,7 +1477,20 @@ public partial class ReaderViewModel(
         var index = topSentenceIndex ?? _lastSentence;
         if (index < 0 || index >= _text.Sentences.Count) return Task.CompletedTask;
 
-        return database.SaveReadingStateAsync(BookId, textOffset: _text.Sentences[index].Start);
+        // For a paired book read in silence, the page is where the reader actually is — and it is
+        // the audio position, not this text offset, that reopening the book resumes from. Saving
+        // only the text left the two disagreeing, and the stale audio won: close the book on page
+        // ten of a chapter and it reopened at the chapter's start. Whichever moved last updates the
+        // other, so the voice is moved to the page too, and both are written in one statement.
+        long? audio = null;
+
+        if (CanFollow && !playback.IsPlaying && AudioPositionForSentence(index) is { } at)
+        {
+            playback.SeekTo(at);
+            audio = at;
+        }
+
+        return database.SaveReadingStateAsync(BookId, audioPositionMs: audio, textOffset: _text.Sentences[index].Start);
     }
 
     [RelayCommand]
