@@ -92,7 +92,9 @@ public partial class BookViewModel(
     public partial bool IsPlaying { get; set; }
 
     /// <summary>The one control that has to be readable at arm's length, so it carries a glyph, not a word.</summary>
-    public string PlayGlyph => IsPlaying ? "❚❚" : "▶";
+    // U+FE0E asks for the text presentation. Without it iOS draws U+25B6 as a blue emoji tile
+    // inside the brass button; Android happened not to, which is why it went unnoticed.
+    public string PlayGlyph => IsPlaying ? "❚❚" : "▶︎";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PositionText))]

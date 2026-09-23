@@ -23,7 +23,7 @@ public partial class ChapterRow(Chapter chapter, string title, string startText)
     [NotifyPropertyChangedFor(nameof(TitleWeight))]
     public partial bool IsCurrent { get; set; }
 
-    public string Marker => IsCurrent ? "▶" : "";
+    public string Marker => IsCurrent ? "▶︎" : "";
 
     public FontAttributes TitleWeight => IsCurrent ? FontAttributes.Bold : FontAttributes.None;
 }

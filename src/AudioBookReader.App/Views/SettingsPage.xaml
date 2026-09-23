@@ -323,6 +323,16 @@
                     <Label
                         Style="{StaticResource Muted}"
                         Text="{x:Static s:Strings.Settings_VerboseNote}" />
+
+                    <!--
+                        The log is in the app's private storage, where nothing outside the app can
+                        read it — on iOS not even with a cable. Handing it to the share sheet is the
+                        one way to get it off a phone that shows a problem.
+                    -->
+                    <Button
+                        Command="{Binding ShareLogCommand}"
+                        Style="{StaticResource Secondary}"
+                        Text="{x:Static s:Strings.Settings_ShareLog}" />
                 </VerticalStackLayout>
             </Border>
         </VerticalStackLayout>

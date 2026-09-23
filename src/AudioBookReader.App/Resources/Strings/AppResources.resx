@@ -1035,4 +1035,10 @@
     <value>Unknown author</value>
     <comment>Used as a folder name when a book has no author.</comment>
   </data>
+  <data name="Server_ShowPassword" xml:space="preserve">
+    <value>Show password</value>
+  </data>
+  <data name="Settings_ShareLog" xml:space="preserve">
+    <value>Share log</value>
+  </data>
 </root>

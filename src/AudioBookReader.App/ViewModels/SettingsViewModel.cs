@@ -202,6 +202,41 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings, Language
 
     partial void OnVerboseLogChanged(bool value) => settings.VerboseLog = value;
 
+    /// <summary>
+    /// Hands the log to the share sheet, as one file with the rolled-over half first so it reads in
+    /// order. Copied rather than shared in place: the log is appended to while the app runs, and a
+    /// receiving app reading it mid-write would get a torn last line at best.
+    /// </summary>
+    [RelayCommand]
+    private async Task ShareLogAsync()
+    {
+        try
+        {
+            var copy = Path.Combine(FileSystem.CacheDirectory, "syncbook-log.txt");
+
+            await using (var output = File.Create(copy))
+            {
+                foreach (var part in new[] { AppPaths.Log + ".old", AppPaths.Log })
+                {
+                    if (!File.Exists(part)) continue;
+
+                    await using var input = new FileStream(part, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    await input.CopyToAsync(output);
+                }
+            }
+
+            await Share.Default.RequestAsync(new ShareFileRequest
+            {
+                Title = Strings.Settings_ShareLog,
+                File = new ShareFile(copy, "text/plain"),
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("sharing the log", ex);
+        }
+    }
+
     partial void OnChargingOnlyChanged(bool value) => settings.ChargingOnly = value;
 
     partial void OnScreenOffOnlyChanged(bool value) => settings.ScreenOffOnly = value;

@@ -975,4 +975,10 @@
   <data name="Server_UnknownAuthor" xml:space="preserve">
     <value>Nepoznat autor</value>
   </data>
+  <data name="Server_ShowPassword" xml:space="preserve">
+    <value>Prikaži lozinku</value>
+  </data>
+  <data name="Settings_ShareLog" xml:space="preserve">
+    <value>Podijeli log</value>
+  </data>
 </root>

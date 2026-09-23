@@ -152,6 +152,8 @@ public static class Strings
     public static string Server_Username => Get(nameof(Server_Username));
     /// <summary>Password</summary>
     public static string Server_Password => Get(nameof(Server_Password));
+    public static string Server_ShowPassword => Get(nameof(Server_ShowPassword));
+    public static string Settings_ShareLog => Get(nameof(Settings_ShareLog));
     /// <summary>Remember sign-in</summary>
     public static string Server_RememberSignIn => Get(nameof(Server_RememberSignIn));
     /// <summary>API token from your account page</summary>

@@ -13,6 +13,10 @@ public partial class ServerPage : ContentPage
         BindingContext = _viewModel = viewModel;
     }
 
+    private void OnShowPasswordPressed(object? sender, EventArgs e) => PasswordEntry.IsPassword = false;
+
+    private void OnShowPasswordReleased(object? sender, EventArgs e) => PasswordEntry.IsPassword = true;
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();

@@ -99,10 +99,25 @@
 
                 <VerticalStackLayout IsVisible="{Binding UsesPassword}" Spacing="10">
                     <Entry Placeholder="{x:Static s:Strings.Server_Username}" Text="{Binding Username}" />
-                    <Entry
-                        IsPassword="True"
-                        Placeholder="{x:Static s:Strings.Server_Password}"
-                        Text="{Binding Password}" />
+                    <!--  Hold the eye to see what was typed; letting go hides it again.  -->
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Entry
+                            x:Name="PasswordEntry"
+                            Grid.Column="0"
+                            IsPassword="True"
+                            Placeholder="{x:Static s:Strings.Server_Password}"
+                            Text="{Binding Password}" />
+                        <ImageButton
+                            Grid.Column="1"
+                            Padding="8"
+                            BackgroundColor="Transparent"
+                            HeightRequest="44"
+                            Pressed="OnShowPasswordPressed"
+                            Released="OnShowPasswordReleased"
+                            SemanticProperties.Description="{x:Static s:Strings.Server_ShowPassword}"
+                            Source="eye.png"
+                            WidthRequest="44" />
+                    </Grid>
 
                     <Grid ColumnDefinitions="*,Auto">
                         <Label
