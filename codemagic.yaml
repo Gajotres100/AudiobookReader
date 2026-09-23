@@ -1,18 +1,13 @@
+# Every workflow here is started by hand ("Start new build"): none has a triggering block. The free
+# tier is 500 build minutes a month and each of these takes about fifteen, so building on every push
+# would spend it on checks that already run locally — net10.0-ios compiles on Windows without a Mac.
 workflows:
-  # Runs on every push. Builds net10.0-ios for the iOS *simulator* specifically — a simulator
-  # binary never needs code signing, so this workflow needs no Apple Developer account and no
-  # secrets at all. It exists purely as the "does the iOS platform code even compile" signal
-  # (iOS-0 through iOS-5 in the port plan), since there is no Mac available locally to check that.
+  # Builds net10.0-ios for the iOS simulator — a simulator binary never needs code signing, so this
+  # needs no Apple account and no secrets. A "does it build on a real Mac" check, nothing more.
   ios-build:
     name: iOS build check (simulator, unsigned)
     instance_type: mac_mini_m2
     max_build_duration: 30
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: '*'
-          include: true
     scripts:
       - name: Install .NET SDK
         script: |
@@ -45,8 +40,6 @@ workflows:
     name: iOS unsigned device build (for Sideloadly/AltStore)
     instance_type: mac_mini_m2
     max_build_duration: 30
-    triggering:
-      events: []  # manual only — "Start new build" in the Codemagic UI
     scripts:
       - name: Install .NET SDK
         script: |
@@ -103,8 +96,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.gajotres.audiobookreader
-    triggering:
-      events: []  # manual only — "Start new build" in the Codemagic UI, never on push
     scripts:
       - name: Install .NET SDK
         script: |
