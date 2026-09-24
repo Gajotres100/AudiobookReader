@@ -789,6 +789,26 @@ public class PlaybackService : MediaLibraryService
 
     public void Pause() => OnPlayer(() => _player?.Pause());
 
+    /// <summary>
+    /// Stops and lets go of the file, for a book being deleted or losing its audio.
+    ///
+    /// Pausing is not enough: the player keeps the file open, and a deleted file that is still
+    /// open keeps its space. Deleting a playing book went on playing it from the deleted file, and
+    /// a television with 4 GB of storage had 630 MB of it held by a book that was no longer there.
+    /// </summary>
+    public void Unload() => OnPlayer(() =>
+    {
+        if (_player is null) return;
+
+        _sleepTimer?.Cancel();
+        _player.Stop();
+        _player.ClearMediaItems();
+
+        LoadedPath = null;
+        CurrentBookId = null;
+        _chapterStarts = [];
+    });
+
     public void SeekTo(long positionMs) => OnPlayer(() =>
         _player?.SeekTo(Math.Clamp(positionMs, 0, DurationMs > 0 ? DurationMs : long.MaxValue)));
 

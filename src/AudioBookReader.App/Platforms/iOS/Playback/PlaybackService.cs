@@ -331,6 +331,22 @@ public sealed class PlaybackService
         PublishNowPlayingInfo();
     });
 
+    /// <summary>Stops and lets go of the file, for a book being deleted — see the Android service.</summary>
+    public void Unload() => OnMain(() =>
+    {
+        _sleepTimer.Cancel();
+        _playWhenReady = false;
+        _pendingSeekMs = null;
+        _player.Pause();
+        _player.ReplaceCurrentItemWithPlayerItem(null);
+
+        _item = null;
+        _loadedPath = null;
+        CurrentBookId = null;
+        _chapterStarts = [];
+        MPNowPlayingInfoCenter.DefaultCenter.NowPlaying = new MPNowPlayingInfo();
+    });
+
     public void SeekTo(long positionMs) => OnMain(() =>
     {
         var clamped = Math.Clamp(positionMs, 0, DurationMs > 0 ? DurationMs : long.MaxValue);

@@ -57,6 +57,7 @@ public partial class PlaybackController
 
     public partial void Play() => Service?.Play();
     public partial void Pause() => Service?.Pause();
+    private partial void UnloadCore() => Service?.Unload();
     public partial void SeekTo(long positionMs) => Service?.SeekTo(positionMs);
     public partial void Nudge(long deltaMs) => Service?.Nudge(deltaMs);
     public partial void SetSpeed(float speed) => Service?.SetSpeed(speed);

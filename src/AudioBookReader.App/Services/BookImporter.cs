@@ -318,6 +318,9 @@ public class BookImporter(
         // only medium left.
         var fromText = await ChaptersFromTextAsync(before, ct);
 
+        // The audio is about to be deleted; see DeleteBookAsync.
+        playback.Unload(bookId);
+
         var book = await library.DetachAudioAsync(bookId, fromText);
 
         // The internal copy (if alignment made one) and the user's real original are two different
@@ -375,6 +378,10 @@ public class BookImporter(
         CancellationToken ct = default)
     {
         var book = await database.GetBookAsync(bookId);
+
+        // Before its files go: a player still holding the audio would play on from a deleted file
+        // and keep all of its space until the app closed.
+        playback.Unload(bookId);
 
         await database.DeleteBookAsync(bookId);
         syncMaps.Delete(bookId);

@@ -103,6 +103,22 @@ public partial class PlaybackController
         return true;
     }
 
+    private partial void UnloadCore();
+
+    /// <summary>
+    /// Stops and releases a book's audio if it is the one loaded — before that audio is deleted.
+    ///
+    /// A deleted file the player still holds open keeps playing and keeps its space until the app
+    /// is closed, which on a television short of storage is the space the next download needed.
+    /// </summary>
+    public void Unload(int bookId)
+    {
+        if (_bookId != bookId) return;
+
+        UnloadCore();
+        _bookId = null;
+    }
+
     public void TogglePlayPause()
     {
         if (IsPlaying) Pause();
