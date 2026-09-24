@@ -192,25 +192,33 @@ public partial class ReaderViewModel(
     public partial bool IsWaitingToSpeak { get; set; }
 
     /// <summary>
-    /// Whether play is offered.
+    /// Whether play is offered: whenever there is a narration.
     ///
-    /// Withheld in exactly one situation: the few seconds after a chapter jump, while measuring
-    /// works towards the new position and the status line says so. Starting there would mean a
-    /// voice reading text the page cannot mark.
+    /// It used to be withheld for the seconds after a chapter jump, while measuring worked towards
+    /// the new position, so that the voice would not start ahead of text the page could mark. In
+    /// use that was a dead button at exactly the moment someone had just asked for a chapter and
+    /// wanted to hear it — and since the whole book is now searched for whatever is heard, the
+    /// place is found within a window or two anyway. So play is always allowed; pressed during
+    /// that wait, the voice starts at the best guess and the correction still moves it into place.
     ///
-    /// It is deliberately not withheld merely because the passage is unmeasured. That looked like
-    /// the same rule but is a very different one — on a book that has never been played there is no
-    /// playhead, nothing measured anywhere, and gating play on measurement leaves a dead button and
-    /// no way to ever start the book. The control that starts a thing cannot depend on the thing
-    /// having started.
+    /// Never withheld merely because the passage is unmeasured either — on a book that has never
+    /// been played nothing is measured anywhere, and the control that starts a thing cannot depend
+    /// on the thing having started.
     /// </summary>
-    public bool CanPlay => HasAudio && !IsWaitingToSpeak;
+    public bool CanPlay => HasAudio;
 
+    /// <summary>
+    /// Set when play or pause is pressed while a jump is still settling, so the settling does not
+    /// then resume, or fail to resume, against what the person just chose.
+    /// </summary>
+    private bool _toggledWhileHolding;
 
     [RelayCommand]
     private async Task TogglePlayAsync()
     {
         if (!await EnsurePlaybackLoadedAsync()) return;
+
+        if (_holding is not null) _toggledWhileHolding = true;
 
         playback.TogglePlayPause();
         IsPlaying = playback.IsPlaying;
@@ -1056,6 +1064,7 @@ public partial class ReaderViewModel(
     private async Task SettleSeekAsync(bool resume, CancellationToken ct)
     {
         IsWaitingToSpeak = true;
+        _toggledWhileHolding = false;
         FollowStatus = Strings.Reader_PreparingChapter;
 
         try
@@ -1079,12 +1088,13 @@ public partial class ReaderViewModel(
         // Whatever is showing was chosen against the old position; let the next tick place it.
         _lastSentence = -1;
 
-        if (resume) playback.Play();
+        if (resume && !_toggledWhileHolding) playback.Play();
     }
 
     private async Task HoldUntilMeasuredAsync(int targetChar, bool resume, bool blockPlay, CancellationToken ct)
     {
         if (blockPlay) IsWaitingToSpeak = true;
+        _toggledWhileHolding = false;
         FollowStatus = Strings.Reader_PreparingChapter;
 
         var corrections = 0;
@@ -1169,8 +1179,9 @@ public partial class ReaderViewModel(
             FollowStatus = "";
 
             // Only resumes what was already running. A jump made while paused leaves it paused —
-            // with the position now correct, which was the whole point of waiting.
-            if (resume) playback.Play();
+            // with the position now correct, which was the whole point of waiting. And whatever
+            // was pressed in the meantime stands.
+            if (resume && !_toggledWhileHolding) playback.Play();
         }
     }
 
