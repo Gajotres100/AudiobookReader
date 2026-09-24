@@ -46,6 +46,21 @@
 			<action android:name="android.intent.action.PROCESS_TEXT" />
 			<data android:mimeType="text/plain" />
 		</intent>
+
+		<!-- The pickers, so the app can tell whether this device has one before opening it. A
+		     television usually has no system picker, and then a file manager answering "get
+		     content" is used instead — without these, both would look absent on every device. -->
+		<intent>
+			<action android:name="android.intent.action.OPEN_DOCUMENT" />
+			<data android:mimeType="*/*" />
+		</intent>
+		<intent>
+			<action android:name="android.intent.action.OPEN_DOCUMENT_TREE" />
+		</intent>
+		<intent>
+			<action android:name="android.intent.action.GET_CONTENT" />
+			<data android:mimeType="*/*" />
+		</intent>
 	</queries>
 
 	<application

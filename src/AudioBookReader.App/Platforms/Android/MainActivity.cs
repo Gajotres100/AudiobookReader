@@ -54,6 +54,18 @@ public class MainActivity : MauiAppCompatActivity
             return _pending.Task;
         }
 
+        // A television has no system document picker, but a file manager installed on it often
+        // answers the older "get content" request — which is how a book on a USB stick gets in.
+        // What that hands back carries no lasting permission, so the importer copies the file in
+        // instead of referencing it, which is what it already does with anything it cannot hold.
+        if (!HasRealHandler(activity, intent))
+        {
+            intent = new Intent(Intent.ActionGetContent);
+            intent.AddCategory(Intent.CategoryOpenable);
+            intent.SetType("*/*");
+            intent.AddFlags(ActivityFlags.GrantReadUriPermission);
+        }
+
         // Started directly, not through a chooser: the system document picker is the only handler
         // for this action, and wrapping it loses the persistable grant.
         StartPicker(activity, intent, PickDocumentRequest);
@@ -61,29 +73,59 @@ public class MainActivity : MauiAppCompatActivity
     }
 
     /// <summary>
-    /// Opens a system picker, or says plainly that there is none.
+    /// Whether anything real answers the request.
     ///
-    /// Televisions usually ship without the document picker, and starting an activity nothing
-    /// handles throws — out of a button's command, which closes the app. Caught here instead,
-    /// answered as "nothing chosen", with a note pointing at the way that does work on such a
-    /// device. Not tested beforehand by resolving the intent: from Android 11 that answers "none"
-    /// for any app not declared in the manifest's queries, which would break phones too.
+    /// Asked of the package manager, which sees these requests because the manifest declares them
+    /// in its queries. A television can answer with a placeholder — Sony routes the folder picker
+    /// to a stub that only says "you don't have an app that can do this" — so that counts as no
+    /// answer at all.
+    /// </summary>
+    private static bool HasRealHandler(Activity activity, Intent intent)
+    {
+        if (activity.PackageManager is not { } packages) return true;
+
+        var handler = intent.ResolveActivity(packages);
+        return handler is not null && handler.PackageName?.Contains("packagestubs", StringComparison.Ordinal) != true;
+    }
+
+    /// <summary>
+    /// Opens a picker, or says plainly that there is none.
+    ///
+    /// Televisions usually ship without one, and starting an activity nothing handles throws — out
+    /// of a button's command, which closes the app. Answered instead as "nothing chosen", with a
+    /// note pointing at the ways that do work on such a device.
     /// </summary>
     private static void StartPicker(Activity activity, Intent intent, int request)
     {
         try
         {
+            if (!HasRealHandler(activity, intent)) throw new ActivityNotFoundException();
+
             activity.StartActivityForResult(intent, request);
         }
         catch (ActivityNotFoundException)
         {
-            AppLog.Info($"no system picker for {intent.Action} on this device");
+            AppLog.Info($"no picker for {intent.Action} on this device");
 
             _pending?.TrySetResult(null);
-            global::Android.Widget.Toast.MakeText(
-                activity,
-                AudioBookReader.App.Resources.Strings.Strings.Picker_Unavailable,
-                global::Android.Widget.ToastLength.Long)?.Show();
+
+            // A dialog rather than a toast: the note is two sentences of instructions, and a toast
+            // cut it off after the first line and was gone before anyone across a room had read it.
+            Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                try
+                {
+                    if (Shell.Current is { } shell)
+                        await shell.DisplayAlertAsync(
+                            null,
+                            AudioBookReader.App.Resources.Strings.Strings.Picker_Unavailable,
+                            AudioBookReader.App.Resources.Strings.Strings.Common_Close);
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Error("explaining there is no picker", ex);
+                }
+            });
         }
     }
 
