@@ -631,7 +631,11 @@
     <value>Baterija ispod {0}%</value>
   </data>
   <data name="Picker_Unavailable" xml:space="preserve">
-    <value>Ovaj uređaj nema birač datoteka. Knjige dodaj s Audiobookshelf servera (spremi ih u memoriju aplikacije), ili instaliraj upravitelj datoteka poput X-plore pa ih odaberi s USB-a.</value>
+    <value>Ovaj uređaj nema birač datoteka.
+
+Za knjige s USB-a instaliraj „X-plore File Manager” iz Google Playa, pa ponovno pritisni ovu tipku i odaberi datoteku.
+
+Knjige možeš dodati i s Audiobookshelf servera (spremi ih u memoriju aplikacije).</value>
   </data>
   <data name="Folder_NoSystemAccess" xml:space="preserve">
     <value>Nema pristupa datotekama sustava.</value>

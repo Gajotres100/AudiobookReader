@@ -668,7 +668,11 @@
     <comment>{0} is a whole number.</comment>
   </data>
   <data name="Picker_Unavailable" xml:space="preserve">
-    <value>This device has no file picker. Add books from an Audiobookshelf server (saving them to app storage), or install a file manager such as X-plore and choose them from USB.</value>
+    <value>This device has no file picker.
+
+For books on USB, install "X-plore File Manager" from Google Play, then press this button again and choose the file.
+
+You can also add books from an Audiobookshelf server (saving them to app storage).</value>
   </data>
   <data name="Folder_NoSystemAccess" xml:space="preserve">
     <value>No access to the system's files.</value>
