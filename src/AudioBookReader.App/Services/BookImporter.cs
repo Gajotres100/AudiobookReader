@@ -54,14 +54,18 @@ public class BookImporter(
         IProgress<ImportProgress>? progress = null,
         CancellationToken ct = default)
     {
+        using var busy = Busy();
+
         var referenced = references.TryHold(picked.Location);
         var location = picked.Location;
+        var how = referenced ? "referenced" : "copied";
 
         if (!referenced)
         {
             if (MoveInIfStaged(picked.Location, picked.FileName) is { } moved)
             {
                 location = moved;
+                how = "moved";
             }
             else
             {
@@ -70,7 +74,7 @@ public class BookImporter(
             }
         }
 
-        AppLog.Info($"audio import: {(referenced ? "referenced" : "copied")} '{location}'");
+        AppLog.Info($"audio import: {how} '{location}'");
 
         try
         {
@@ -164,6 +168,8 @@ public class BookImporter(
         IProgress<ImportProgress>? progress = null,
         CancellationToken ct = default)
     {
+        using var busy = Busy();
+
         var book = await database.GetBookAsync(bookId);
         if (book?.AudioPath is not { } location || !references.IsReference(location)) return book;
 
@@ -200,6 +206,8 @@ public class BookImporter(
         IProgress<ImportProgress>? progress = null,
         CancellationToken ct = default)
     {
+        using var busy = Busy();
+
         await using var source = references.OpenRead(picked.Location);
 
         var fileName = picked.FileName;
@@ -409,6 +417,25 @@ public class BookImporter(
 
         if (path.StartsWith(AppPaths.Books, StringComparison.OrdinalIgnoreCase) && File.Exists(path))
             File.Delete(path);
+    }
+
+    private static int _inFlight;
+
+    /// <summary>
+    /// Whether an import is writing into app storage right now — the file it is making belongs to
+    /// no book until it finishes, and must not be taken for one left behind.
+    /// </summary>
+    public static bool IsImporting => Volatile.Read(ref _inFlight) > 0;
+
+    private static InFlight Busy()
+    {
+        Interlocked.Increment(ref _inFlight);
+        return new InFlight();
+    }
+
+    private readonly struct InFlight : IDisposable
+    {
+        public void Dispose() => Interlocked.Decrement(ref _inFlight);
     }
 
     /// <summary>
