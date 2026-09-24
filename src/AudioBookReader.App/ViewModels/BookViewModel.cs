@@ -262,6 +262,10 @@ public partial class BookViewModel(
     /// </summary>
     private async Task FetchModelAsync()
     {
+        // Nothing could ever load it here, and it is tens of megabytes on a device that is often
+        // short of space.
+        if (!SpeechSupport.IsAvailable) return;
+
         var model = alignmentSettings.Model;
         if (models.IsDownloaded(model)) return;
 
@@ -291,7 +295,12 @@ public partial class BookViewModel(
         }
     }
 
-    public bool CanStartAlignment => IsPaired && !IsAligning && !MeasuresWhileReading;
+    public bool CanStartAlignment => CanAlign && IsPaired && !IsAligning && !MeasuresWhileReading;
+
+    /// <summary>Whether this device can align at all — see <see cref="SpeechSupport"/>.</summary>
+    public bool CanAlign => SpeechSupport.IsAvailable;
+
+    public bool CannotAlign => !CanAlign;
 
     /// <summary>Chapters holding real anchors — not chapters merely visited by a run.</summary>
     [ObservableProperty]

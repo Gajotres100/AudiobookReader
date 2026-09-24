@@ -411,6 +411,8 @@ public static class Strings
     public static string Notification_WholeBook => Get(nameof(Notification_WholeBook));
     /// <summary>{0} is a whole number.</summary>
     public static string Gate_BatteryBelow => Get(nameof(Gate_BatteryBelow));
+    /// <summary>Alignment is impossible on this device (32-bit system, no speech recognition).</summary>
+    public static string Details_AlignmentUnsupported => Get(nameof(Details_AlignmentUnsupported));
     /// <summary>This device has no file picker (televisions usually do not).</summary>
     public static string Picker_Unavailable => Get(nameof(Picker_Unavailable));
     /// <summary>No access to the system's files.</summary>

@@ -94,7 +94,13 @@
                             line, inside its own outline, and the summary sits under the option it
                             is actually about.
                         -->
-                        <Border Style="{StaticResource Choice}">
+                        <!--  A 32-bit television cannot run speech recognition; say so instead of offering switches that do nothing.  -->
+                        <Label
+                            IsVisible="{Binding CannotAlign}"
+                            Style="{StaticResource Muted}"
+                            Text="{x:Static s:Strings.Details_AlignmentUnsupported}" />
+
+                        <Border IsVisible="{Binding CanAlign}" Style="{StaticResource Choice}">
                             <VerticalStackLayout Spacing="10">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                                     <VerticalStackLayout Grid.Column="0" Spacing="3">
@@ -120,7 +126,7 @@
                             </VerticalStackLayout>
                         </Border>
 
-                        <Border Style="{StaticResource Choice}">
+                        <Border IsVisible="{Binding CanAlign}" Style="{StaticResource Choice}">
                             <VerticalStackLayout Spacing="10">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                                     <VerticalStackLayout Grid.Column="0" Spacing="3">

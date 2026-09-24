@@ -667,6 +667,9 @@
     <value>Battery below {0}%</value>
     <comment>{0} is a whole number.</comment>
   </data>
+  <data name="Details_AlignmentUnsupported" xml:space="preserve">
+    <value>Aligning the text with the narration is not possible on this device: speech recognition needs a 64-bit system, and this one is 32-bit. Listening and reading work as usual.</value>
+  </data>
   <data name="Picker_Unavailable" xml:space="preserve">
     <value>This device has no file picker.
 

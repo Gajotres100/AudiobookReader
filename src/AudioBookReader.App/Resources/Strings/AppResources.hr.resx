@@ -630,6 +630,9 @@
   <data name="Gate_BatteryBelow" xml:space="preserve">
     <value>Baterija ispod {0}%</value>
   </data>
+  <data name="Details_AlignmentUnsupported" xml:space="preserve">
+    <value>Na ovom uređaju poravnanje teksta i naracije nije moguće: prepoznavanje govora traži 64-bitni sustav, a ovaj je 32-bitni. Slušanje i čitanje rade normalno.</value>
+  </data>
   <data name="Picker_Unavailable" xml:space="preserve">
     <value>Ovaj uređaj nema birač datoteka.
 

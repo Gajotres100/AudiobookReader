@@ -64,6 +64,14 @@ public partial class AlignmentQueue
     {
         if (Status.IsRunning) return;
 
+        // Pairing a book starts alignment on its own, so this is reached even where the switches
+        // are hidden. Said once, rather than started and failed.
+        if (!SpeechSupport.IsAvailable)
+        {
+            Report(new AlignmentStatus(bookId, AlignmentPhase.Failed, Strings.Details_AlignmentUnsupported));
+            return;
+        }
+
         // Reported before the service is even asked to start. Bringing up a service, resolving its
         // dependencies and opening a download all take a few seconds during which nothing would
         // otherwise change on screen — and a button that visibly does nothing reads as a hang.
