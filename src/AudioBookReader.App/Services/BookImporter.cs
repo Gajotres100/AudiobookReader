@@ -59,8 +59,15 @@ public class BookImporter(
 
         if (!referenced)
         {
-            await using var source = references.OpenRead(picked.Location);
-            location = await CopyInAsync(source, picked.FileName, progress, ct);
+            if (MoveInIfStaged(picked.Location, picked.FileName) is { } moved)
+            {
+                location = moved;
+            }
+            else
+            {
+                await using var source = references.OpenRead(picked.Location);
+                location = await CopyInAsync(source, picked.FileName, progress, ct);
+            }
         }
 
         AppLog.Info($"audio import: {(referenced ? "referenced" : "copied")} '{location}'");
@@ -402,6 +409,34 @@ public class BookImporter(
 
         if (path.StartsWith(AppPaths.Books, StringComparison.OrdinalIgnoreCase) && File.Exists(path))
             File.Delete(path);
+    }
+
+    /// <summary>
+    /// Moves a file the server download staged in app storage into the library, rather than
+    /// copying it there.
+    ///
+    /// Both sit on the same disk, so a move is a rename: instant, and no second copy of a book that
+    /// can run to a gigabyte. Copying needed room for the book twice over, and a television with
+    /// 4 GB of storage and 640 MB free could not take a book it had enough room to keep.
+    /// </summary>
+    /// <returns>The new location, or null when this is not a staged download and must be copied.</returns>
+    private static string? MoveInIfStaged(string location, string fileName)
+    {
+        if (!location.StartsWith(AppPaths.Downloads, StringComparison.Ordinal) || !File.Exists(location)) return null;
+
+        try
+        {
+            Directory.CreateDirectory(AppPaths.Books);
+
+            var path = UniquePath(AppPaths.Books, SafeName(fileName));
+            File.Move(location, path);
+            return path;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Info($"could not move '{location}' into the library ({ex.Message}); copying instead");
+            return null;
+        }
     }
 
     /// <summary>

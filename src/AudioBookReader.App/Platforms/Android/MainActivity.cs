@@ -2,12 +2,16 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
+using Android.Views;
 using AudioBookReader.App.Services;
 using AndroidUri = Android.Net.Uri;
 
 namespace AudioBookReader.App;
 
-[Activity(Theme = "@style/Maui.SplashTheme", MainLauncher = true, LaunchMode = LaunchMode.SingleTop, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
+[Activity(Theme = "@style/Maui.SplashTheme", MainLauncher = true, LaunchMode = LaunchMode.SingleTop, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density | ConfigChanges.Keyboard | ConfigChanges.KeyboardHidden | ConfigChanges.Navigation)]
+// The television home screen lists only activities in this category; the ordinary launcher entry
+// that MainLauncher adds is invisible there.
+[IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLeanbackLauncher])]
 public class MainActivity : MauiAppCompatActivity
 {
     /// <summary>Set by the alignment notification, to say which book it was reporting on.</summary>
@@ -52,8 +56,35 @@ public class MainActivity : MauiAppCompatActivity
 
         // Started directly, not through a chooser: the system document picker is the only handler
         // for this action, and wrapping it loses the persistable grant.
-        activity.StartActivityForResult(intent, PickDocumentRequest);
+        StartPicker(activity, intent, PickDocumentRequest);
         return _pending.Task;
+    }
+
+    /// <summary>
+    /// Opens a system picker, or says plainly that there is none.
+    ///
+    /// Televisions usually ship without the document picker, and starting an activity nothing
+    /// handles throws — out of a button's command, which closes the app. Caught here instead,
+    /// answered as "nothing chosen", with a note pointing at the way that does work on such a
+    /// device. Not tested beforehand by resolving the intent: from Android 11 that answers "none"
+    /// for any app not declared in the manifest's queries, which would break phones too.
+    /// </summary>
+    private static void StartPicker(Activity activity, Intent intent, int request)
+    {
+        try
+        {
+            activity.StartActivityForResult(intent, request);
+        }
+        catch (ActivityNotFoundException)
+        {
+            AppLog.Info($"no system picker for {intent.Action} on this device");
+
+            _pending?.TrySetResult(null);
+            global::Android.Widget.Toast.MakeText(
+                activity,
+                AudioBookReader.App.Resources.Strings.Strings.Picker_Unavailable,
+                global::Android.Widget.ToastLength.Long)?.Show();
+        }
     }
 
     /// <summary>
@@ -89,7 +120,7 @@ public class MainActivity : MauiAppCompatActivity
             return _pending.Task;
         }
 
-        activity.StartActivityForResult(intent, PickFolderRequest);
+        StartPicker(activity, intent, PickFolderRequest);
         return _pending.Task;
     }
 
@@ -133,8 +164,17 @@ public class MainActivity : MauiAppCompatActivity
 
         // No persistable flag, unlike a book: the picture is read once, turned into text and
         // forgotten, so there is nothing to come back to after a reboot.
-        activity.StartActivityForResult(intent, PickImageRequest);
+        StartPicker(activity, intent, PickImageRequest);
         return _pending.Task;
+    }
+
+    /// <summary>Readies the screen for a remote before an arrow or OK is acted on.</summary>
+    public override bool DispatchKeyEvent(KeyEvent? e)
+    {
+        if (e is { Action: KeyEventActions.Down } && RemoteFocus.IsNavigationKey(e.KeyCode))
+            RemoteFocus.PrepareForKeys(this);
+
+        return base.DispatchKeyEvent(e);
     }
 
     protected override void OnCreate(Bundle? savedInstanceState)

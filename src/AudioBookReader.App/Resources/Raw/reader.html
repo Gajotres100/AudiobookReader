@@ -130,6 +130,27 @@
     report();
   }
 
+  // A television remote: left and right turn a screenful, carrying on into the next or previous
+  // chapter at either end, the way turning the last page of a paper book does; OK shows and hides
+  // the controls, as a tap on the page does. Up and down are left alone, so they scroll and can
+  // still move focus out to the controls above and below.
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+
+      var forward = e.key === 'ArrowRight';
+      var page = pageNow();
+
+      if (forward ? page >= pageCount - 1 : page <= 0)
+        location.href = forward ? 'abr://page/next' : 'abr://page/previous';
+      else
+        goToPage(page + (forward ? 1 : -1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      location.href = 'abr://tap';
+    }
+  });
+
   content.addEventListener('scroll', function () {
     clearTimeout(window.__scrollReport);
     window.__scrollReport = setTimeout(report, 120);

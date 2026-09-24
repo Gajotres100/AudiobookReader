@@ -43,8 +43,14 @@
 
 		     These are the exact strings Whisper.net.Runtime.targets tests against to decide which
 		     .so files to pack, so they are not interchangeable with the older AndroidSupportedAbis
-		     spelling — which this SDK has dropped anyway. -->
-		<RuntimeIdentifiers Condition="'$(TargetFramework)'=='net10.0-android'">android-arm64;android-x64</RuntimeIdentifiers>
+		     spelling — which this SDK has dropped anyway.
+
+		     android-arm (32-bit) is here for televisions: many run a 32-bit system even on 64-bit
+		     chips — a Sony BRAVIA on Android 12 reports only armeabi-v7a — and without it the app
+		     would not install there at all. Whisper has no 32-bit build, so on such a device the app
+		     plays and reads but cannot align; SpeechSupport says so rather than failing at runtime.
+		     Play delivers each device only its own architecture, so phones download no more. -->
+		<RuntimeIdentifiers Condition="'$(TargetFramework)'=='net10.0-android'">android-arm64;android-arm;android-x64</RuntimeIdentifiers>
 
 		<!-- Same reasoning as the Android RuntimeIdentifiers above, for Whisper.net.Runtime's
 		     ios-device/ios-simulator native binaries. iossimulator carries the arm64 Apple Silicon

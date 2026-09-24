@@ -411,6 +411,8 @@ public static class Strings
     public static string Notification_WholeBook => Get(nameof(Notification_WholeBook));
     /// <summary>{0} is a whole number.</summary>
     public static string Gate_BatteryBelow => Get(nameof(Gate_BatteryBelow));
+    /// <summary>This device has no file picker (televisions usually do not).</summary>
+    public static string Picker_Unavailable => Get(nameof(Picker_Unavailable));
     /// <summary>No access to the system's files.</summary>
     public static string Folder_NoSystemAccess => Get(nameof(Folder_NoSystemAccess));
     /// <summary>Not chosen</summary>
