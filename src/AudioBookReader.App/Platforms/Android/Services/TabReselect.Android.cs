@@ -15,6 +15,21 @@ public partial class TabReselect
 
     public partial void Watch()
     {
+        // A convenience, and called from a page's OnAppearing, where anything thrown reaches the
+        // runtime and closes the app. Losing the reselect gesture for a session is the right
+        // price for any failure here.
+        try
+        {
+            WatchCore();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("watching the tab bar", ex);
+        }
+    }
+
+    private void WatchCore()
+    {
         var activity = global::Android.App.Application.Context as global::Android.App.Activity
                        ?? Platform.CurrentActivity;
 
@@ -27,7 +42,20 @@ public partial class TabReselect
         // this, the old one — and everything its own subscription chain keeps reachable — was never
         // let go, so a session that switched languages a few times left that many dead bars pinned
         // in memory for no reason.
-        if (_bar is not null) _bar.ItemReselected -= OnReselected;
+        if (_bar is not null)
+        {
+            try
+            {
+                _bar.ItemReselected -= OnReselected;
+            }
+            catch (ObjectDisposedException)
+            {
+                // Closing the app with back ends the activity but not the process, so on the next
+                // launch this still pointed at the old activity's bar, already torn down —
+                // unsubscribing from it threw, and every such reopen crashed. There is nothing
+                // left to let go of.
+            }
+        }
 
         _bar = bar;
         bar.ItemReselected += OnReselected;
