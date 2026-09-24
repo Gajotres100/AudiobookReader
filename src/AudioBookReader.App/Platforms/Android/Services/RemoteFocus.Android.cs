@@ -16,6 +16,11 @@ public static partial class RemoteFocus
         BorderHandler.Mapper.AppendToMapping(nameof(RemoteFocus), (handler, view) => MakeTappable(handler.PlatformView, view));
         ContentViewHandler.Mapper.AppendToMapping(nameof(RemoteFocus), (handler, view) => MakeTappable(handler.PlatformView, view));
 
+        // A tappable piece of text or picture: the player's chapter title, which opens the chapter
+        // list, is a label — unreachable from a remote until labels were included here.
+        LabelHandler.Mapper.AppendToMapping(nameof(RemoteFocus), (handler, view) => MakeTappable(handler.PlatformView, view));
+        ImageHandler.Mapper.AppendToMapping(nameof(RemoteFocus), (handler, view) => MakeTappable(handler.PlatformView, view));
+
         ButtonHandler.Mapper.AppendToMapping(nameof(RemoteFocus), (handler, _) => Ring(handler.PlatformView));
         ImageButtonHandler.Mapper.AppendToMapping(nameof(RemoteFocus), (handler, _) => Ring(handler.PlatformView));
         SwitchHandler.Mapper.AppendToMapping(nameof(RemoteFocus), (handler, _) => Ring(handler.PlatformView));
