@@ -47,13 +47,29 @@ public static class Dialogs
         return await ShowPageAsync(title, null, buttons, onBack: cancel) ?? cancel;
     }
 
-    private static async Task<string?> ShowPageAsync(
+    /// <summary>A question answered by typing. Null when it was cancelled.</summary>
+    public static async Task<string?> PromptAsync(
+        string? title,
+        string? message,
+        string accept,
+        string cancel,
+        string placeholder)
+    {
+        var page = new DialogPage(
+            title, message, [(accept, DialogButtonKind.Primary), (cancel, DialogButtonKind.Secondary)], cancel, placeholder);
+
+        return await PresentAsync(page, cancel) == accept ? page.EntryText : null;
+    }
+
+    private static Task<string?> ShowPageAsync(
         string? title,
         string? message,
         IReadOnlyList<(string, DialogButtonKind)> buttons,
-        string onBack)
+        string onBack) =>
+        PresentAsync(new DialogPage(title, message, buttons, onBack), onBack);
+
+    private static async Task<string?> PresentAsync(DialogPage page, string onBack)
     {
-        var page = new DialogPage(title, message, buttons, onBack);
 
         var navigation = Shell.Current?.Navigation
                          ?? Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;

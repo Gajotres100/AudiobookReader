@@ -207,6 +207,16 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings, Language
     /// order. Copied rather than shared in place: the log is appended to while the app runs, and a
     /// receiving app reading it mid-write would get a torn last line at best.
     /// </summary>
+    /// <summary>
+    /// Where other devices can send an alignment to this one — for typing in on an iPhone or iPad,
+    /// which cannot always find it on the network by itself. Read each time the page is built,
+    /// since the address changes with the network.
+    /// </summary>
+    public string ShareAddressText =>
+        AlignmentShare.LocalAddresses() is { Count: > 0 } addresses
+            ? string.Format(Strings.Settings_ShareAddress, string.Join(", ", addresses))
+            : Strings.Settings_ShareNoAddress;
+
     [RelayCommand]
     private async Task ShareLogAsync()
     {

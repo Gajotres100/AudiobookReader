@@ -666,6 +666,63 @@
   <data name="Sync_ElsewhereStay" xml:space="preserve">
     <value>Ostani ovdje</value>
   </data>
+  <data name="Share_Button" xml:space="preserve">
+    <value>Pošalji poravnanje na drugi uređaj</value>
+  </data>
+  <data name="Share_Looking" xml:space="preserve">
+    <value>Tražim uređaje u mreži…</value>
+  </data>
+  <data name="Share_ChooseTitle" xml:space="preserve">
+    <value>Pošalji poravnanje na</value>
+  </data>
+  <data name="Share_TypeAddress" xml:space="preserve">
+    <value>Upiši adresu…</value>
+  </data>
+  <data name="Share_AddressTitle" xml:space="preserve">
+    <value>Adresa uređaja</value>
+  </data>
+  <data name="Share_AddressBody" xml:space="preserve">
+    <value>Drugi uređaj piše svoju adresu u Postavkama, npr. 192.168.1.125. Aplikacija ondje mora biti otvorena.</value>
+  </data>
+  <data name="Share_Send" xml:space="preserve">
+    <value>Pošalji</value>
+  </data>
+  <data name="Share_Sending" xml:space="preserve">
+    <value>Šaljem na {0}… potvrdi na tom uređaju.</value>
+  </data>
+  <data name="Share_Done" xml:space="preserve">
+    <value>Poslano — {0} sad prati tekst s ovim poravnanjem.</value>
+  </data>
+  <data name="Share_NoSuchBook" xml:space="preserve">
+    <value>{0} nema ovu knjigu s istim datotekama. Dodaj je ondje sa servera pa pošalji ponovno.</value>
+  </data>
+  <data name="Share_Declined" xml:space="preserve">
+    <value>{0} je odbio poravnanje.</value>
+  </data>
+  <data name="Share_Unreachable" xml:space="preserve">
+    <value>Uređaj se ne javlja. Je li aplikacija na njemu otvorena i je li u istoj mreži?</value>
+  </data>
+  <data name="Share_ReceiveTitle" xml:space="preserve">
+    <value>Primiti poravnanje?</value>
+  </data>
+  <data name="Share_ReceiveBody" xml:space="preserve">
+    <value>„{0}” šalje poravnanje za „{1}”. Tekst će ovdje pratiti naraciju bez poravnavanja na ovom uređaju.</value>
+  </data>
+  <data name="Share_Accept" xml:space="preserve">
+    <value>Primi</value>
+  </data>
+  <data name="Share_Decline" xml:space="preserve">
+    <value>Odbij</value>
+  </data>
+  <data name="Share_NothingToSend" xml:space="preserve">
+    <value>Ova knjiga još nema poravnanja.</value>
+  </data>
+  <data name="Settings_ShareAddress" xml:space="preserve">
+    <value>Drugi uređaji mogu poslati poravnanje na ovaj uređaj na adresu {0}.</value>
+  </data>
+  <data name="Settings_ShareNoAddress" xml:space="preserve">
+    <value>Ovaj uređaj trenutno nije u lokalnoj mreži.</value>
+  </data>
   <data name="Picker_Unavailable" xml:space="preserve">
     <value>Ovaj uređaj nema birač datoteka.
 

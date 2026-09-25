@@ -99,6 +99,75 @@ public class LibraryServiceTests : IAsyncLifetime, IDisposable
         Assert.True(state.TextOffset > 5_000, $"reading position fell back to {state.TextOffset}");
     }
 
+    // ---- An alignment arriving from another device ----
+
+    private static SyncMap MapFor(string audioHash, string ebookHash, int chapters) => new()
+    {
+        AudioHash = audioHash,
+        EbookHash = ebookHash,
+        Chapters =
+        [
+            .. Enumerable.Range(0, chapters).Select(i => ChapterSyncMap.FromAnchors(i,
+            [
+                new Anchor(i * 60_000L + 1_000, i * 1_000 + 10, 0.9f),
+                new Anchor(i * 60_000L + 50_000, i * 1_000 + 900, 0.9f),
+            ])),
+        ],
+    };
+
+    private static List<ChapterRange> RangesFor(int chapters) =>
+        [.. Enumerable.Range(0, chapters).Select(i => new ChapterRange(i, i * 1_000, (i + 1) * 1_000))];
+
+    [Fact]
+    public async Task AnAlignmentFromAnotherDeviceFitsTheSameBookHere()
+    {
+        var book = await _service.CreateFromAudioAsync(Audio());
+        await _service.AttachTextAsync(book.Id, Text());
+
+        Assert.Equal(book.Id, (await _service.FindByPairAsync("audio-1", "text-1"))?.Id);
+
+        Assert.True(await _service.AdoptAlignmentAsync(book.Id, MapFor("audio-1", "text-1", 2), RangesFor(2)));
+
+        var after = await _database.GetBookAsync(book.Id);
+        Assert.Equal(SyncState.Complete, after!.SyncState);
+
+        // Where each chapter starts in the text came along too, so the reader can open it.
+        Assert.All(await _database.GetChaptersAsync(book.Id), c => Assert.True(c.HasTextRange));
+        Assert.True(_syncMaps.Exists(book.Id));
+    }
+
+    [Fact]
+    public async Task AnAlignmentForOtherFilesIsRefused()
+    {
+        var book = await _service.CreateFromAudioAsync(Audio());
+        await _service.AttachTextAsync(book.Id, Text());
+
+        // The same title, another edition of the text: its map would point at the wrong words.
+        Assert.Null(await _service.FindByPairAsync("audio-1", "some-other-edition"));
+        Assert.False(await _service.AdoptAlignmentAsync(book.Id, MapFor("audio-1", "some-other-edition", 2), RangesFor(2)));
+        Assert.False(_syncMaps.Exists(book.Id));
+    }
+
+    [Fact]
+    public async Task APackageSurvivesTheJourney()
+    {
+        var sent = new AlignmentPackage("Phone", "Novel", "audio-1", "text-1", RangesFor(2), MapFor("audio-1", "text-1", 2));
+
+        using var wire = new MemoryStream();
+        await AlignmentTransfer.WritePackageAsync(wire, sent);
+        await AlignmentTransfer.WriteReplyAsync(wire, new AlignmentReply(false, AlignmentTransfer.Declined));
+
+        wire.Position = 0;
+        var received = await AlignmentTransfer.ReadPackageAsync(wire);
+        var reply = await AlignmentTransfer.ReadReplyAsync(wire);
+
+        Assert.NotNull(received);
+        Assert.Equal("Novel", received.Title);
+        Assert.Equal(2, received.Chapters.Count);
+        Assert.Equal(sent.Map.Chapters[1].Anchors, received.Map.Chapters[1].Anchors);
+        Assert.Equal(AlignmentTransfer.Declined, reply?.Reason);
+    }
+
     public void Dispose()
     {
         // Cleanup only; a lingering file handle should not fail a test that otherwise passed.

@@ -435,6 +435,44 @@ public static class Strings
     public static string Sync_ElsewhereGo => Get(nameof(Sync_ElsewhereGo));
     /// <summary>Keep this device's place.</summary>
     public static string Sync_ElsewhereStay => Get(nameof(Sync_ElsewhereStay));
+    /// <summary>Book page: send this alignment over the local network.</summary>
+    public static string Share_Button => Get(nameof(Share_Button));
+    /// <summary>While discovering.</summary>
+    public static string Share_Looking => Get(nameof(Share_Looking));
+    /// <summary>Choose a device.</summary>
+    public static string Share_ChooseTitle => Get(nameof(Share_ChooseTitle));
+    /// <summary>Option: enter an IP address by hand.</summary>
+    public static string Share_TypeAddress => Get(nameof(Share_TypeAddress));
+    /// <summary>Prompt title.</summary>
+    public static string Share_AddressTitle => Get(nameof(Share_AddressTitle));
+    /// <summary>Prompt body.</summary>
+    public static string Share_AddressBody => Get(nameof(Share_AddressBody));
+    /// <summary>Prompt accept.</summary>
+    public static string Share_Send => Get(nameof(Share_Send));
+    /// <summary>{0} device name.</summary>
+    public static string Share_Sending => Get(nameof(Share_Sending));
+    /// <summary>{0} device name.</summary>
+    public static string Share_Done => Get(nameof(Share_Done));
+    /// <summary>{0} device name.</summary>
+    public static string Share_NoSuchBook => Get(nameof(Share_NoSuchBook));
+    /// <summary>{0} device name.</summary>
+    public static string Share_Declined => Get(nameof(Share_Declined));
+    /// <summary>Send failed.</summary>
+    public static string Share_Unreachable => Get(nameof(Share_Unreachable));
+    /// <summary>Receiver prompt title.</summary>
+    public static string Share_ReceiveTitle => Get(nameof(Share_ReceiveTitle));
+    /// <summary>{0} sender, {1} book title.</summary>
+    public static string Share_ReceiveBody => Get(nameof(Share_ReceiveBody));
+    /// <summary>Receiver accept.</summary>
+    public static string Share_Accept => Get(nameof(Share_Accept));
+    /// <summary>Receiver decline.</summary>
+    public static string Share_Decline => Get(nameof(Share_Decline));
+    /// <summary>Nothing to send.</summary>
+    public static string Share_NothingToSend => Get(nameof(Share_NothingToSend));
+    /// <summary>{0} IP address(es).</summary>
+    public static string Settings_ShareAddress => Get(nameof(Settings_ShareAddress));
+    /// <summary>No local address.</summary>
+    public static string Settings_ShareNoAddress => Get(nameof(Settings_ShareNoAddress));
     /// <summary>This device has no file picker (televisions usually do not).</summary>
     public static string Picker_Unavailable => Get(nameof(Picker_Unavailable));
     /// <summary>No access to the system's files.</summary>

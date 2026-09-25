@@ -205,6 +205,21 @@
                             another run. Two decisions, two buttons — and this one is destructive,
                             so it is styled as such rather than sitting quietly as a secondary.
                         -->
+                        <!--
+                            To another device on the same network — a television that cannot align
+                            for itself follows along with an alignment a phone made.
+                        -->
+                        <Button
+                            Command="{Binding ShareAlignmentCommand}"
+                            IsVisible="{Binding CanShareAlignment}"
+                            Style="{StaticResource Secondary}"
+                            Text="{x:Static s:Strings.Share_Button}" />
+
+                        <Label
+                            IsVisible="{Binding HasShareStatus}"
+                            Style="{StaticResource Muted}"
+                            Text="{Binding ShareStatus}" />
+
                         <Button
                             Command="{Binding ClearAlignmentCommand}"
                             IsVisible="{Binding CanClearAlignment}"

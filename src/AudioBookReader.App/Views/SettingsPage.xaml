@@ -333,6 +333,9 @@
                         Command="{Binding ShareLogCommand}"
                         Style="{StaticResource Secondary}"
                         Text="{x:Static s:Strings.Settings_ShareLog}" />
+
+                    <!--  For typing in on a device that cannot find this one by itself.  -->
+                    <Label Style="{StaticResource Muted}" Text="{Binding ShareAddressText}" />
                 </VerticalStackLayout>
             </Border>
         </VerticalStackLayout>

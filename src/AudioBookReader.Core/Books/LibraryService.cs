@@ -88,6 +88,53 @@ public class LibraryService(LibraryDatabase database, SyncMapStore syncMaps)
         return book;
     }
 
+    /// <summary>
+    /// The book here made of exactly the files an alignment describes, or null when there is none.
+    /// </summary>
+    public async Task<Book?> FindByPairAsync(string? audioHash, string? ebookHash)
+    {
+        if (string.IsNullOrEmpty(audioHash) || string.IsNullOrEmpty(ebookHash)) return null;
+
+        return (await database.GetBooksAsync())
+            .FirstOrDefault(b => b.AudioHash == audioHash && b.EbookHash == ebookHash);
+    }
+
+    /// <summary>
+    /// Takes on an alignment made elsewhere — another device that has the same book.
+    ///
+    /// The map is kept only if it describes this book's own pair of files, the same test every map
+    /// has to pass, so nothing measured against other audio or another edition can slip in. Where the
+    /// chapters agree in number, their places in the text come along too: that is what lets the
+    /// reader open a chapter on the right page without aligning anything here.
+    /// </summary>
+    /// <returns>False when the map is for different files.</returns>
+    public async Task<bool> AdoptAlignmentAsync(int bookId, SyncMap map, IReadOnlyList<ChapterRange> ranges)
+    {
+        var book = await RequireBookAsync(bookId);
+        if (!book.IsPaired || !map.MatchesPair(book.AudioHash, book.EbookHash)) return false;
+
+        var chapters = await database.GetChaptersAsync(bookId);
+
+        if (ranges.Count == chapters.Count && ranges.Count > 0)
+        {
+            foreach (var chapter in chapters)
+            {
+                if (ranges.FirstOrDefault(r => r.Index == chapter.Index) is not { TextStart: { } start, TextEnd: { } end })
+                    continue;
+
+                chapter.TextStart = start;
+                chapter.TextEnd = end;
+                await database.UpdateChapterAsync(chapter);
+            }
+        }
+
+        await syncMaps.SaveAsync(bookId, map);
+
+        await ApplySyncStateAsync(book, chapters.Count);
+        await database.UpdateBookAsync(book);
+        return true;
+    }
+
     /// <summary>Adds an ebook to a book, replacing one already there.</summary>
     public async Task<Book> AttachTextAsync(int bookId, TextAttachment text)
     {

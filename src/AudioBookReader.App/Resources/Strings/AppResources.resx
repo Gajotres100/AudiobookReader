@@ -703,6 +703,63 @@
   <data name="Sync_ElsewhereStay" xml:space="preserve">
     <value>Stay here</value>
   </data>
+  <data name="Share_Button" xml:space="preserve">
+    <value>Send the alignment to another device</value>
+  </data>
+  <data name="Share_Looking" xml:space="preserve">
+    <value>Looking for devices on this network…</value>
+  </data>
+  <data name="Share_ChooseTitle" xml:space="preserve">
+    <value>Send the alignment to</value>
+  </data>
+  <data name="Share_TypeAddress" xml:space="preserve">
+    <value>Type an address…</value>
+  </data>
+  <data name="Share_AddressTitle" xml:space="preserve">
+    <value>Device address</value>
+  </data>
+  <data name="Share_AddressBody" xml:space="preserve">
+    <value>The other device shows its address in Settings, for example 192.168.1.125. The app must be open there.</value>
+  </data>
+  <data name="Share_Send" xml:space="preserve">
+    <value>Send</value>
+  </data>
+  <data name="Share_Sending" xml:space="preserve">
+    <value>Sending to {0}… confirm it on that device.</value>
+  </data>
+  <data name="Share_Done" xml:space="preserve">
+    <value>Sent — {0} now follows the text with this alignment.</value>
+  </data>
+  <data name="Share_NoSuchBook" xml:space="preserve">
+    <value>{0} does not have this book made of the same files. Add it there from the server, then send again.</value>
+  </data>
+  <data name="Share_Declined" xml:space="preserve">
+    <value>{0} declined the alignment.</value>
+  </data>
+  <data name="Share_Unreachable" xml:space="preserve">
+    <value>The device did not answer. Is the app open on it, and is it on the same network?</value>
+  </data>
+  <data name="Share_ReceiveTitle" xml:space="preserve">
+    <value>Take this alignment?</value>
+  </data>
+  <data name="Share_ReceiveBody" xml:space="preserve">
+    <value>&quot;{0}&quot; is sending the alignment for &quot;{1}&quot;. The text will follow the narration here without aligning on this device.</value>
+  </data>
+  <data name="Share_Accept" xml:space="preserve">
+    <value>Take it</value>
+  </data>
+  <data name="Share_Decline" xml:space="preserve">
+    <value>Decline</value>
+  </data>
+  <data name="Share_NothingToSend" xml:space="preserve">
+    <value>This book has no alignment yet.</value>
+  </data>
+  <data name="Settings_ShareAddress" xml:space="preserve">
+    <value>Other devices can send alignments to this one at {0}.</value>
+  </data>
+  <data name="Settings_ShareNoAddress" xml:space="preserve">
+    <value>This device is not on a local network right now.</value>
+  </data>
   <data name="Picker_Unavailable" xml:space="preserve">
     <value>This device has no file picker.
 

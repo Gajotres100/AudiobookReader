@@ -1,5 +1,6 @@
 using AudioBookReader.App.Resources.Strings;
 using System.Collections.ObjectModel;
+using System.Net;
 using AudioBookReader.App.Services;
 using AudioBookReader.App.Views;
 using AudioBookReader.Core.Alignment;
@@ -26,7 +27,8 @@ public partial class BookViewModel(
     PhotoPicker photos,
     IOcrService ocr,
     AlignmentSettingsStore alignmentSettings,
-    WhisperModelStore models) : ObservableObject, IDisposable
+    WhisperModelStore models,
+    AlignmentShare share) : ObservableObject, IDisposable
 {
     /// <summary>The speeds the button cycles through. Nothing below 0.75 or above 2 is useful for narration.</summary>
     private static readonly float[] Speeds = [1f, 1.25f, 1.5f, 1.75f, 2f, 0.75f];
@@ -72,6 +74,7 @@ public partial class BookViewModel(
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanStartAlignment))]
     [NotifyPropertyChangedFor(nameof(CanClearAlignment))]
+    [NotifyPropertyChangedFor(nameof(CanShareAlignment))]
     public partial bool IsPaired { get; set; }
 
     public bool HasNoAudio => !HasAudio;
@@ -193,6 +196,7 @@ public partial class BookViewModel(
     [NotifyPropertyChangedFor(nameof(CanStartAlignment))]
     [NotifyPropertyChangedFor(nameof(IsIdleWithMessage))]
     [NotifyPropertyChangedFor(nameof(CanClearAlignment))]
+    [NotifyPropertyChangedFor(nameof(CanShareAlignment))]
     public partial bool IsAligning { get; set; }
 
     /// <summary>
@@ -205,6 +209,7 @@ public partial class BookViewModel(
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanStartAlignment))]
     [NotifyPropertyChangedFor(nameof(CanClearAlignment))]
+    [NotifyPropertyChangedFor(nameof(CanShareAlignment))]
     [NotifyPropertyChangedFor(nameof(ClearAlignmentText))]
     [NotifyPropertyChangedFor(nameof(AlignmentSummary))]
     public partial bool MeasuresWhileReading { get; set; }
@@ -317,12 +322,14 @@ public partial class BookViewModel(
     [NotifyPropertyChangedFor(nameof(AlignmentSummary))]
     [NotifyPropertyChangedFor(nameof(StartAlignmentText))]
     [NotifyPropertyChangedFor(nameof(CanClearAlignment))]
+    [NotifyPropertyChangedFor(nameof(CanShareAlignment))]
     public partial int AlignedChapterCount { get; set; }
 
     /// <summary>How much audio has genuinely been measured, which is what live measuring produces.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AlignmentSummary))]
     [NotifyPropertyChangedFor(nameof(CanClearAlignment))]
+    [NotifyPropertyChangedFor(nameof(CanShareAlignment))]
     public partial long MeasuredMs { get; set; }
 
     /// <summary>Only worth offering once there is something to discard.</summary>
@@ -1305,6 +1312,82 @@ public partial class BookViewModel(
 
     [RelayCommand]
     private void StopAlignment() => alignment.Stop();
+
+    // ---- Sending the alignment to another device ----
+
+    /// <summary>Whether there is an alignment here worth sending: something measured, of a paired book.</summary>
+    public bool CanShareAlignment => IsPaired && !IsAligning && (AlignedChapterCount > 0 || MeasuredMs > 0);
+
+    /// <summary>How the last send went, or what it is doing now.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasShareStatus))]
+    public partial string ShareStatus { get; set; } = "";
+
+    public bool HasShareStatus => ShareStatus.Length > 0;
+
+    /// <summary>
+    /// Sends this book's alignment to another device on the network — a television that cannot
+    /// align for itself, say — which takes it only for a book made of the same files, and only once
+    /// someone there agrees.
+    /// </summary>
+    [RelayCommand]
+    private async Task ShareAlignmentAsync()
+    {
+        try
+        {
+            ShareStatus = Strings.Share_Looking;
+
+            var devices = await AlignmentShare.FindAsync(TimeSpan.FromSeconds(2));
+            var labels = devices.Select(d => $"{d.Name} ({d.Address})").ToList();
+
+            var choice = await Dialogs.ChooseAsync(
+                Strings.Share_ChooseTitle, Strings.Common_Cancel, null, [.. labels, Strings.Share_TypeAddress]);
+
+            IPAddress? to = null;
+            var name = "";
+
+            if (choice == Strings.Share_TypeAddress)
+            {
+                var typed = await Dialogs.PromptAsync(
+                    Strings.Share_AddressTitle, Strings.Share_AddressBody, Strings.Share_Send, Strings.Common_Cancel, "192.168.1.");
+
+                if (typed is not null && IPAddress.TryParse(typed.Trim(), out var parsed))
+                {
+                    to = parsed;
+                    name = parsed.ToString();
+                }
+            }
+            else if (labels.IndexOf(choice) is var index and >= 0)
+            {
+                to = devices[index].Address;
+                name = devices[index].Name;
+            }
+
+            if (to is null)
+            {
+                ShareStatus = "";
+                return;
+            }
+
+            ShareStatus = string.Format(Strings.Share_Sending, name);
+
+            var reply = await share.SendAsync(BookId, to);
+
+            ShareStatus = reply.Accepted
+                ? string.Format(Strings.Share_Done, name)
+                : reply.Reason switch
+                {
+                    AlignmentTransfer.NoSuchBook => string.Format(Strings.Share_NoSuchBook, name),
+                    AlignmentTransfer.Declined => string.Format(Strings.Share_Declined, name),
+                    _ => Strings.Share_Unreachable,
+                };
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("sending the alignment to another device", ex);
+            ShareStatus = ex.Message;
+        }
+    }
 
     /// <summary>
     /// Discards everything aligned so far and starts again.

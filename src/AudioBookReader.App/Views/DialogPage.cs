@@ -39,7 +39,8 @@ public sealed class DialogPage : ContentPage
         string? title,
         string? message,
         IReadOnlyList<(string Text, DialogButtonKind Kind)> buttons,
-        string? onBack)
+        string? onBack,
+        string? entryPlaceholder = null)
     {
         _onBack = onBack;
 
@@ -59,6 +60,13 @@ public sealed class DialogPage : ContentPage
                 LineHeight = 1.25,
                 Margin = new Thickness(0, 0, 0, 8),
             });
+
+        // A line to type into, when the question needs words rather than a choice.
+        if (entryPlaceholder is not null)
+        {
+            _entry = new Entry { Placeholder = entryPlaceholder, Keyboard = Keyboard.Url, Margin = new Thickness(0, 0, 0, 8) };
+            content.Add(_entry);
+        }
 
         foreach (var (text, kind) in buttons)
         {
@@ -104,6 +112,11 @@ public sealed class DialogPage : ContentPage
         Content = frame;
     }
 
+    private readonly Entry? _entry;
+
+    /// <summary>What was typed, when the dialog asked for something to be typed.</summary>
+    public string? EntryText => _entry?.Text;
+
     /// <summary>The navigation that opened this, and so the one that closes it.</summary>
     internal INavigation? Host { get; set; }
 
@@ -117,7 +130,8 @@ public sealed class DialogPage : ContentPage
         // Where a remote starts: on the answer the dialog is asking for. Only on a television —
         // on a touch screen a focused button takes its first tap as focus rather than as a press,
         // so the main answer needed pressing twice.
-        if (DeviceInfo.Current.Idiom == DeviceIdiom.TV) _first?.Focus();
+        if (_entry is not null) _entry.Focus();
+        else if (DeviceInfo.Current.Idiom == DeviceIdiom.TV) _first?.Focus();
     }
 
     protected override bool OnBackButtonPressed()
