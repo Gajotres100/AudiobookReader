@@ -608,6 +608,9 @@ public class PlaybackService : MediaLibraryService
 
     private DateTime _lastPositionSaved = DateTime.MinValue;
 
+    /// <summary>Whether it was playing at the last look, to notice the moment it stops.</summary>
+    private bool _wasPlaying;
+
     /// <summary>
     /// Writes the playing position down every few seconds, from the service rather than from a page.
     ///
@@ -623,6 +626,15 @@ public class PlaybackService : MediaLibraryService
     /// </summary>
     private void RememberPosition()
     {
+        // Listening has just stopped — paused here, from the lock screen, by a headset or by the
+        // sleep timer. Where it stopped goes to the server at once rather than in half a minute,
+        // since stopping is exactly when someone might pick the book up on another device.
+        if (_wasPlaying && !_stateIsPlaying && CurrentBookId is { } stoppedBook)
+            ProgressSync.Current?.NoteAudio(
+                stoppedBook, Interlocked.Read(ref _statePositionMs), Interlocked.Read(ref _stateDurationMs), now: true);
+
+        _wasPlaying = _stateIsPlaying;
+
         if (!_stateIsPlaying
             || CurrentBookId is not { } bookId
             || _database is not { } database
@@ -637,6 +649,7 @@ public class PlaybackService : MediaLibraryService
         var speed = _stateSpeed;
 
         _ = SaveAsync();
+        ProgressSync.Current?.NoteAudio(bookId, positionMs, Interlocked.Read(ref _stateDurationMs));
 
         async Task SaveAsync()
         {

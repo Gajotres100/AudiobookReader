@@ -446,6 +446,37 @@ public class ServerConnection(
         }
     }
 
+    // ---- Progress, shared with every other device signed in to the same account ----
+
+    /// <summary>Whether a server has been set up at all, so there is anywhere to share progress with.</summary>
+    public bool IsConfigured => account.Url is not null;
+
+    public async Task<ServerProgress?> GetProgressAsync(string itemId, CancellationToken ct = default)
+    {
+        await EnsureRestoredAsync();
+        return await Wrap(() => _client.GetProgressAsync(itemId, ct));
+    }
+
+    public async Task SetProgressAsync(string itemId, double seconds, double durationSeconds, CancellationToken ct = default)
+    {
+        await EnsureRestoredAsync();
+        await Wrap(async () =>
+        {
+            await _client.SetProgressAsync(itemId, seconds, durationSeconds, ct);
+            return true;
+        });
+    }
+
+    public async Task SetEbookProgressAsync(string itemId, double fraction, CancellationToken ct = default)
+    {
+        await EnsureRestoredAsync();
+        await Wrap(async () =>
+        {
+            await _client.SetEbookProgressAsync(itemId, fraction, ct);
+            return true;
+        });
+    }
+
     // ---- Streaming, for the player and for copying a streamed book in ----
 
     /// <summary>Puts the stored connection back first, for a book played before any server page was opened.</summary>

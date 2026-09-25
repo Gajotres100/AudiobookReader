@@ -586,7 +586,51 @@ public partial class BookViewModel(
             BookId, _book.AudioPath!, startMs, speed,
             title: Title, author: Author, coverPath: _book.CoverPath,
             chapterStarts: ChapterStarts());
+
+        _ = OfferPositionFromElsewhereAsync();
     }
+
+    /// <summary>
+    /// Offers to carry on from where another device got to, when that is newer and somewhere else.
+    ///
+    /// Asked rather than done, by the user's choice: someone who went back an hour on purpose must
+    /// not be thrown forward again by a phone left in a drawer. Asked once the book is already loaded
+    /// where this device left it, so a slow network never holds up pressing play.
+    /// </summary>
+    private async Task OfferPositionFromElsewhereAsync()
+    {
+        try
+        {
+            if (_book is null || ProgressSync.Current is not { } sync) return;
+            if (await sync.FindNewerAsync(_book, forText: false) is not { AudioMs: { } at }) return;
+
+            // Left, or moved to another book, while the server was being asked.
+            if (playback.BookId != BookId) return;
+
+            var go = await Shell.Current.DisplayAlertAsync(
+                Strings.Sync_ElsewhereTitle,
+                string.Format(Strings.Sync_ElsewhereAudio, Clock(at), Clock(PositionMs)),
+                Strings.Sync_ElsewhereGo,
+                Strings.Sync_ElsewhereStay);
+
+            if (go)
+            {
+                playback.SeekTo(at);
+                PositionMs = at;
+            }
+
+            // Either way this device has now decided, which is what stops the question coming back.
+            await database.SaveReadingStateAsync(BookId, PositionMs, speed: playback.Speed);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("offering the position reached on another device", ex);
+        }
+    }
+
+    private static string Clock(long ms) => TimeSpan.FromMilliseconds(ms) is var t && t.TotalHours >= 1
+        ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}"
+        : $"{t.Minutes}:{t.Seconds:00}";
 
     private void AdoptPlayerState()
     {

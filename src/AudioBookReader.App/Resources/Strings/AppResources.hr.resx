@@ -651,6 +651,21 @@
   <data name="Library_Streamed" xml:space="preserve">
     <value>sluša se sa servera</value>
   </data>
+  <data name="Sync_ElsewhereTitle" xml:space="preserve">
+    <value>Nastaviti s drugog uređaja?</value>
+  </data>
+  <data name="Sync_ElsewhereAudio" xml:space="preserve">
+    <value>Na drugom uređaju stigao si do {0}. Ovdje si na {1}.</value>
+  </data>
+  <data name="Sync_ElsewhereText" xml:space="preserve">
+    <value>Na drugom uređaju stigao si do {0} % knjige. Ovdje si na {1} %.</value>
+  </data>
+  <data name="Sync_ElsewhereGo" xml:space="preserve">
+    <value>Nastavi ondje</value>
+  </data>
+  <data name="Sync_ElsewhereStay" xml:space="preserve">
+    <value>Ostani ovdje</value>
+  </data>
   <data name="Picker_Unavailable" xml:space="preserve">
     <value>Ovaj uređaj nema birač datoteka.
 

@@ -724,6 +724,8 @@ public partial class ReaderViewModel(
 
             await ShowStartingDocumentAsync();
             StartTicking();
+
+            _ = OfferPlaceFromElsewhereAsync();
         }
         finally
         {
@@ -785,6 +787,73 @@ public partial class ReaderViewModel(
             HighlightRequested?.Invoke(this, sentence.Index);
         }
     }
+
+    /// <summary>
+    /// Offers to carry on from where another device reached, when it got further — or elsewhere —
+    /// more recently than this one.
+    ///
+    /// A book that follows its narration is placed by the voice, so it is the listening position
+    /// that is compared; otherwise the page. Asked after the book is already open where this device
+    /// left it, so a slow or absent network never holds up reading.
+    /// </summary>
+    private async Task OfferPlaceFromElsewhereAsync()
+    {
+        try
+        {
+            if (_book is null || _text is null || ProgressSync.Current is not { } sync) return;
+
+            var length = _text.PlainText.Length;
+            string message;
+            int offset;
+            long? audioMs = null;
+
+            if (CanFollow && _sync is not null)
+            {
+                if (await sync.FindNewerAsync(_book, forText: false) is not { AudioMs: { } at }) return;
+                if (_sync.CharOffsetAt(at) is not { } placed) return;
+
+                offset = placed;
+                audioMs = at;
+                message = string.Format(Strings.Sync_ElsewhereAudio, Clock(at), Clock(playback.PositionMs));
+            }
+            else
+            {
+                if (await sync.FindNewerAsync(_book, forText: true, length) is not { TextOffset: { } there }) return;
+
+                offset = there;
+                var here = _lastSentence >= 0 && _lastSentence < _text.Sentences.Count
+                    ? _text.Sentences[_lastSentence].Start
+                    : 0;
+                message = string.Format(Strings.Sync_ElsewhereText, Percent(there, length), Percent(here, length));
+            }
+
+            var go = await Shell.Current.DisplayAlertAsync(
+                Strings.Sync_ElsewhereTitle, message, Strings.Sync_ElsewhereGo, Strings.Sync_ElsewhereStay);
+
+            if (!go)
+            {
+                // Staying counts as this device's choice, so the same question is not asked again
+                // next time for a place already turned down.
+                await SavePositionAsync(null);
+                return;
+            }
+
+            if (audioMs is { } ms) playback.SeekTo(ms);
+
+            EntryOffset = offset;
+            await ShowStartingDocumentAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("offering the place reached on another device", ex);
+        }
+
+        static string Percent(int offset, int length) => length > 0 ? $"{offset * 100L / length}" : "0";
+    }
+
+    private static string Clock(long ms) => TimeSpan.FromMilliseconds(ms) is var t && t.TotalHours >= 1
+        ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}"
+        : $"{t.Minutes}:{t.Seconds:00}";
 
     private void ShowDocumentAt(int charOffset)
     {
@@ -1581,7 +1650,8 @@ public partial class ReaderViewModel(
     }
 
     /// <summary>Records where the reader stopped, so opening the book again lands in the right place.</summary>
-    public Task SavePositionAsync(int? topSentenceIndex)
+    /// <param name="leaving">The reader is closing, so the server hears about it at once.</param>
+    public Task SavePositionAsync(int? topSentenceIndex, bool leaving = false)
     {
         if (_text is null) return Task.CompletedTask;
 
@@ -1601,7 +1671,16 @@ public partial class ReaderViewModel(
             audio = at;
         }
 
-        return database.SaveReadingStateAsync(BookId, audioPositionMs: audio, textOffset: _text.Sentences[index].Start);
+        var offset = _text.Sentences[index].Start;
+
+        // Shared with other devices, for a book that came from the server — the listening position
+        // too when reading moved it, so a player elsewhere resumes at this page rather than wherever
+        // the voice last was.
+        ProgressSync.Current?.NoteText(BookId, offset, _text.PlainText.Length, now: leaving);
+        if (audio is { } moved && _book is { DurationMs: > 0 } book)
+            ProgressSync.Current?.NoteAudio(BookId, moved, book.DurationMs, now: leaving);
+
+        return database.SaveReadingStateAsync(BookId, audioPositionMs: audio, textOffset: offset);
     }
 
     [RelayCommand]

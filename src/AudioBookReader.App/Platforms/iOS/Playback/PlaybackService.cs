@@ -473,6 +473,9 @@ public sealed class PlaybackService
     // ---- Periodic pump: pending seeks, errors, position autosave ----
 
     private DateTime _lastPositionSaved = DateTime.MinValue;
+
+    /// <summary>Whether it was playing at the last look, to notice the moment it stops.</summary>
+    private bool _wasPlaying;
     private bool _publishedReady;
 
     private void Tick()
@@ -525,7 +528,15 @@ public sealed class PlaybackService
     /// </summary>
     private void RememberPosition()
     {
-        if (_player.TimeControlStatus != AVPlayerTimeControlStatus.Playing
+        var playing = _player.TimeControlStatus == AVPlayerTimeControlStatus.Playing;
+
+        // Just stopped: tell the server now, not in half a minute — see Android's RememberPosition.
+        if (_wasPlaying && !playing && CurrentBookId is { } stoppedBook)
+            ProgressSync.Current?.NoteAudio(stoppedBook, PositionMs, DurationMs, now: true);
+
+        _wasPlaying = playing;
+
+        if (!playing
             || CurrentBookId is not { } bookId
             || _database is not { } database
             || DateTime.UtcNow - _lastPositionSaved <= TimeSpan.FromSeconds(5))
@@ -539,6 +550,7 @@ public sealed class PlaybackService
         var speed = _speed;
 
         _ = SaveAsync();
+        ProgressSync.Current?.NoteAudio(bookId, positionMs, DurationMs);
 
         async Task SaveAsync()
         {

@@ -425,6 +425,16 @@ public static class Strings
     public static string ServerBook_StreamedHere => Get(nameof(ServerBook_StreamedHere));
     /// <summary>Shelf row: the audio is played from the server.</summary>
     public static string Library_Streamed => Get(nameof(Library_Streamed));
+    /// <summary>Progress on the server is newer than here.</summary>
+    public static string Sync_ElsewhereTitle => Get(nameof(Sync_ElsewhereTitle));
+    /// <summary>{0} there, {1} here, as times.</summary>
+    public static string Sync_ElsewhereAudio => Get(nameof(Sync_ElsewhereAudio));
+    /// <summary>{0} there, {1} here, as percentages.</summary>
+    public static string Sync_ElsewhereText => Get(nameof(Sync_ElsewhereText));
+    /// <summary>Jump to the other device's place.</summary>
+    public static string Sync_ElsewhereGo => Get(nameof(Sync_ElsewhereGo));
+    /// <summary>Keep this device's place.</summary>
+    public static string Sync_ElsewhereStay => Get(nameof(Sync_ElsewhereStay));
     /// <summary>This device has no file picker (televisions usually do not).</summary>
     public static string Picker_Unavailable => Get(nameof(Picker_Unavailable));
     /// <summary>No access to the system's files.</summary>

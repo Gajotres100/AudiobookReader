@@ -82,7 +82,14 @@ public record ServerBookDetail(
 public record ServerChapter(double StartSeconds, double EndSeconds, string Title);
 
 /// <param name="CurrentTimeSeconds">Where listening had reached, as the server last heard it.</param>
-public record ServerProgress(double CurrentTimeSeconds, double DurationSeconds, bool IsFinished);
+/// <param name="EbookFraction">How far through the text, 0..1, or null when it was never read there.</param>
+/// <param name="UpdatedAt">When the server last heard about it, from any device.</param>
+public record ServerProgress(
+    double CurrentTimeSeconds,
+    double DurationSeconds,
+    bool IsFinished,
+    double? EbookFraction = null,
+    DateTimeOffset? UpdatedAt = null);
 
 // ---- What the wire actually carries ----
 //
@@ -178,13 +185,21 @@ internal record WireChapter(
 internal record WireProgress(
     [property: JsonPropertyName("currentTime")] double? CurrentTime,
     [property: JsonPropertyName("duration")] double? Duration,
-    [property: JsonPropertyName("isFinished")] bool? IsFinished);
+    [property: JsonPropertyName("isFinished")] bool? IsFinished,
+    [property: JsonPropertyName("ebookProgress")] double? EbookProgress,
+    [property: JsonPropertyName("lastUpdate")] long? LastUpdate);
 
+/// <summary>
+/// A change to one's progress, audio or text. Absent fields are left out of the request rather
+/// than sent as nothing — the server merges what it is given, and a text update that also sent a
+/// listening position of zero would throw the listener back to the start of the book.
+/// </summary>
 internal record ProgressUpdate(
-    [property: JsonPropertyName("currentTime")] double CurrentTime,
-    [property: JsonPropertyName("duration")] double Duration,
-    [property: JsonPropertyName("progress")] double Progress,
-    [property: JsonPropertyName("isFinished")] bool IsFinished);
+    [property: JsonPropertyName("currentTime")] double? CurrentTime = null,
+    [property: JsonPropertyName("duration")] double? Duration = null,
+    [property: JsonPropertyName("progress")] double? Progress = null,
+    [property: JsonPropertyName("isFinished")] bool? IsFinished = null,
+    [property: JsonPropertyName("ebookProgress")] double? EbookProgress = null);
 
 internal record Credentials(
     [property: JsonPropertyName("username")] string Username,

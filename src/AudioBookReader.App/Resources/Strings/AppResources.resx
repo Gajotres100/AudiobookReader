@@ -688,6 +688,21 @@
   <data name="Library_Streamed" xml:space="preserve">
     <value>streams from the server</value>
   </data>
+  <data name="Sync_ElsewhereTitle" xml:space="preserve">
+    <value>Continue from another device?</value>
+  </data>
+  <data name="Sync_ElsewhereAudio" xml:space="preserve">
+    <value>Another device got to {0}. Here you are at {1}.</value>
+  </data>
+  <data name="Sync_ElsewhereText" xml:space="preserve">
+    <value>Another device got to {0} % of the book. Here you are at {1} %.</value>
+  </data>
+  <data name="Sync_ElsewhereGo" xml:space="preserve">
+    <value>Continue there</value>
+  </data>
+  <data name="Sync_ElsewhereStay" xml:space="preserve">
+    <value>Stay here</value>
+  </data>
   <data name="Picker_Unavailable" xml:space="preserve">
     <value>This device has no file picker.
 

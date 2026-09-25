@@ -53,6 +53,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<LiveSyncRunner>();
 		builder.Services.AddSingleton<BookImporter>();
 		builder.Services.AddSingleton<StorageSweep>();
+		builder.Services.AddSingleton<ProgressSync>();
 		builder.Services.AddSingleton<AlignmentSettingsStore>();
 		builder.Services.AddSingleton<BookFilePicker>();
 		builder.Services.AddSingleton<PhotoPicker>();

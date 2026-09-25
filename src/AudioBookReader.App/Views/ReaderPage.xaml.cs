@@ -153,7 +153,7 @@ public partial class ReaderPage : ContentPage
 
         try
         {
-            await _viewModel.SavePositionAsync(await ReadTopSentenceAsync());
+            await _viewModel.SavePositionAsync(await ReadTopSentenceAsync(), leaving: true);
         }
         catch (Exception ex)
         {

@@ -31,7 +31,9 @@ public sealed class ServerException(string message, HttpStatusCode? status = nul
     public bool NeedsSignIn => Status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden;
 }
 
-[JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(Credentials))]
 [JsonSerializable(typeof(LoginResponse))]
 [JsonSerializable(typeof(LibrariesResponse))]
@@ -454,7 +456,33 @@ public class AudiobookshelfClient(HttpClient http)
 
         return body is null
             ? null
-            : new ServerProgress(body.CurrentTime ?? 0, body.Duration ?? 0, body.IsFinished ?? false);
+            : new ServerProgress(
+                body.CurrentTime ?? 0,
+                body.Duration ?? 0,
+                body.IsFinished ?? false,
+                body.EbookProgress,
+                body.LastUpdate is > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(body.LastUpdate.Value) : null);
+    }
+
+    /// <summary>
+    /// Tells the server how far through the text reading has reached, as a fraction of the book.
+    ///
+    /// A fraction rather than the server's own location format, which describes a page in its web
+    /// reader: between devices running this app the fraction of the same text comes back as exactly
+    /// the same character, and the web reader at least shows the right percentage.
+    /// </summary>
+    public async Task SetEbookProgressAsync(string itemId, double fraction, CancellationToken ct = default)
+    {
+        var update = new ProgressUpdate(EbookProgress: Math.Clamp(fraction, 0, 1));
+
+        await SendAsync(
+            () => new HttpRequestMessage(
+                HttpMethod.Patch, Url($"/api/me/progress/{Uri.EscapeDataString(itemId)}"))
+            {
+                Content = JsonContent.Create(update, ServerJsonContext.Default.ProgressUpdate),
+            },
+            authenticated: true,
+            ct);
     }
 
     /// <summary>Tells the server where listening has reached.</summary>
@@ -470,7 +498,11 @@ public class AudiobookshelfClient(HttpClient http)
 
         // Ninety-nine percent is finished as far as anyone listening is concerned; the last seconds
         // of an audiobook are credits, and a book left one percent short never leaves the shelf.
-        var update = new ProgressUpdate(currentTimeSeconds, durationSeconds, fraction, fraction >= 0.99);
+        var update = new ProgressUpdate(
+            CurrentTime: currentTimeSeconds,
+            Duration: durationSeconds,
+            Progress: fraction,
+            IsFinished: fraction >= 0.99);
 
         await SendAsync(
             () => new HttpRequestMessage(
