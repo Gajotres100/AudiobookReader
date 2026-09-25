@@ -12,19 +12,22 @@ public class HttpRangeStreamTests
     {
         public int Requests { get; private set; }
 
-        public Task<HttpResponseMessage> OpenAsync(long from, CancellationToken ct)
+        public Task<HttpResponseMessage> OpenAsync(long from, long to, CancellationToken ct)
         {
             Requests++;
 
-            var start = honoursRanges ? (int)from : 0;
-            var response = new HttpResponseMessage(honoursRanges && from > 0 ? HttpStatusCode.PartialContent : HttpStatusCode.OK)
+            if (!honoursRanges)
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(file) });
+
+            var start = (int)from;
+            var end = (int)Math.Min(to, file.Length - 1);
+
+            var response = new HttpResponseMessage(HttpStatusCode.PartialContent)
             {
-                Content = new ByteArrayContent(file, start, file.Length - start),
+                Content = new ByteArrayContent(file, start, end - start + 1),
             };
 
-            if (honoursRanges)
-                response.Content.Headers.ContentRange = new ContentRangeHeaderValue(start, file.Length - 1, file.Length);
-
+            response.Content.Headers.ContentRange = new ContentRangeHeaderValue(start, end, file.Length);
             return Task.FromResult(response);
         }
     }
@@ -51,12 +54,12 @@ public class HttpRangeStreamTests
 
         Assert.Equal(fromDisk, overTheNetwork);
 
-        // Three samples, not the whole file: the opening response, then one per jump.
-        Assert.InRange(server.Requests, 1, 3);
+        // Three samples, not the whole file: the opening piece is the first, then one per jump.
+        Assert.Equal(3, server.Requests);
     }
 
     [Fact]
-    public async Task ReadingStraightThroughIsOneRequest()
+    public async Task ReadingStraightThroughAsksForGrowingPieces()
     {
         var file = File(3 * 1024 * 1024);
         var server = new FileServer(file);
@@ -66,7 +69,9 @@ public class HttpRangeStreamTests
         await streamed.CopyToAsync(copy);
 
         Assert.Equal(file, copy.ToArray());
-        Assert.Equal(1, server.Requests);
+
+        // 1 + 1 + 2 MB: pieces double while reading on, rather than one request per megabyte.
+        Assert.Equal(3, server.Requests);
     }
 
     [Fact]

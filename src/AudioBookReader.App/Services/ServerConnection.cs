@@ -352,10 +352,14 @@ public class ServerConnection(
 
         progress?.Report(new ImportProgress(Strings.Server_PreparingStream, 0));
 
-        // The same hash a downloaded copy of this file would get, from three small pieces of it.
-        string hash;
-        await using (var stream = await OpenStreamAsync(location, ct))
-            hash = await ContentHash.ComputeAsync(stream, ct);
+        // The same hash a downloaded copy of this file would get, from three small pieces of it. On a
+        // worker: the hash seeks synchronously, and a seek can close a response, which Android will
+        // not allow to touch the network from the UI thread this was started on.
+        var hash = await Task.Run(async () =>
+        {
+            await using var stream = await OpenStreamAsync(location, ct);
+            return await ContentHash.ComputeAsync(stream, ct);
+        }, ct);
 
         var durationMs = (long)Math.Round(
             (file.DurationSeconds > 0 ? file.DurationSeconds : book.DurationSeconds) * 1000);
@@ -472,7 +476,7 @@ public class ServerConnection(
         await EnsureRestoredAsync();
 
         return await Wrap(() => HttpRangeStream.OpenAsync(
-            (from, token) => _client.OpenFileAsync(itemId, ino, from, token), ct));
+            (from, to, token) => _client.OpenFileAsync(itemId, ino, from, to, token), ct));
     }
 
     /// <summary>

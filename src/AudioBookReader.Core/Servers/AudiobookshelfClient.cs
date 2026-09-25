@@ -349,13 +349,13 @@ public class AudiobookshelfClient(HttpClient http)
     public string FileUrl(string itemId, string ino) =>
         Url($"/api/items/{Uri.EscapeDataString(itemId)}/file/{Uri.EscapeDataString(ino)}");
 
-    /// <summary>Opens one of an item's files from a byte offset onwards, for reading as it arrives.</summary>
-    public Task<HttpResponseMessage> OpenFileAsync(string itemId, string ino, long from, CancellationToken ct = default) =>
+    /// <summary>Opens a stretch of one of an item's files, from one byte offset to another inclusive.</summary>
+    public Task<HttpResponseMessage> OpenFileAsync(string itemId, string ino, long from, long to, CancellationToken ct = default) =>
         SendAsync(
             () =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, FileUrl(itemId, ino));
-                request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(from, null);
+                request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(from, to);
                 return request;
             },
             authenticated: true,

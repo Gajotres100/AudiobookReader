@@ -23,14 +23,23 @@ public class BookCard(Book book, ReadingState? state)
     /// <summary>
     /// What this book actually has. Shown because the app is equally happy with an audiobook, an
     /// ebook, or both, and the difference decides what opening it will do.
+    ///
+    /// A cloud instead of headphones when the audio plays from the server: the book is on the shelf
+    /// like any other, but it needs the network and takes no space, and that is worth seeing at a
+    /// glance.
     /// </summary>
     public string MediaBadge { get; } = (book.HasAudio, book.HasText) switch
     {
-        (true, true) => "🎧 📖",
-        (true, false) => "🎧",
+        (true, true) => $"{AudioGlyph(book)} 📖",
+        (true, false) => AudioGlyph(book),
         (false, true) => "📖",
         _ => "",
     };
+
+    /// <summary>Whether the audio stays on the server.</summary>
+    public bool IsStreamed { get; } = StreamedAudio.Is(book.AudioPath);
+
+    private static string AudioGlyph(Book book) => StreamedAudio.Is(book.AudioPath) ? "☁" : "🎧";
 
     public string SyncBadge { get; } = book.SyncState switch
     {
@@ -61,9 +70,12 @@ public class BookCard(Book book, ReadingState? state)
         if (!book.HasAudio) return Strings.Media_TextOnly;
 
         var length = TimeSpan.FromMilliseconds(book.DurationMs);
-        return length.TotalHours >= 1
+        var duration = length.TotalHours >= 1
             ? string.Format(Strings.Duration_HoursMinutes, (int)length.TotalHours, length.Minutes)
             : string.Format(Strings.Duration_Minutes, length.Minutes);
+
+        // Said in words as well as by the cloud, since a glyph alone is easy to read past.
+        return StreamedAudio.Is(book.AudioPath) ? $"{duration} · {Strings.Library_Streamed}" : duration;
     }
 }
 

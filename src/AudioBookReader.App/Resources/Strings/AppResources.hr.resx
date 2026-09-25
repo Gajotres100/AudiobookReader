@@ -648,6 +648,9 @@
   <data name="ServerBook_StreamedHere" xml:space="preserve">
     <value>Ova knjiga već svira sa servera. Preuzmi audio za slušanje bez mreže ili za poravnanje teksta.</value>
   </data>
+  <data name="Library_Streamed" xml:space="preserve">
+    <value>sluša se sa servera</value>
+  </data>
   <data name="Picker_Unavailable" xml:space="preserve">
     <value>Ovaj uređaj nema birač datoteka.
 

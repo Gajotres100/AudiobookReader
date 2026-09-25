@@ -685,6 +685,9 @@
   <data name="ServerBook_StreamedHere" xml:space="preserve">
     <value>This book already plays from the server. Download the audio to listen offline or to align the text with it.</value>
   </data>
+  <data name="Library_Streamed" xml:space="preserve">
+    <value>streams from the server</value>
+  </data>
   <data name="Picker_Unavailable" xml:space="preserve">
     <value>This device has no file picker.
 

@@ -423,6 +423,8 @@ public static class Strings
     public static string Details_StreamedNoAlign => Get(nameof(Details_StreamedNoAlign));
     /// <summary>A streamed book, seen from the server page.</summary>
     public static string ServerBook_StreamedHere => Get(nameof(ServerBook_StreamedHere));
+    /// <summary>Shelf row: the audio is played from the server.</summary>
+    public static string Library_Streamed => Get(nameof(Library_Streamed));
     /// <summary>This device has no file picker (televisions usually do not).</summary>
     public static string Picker_Unavailable => Get(nameof(Picker_Unavailable));
     /// <summary>No access to the system's files.</summary>
