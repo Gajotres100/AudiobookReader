@@ -413,6 +413,16 @@ public static class Strings
     public static string Gate_BatteryBelow => Get(nameof(Gate_BatteryBelow));
     /// <summary>Alignment is impossible on this device (32-bit system, no speech recognition).</summary>
     public static string Details_AlignmentUnsupported => Get(nameof(Details_AlignmentUnsupported));
+    /// <summary>Preparing to stream.</summary>
+    public static string Server_PreparingStream => Get(nameof(Server_PreparingStream));
+    /// <summary>Button: add the book to play from the server.</summary>
+    public static string ServerBook_Stream => Get(nameof(ServerBook_Stream));
+    /// <summary>After adding a streamed book.</summary>
+    public static string ServerBook_StreamReady => Get(nameof(ServerBook_StreamReady));
+    /// <summary>Alignment unavailable for a streamed book.</summary>
+    public static string Details_StreamedNoAlign => Get(nameof(Details_StreamedNoAlign));
+    /// <summary>A streamed book, seen from the server page.</summary>
+    public static string ServerBook_StreamedHere => Get(nameof(ServerBook_StreamedHere));
     /// <summary>This device has no file picker (televisions usually do not).</summary>
     public static string Picker_Unavailable => Get(nameof(Picker_Unavailable));
     /// <summary>No access to the system's files.</summary>

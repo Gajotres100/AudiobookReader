@@ -13,13 +13,13 @@ namespace AudioBookReader.App.Services;
 /// </summary>
 public partial class MediaReferences
 {
-    public partial bool IsReference(string location) => SecurityScopedBookmarks.Covers(location);
+    private partial bool IsReferenceCore(string location) => SecurityScopedBookmarks.Covers(location);
 
-    public partial bool TryHold(string location) => SecurityScopedBookmarks.Covers(location);
+    private partial bool TryHoldCore(string location) => SecurityScopedBookmarks.Covers(location);
 
-    public partial void Release(string location) => SecurityScopedBookmarks.Forget(location);
+    private partial void ReleaseCore(string location) => SecurityScopedBookmarks.Forget(location);
 
-    public partial Stream OpenRead(string location)
+    private partial Stream OpenReadCore(string location)
     {
         // Started once per process and deliberately never stopped per read: alignment reads a
         // referenced file in short bursts for hours. A location that is neither bookmarked nor
@@ -29,7 +29,7 @@ public partial class MediaReferences
         return File.OpenRead(url?.Path ?? location);
     }
 
-    public partial bool TryDelete(string location)
+    private partial bool TryDeleteCore(string location)
     {
         if (!IsReference(location)) return false;
 

@@ -633,6 +633,21 @@
   <data name="Details_AlignmentUnsupported" xml:space="preserve">
     <value>Na ovom uređaju poravnanje teksta i naracije nije moguće: prepoznavanje govora traži 64-bitni sustav, a ovaj je 32-bitni. Slušanje i čitanje rade normalno.</value>
   </data>
+  <data name="Server_PreparingStream" xml:space="preserve">
+    <value>Pripremam slušanje sa servera…</value>
+  </data>
+  <data name="ServerBook_Stream" xml:space="preserve">
+    <value>Slušaj sa servera, bez preuzimanja</value>
+  </data>
+  <data name="ServerBook_StreamReady" xml:space="preserve">
+    <value>Spremno — svira sa servera i ne zauzima mjesto ovdje.</value>
+  </data>
+  <data name="Details_StreamedNoAlign" xml:space="preserve">
+    <value>Ova knjiga svira sa servera. Za poravnanje teksta i naracije najprije preuzmi audio: otvori knjigu na stranici servera i preuzmi je.</value>
+  </data>
+  <data name="ServerBook_StreamedHere" xml:space="preserve">
+    <value>Ova knjiga već svira sa servera. Preuzmi audio za slušanje bez mreže ili za poravnanje teksta.</value>
+  </data>
   <data name="Picker_Unavailable" xml:space="preserve">
     <value>Ovaj uređaj nema birač datoteka.
 

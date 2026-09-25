@@ -19,7 +19,7 @@ public partial class MediaReferences
 {
     private static Context Context => global::Android.App.Application.Context;
 
-    public partial bool IsReference(string location) =>
+    private partial bool IsReferenceCore(string location) =>
         location.StartsWith("content://", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
@@ -29,7 +29,7 @@ public partial class MediaReferences
     /// grants, and a cloud provider may be streaming rather than holding a file at all. A refusal
     /// is not an error: it means this book has to be copied in after all.
     /// </summary>
-    public partial bool TryHold(string location)
+    private partial bool TryHoldCore(string location)
     {
         if (!IsReference(location)) return false;
 
@@ -68,7 +68,7 @@ public partial class MediaReferences
         }
     }
 
-    public partial void Release(string location)
+    private partial void ReleaseCore(string location)
     {
         if (!IsReference(location)) return;
 
@@ -90,7 +90,7 @@ public partial class MediaReferences
     /// identity hash samples three places in the file, and the tag reader jumps around looking for
     /// chapter marks. A plain input stream from a provider is forward-only.
     /// </summary>
-    public partial bool TryDelete(string location)
+    private partial bool TryDeleteCore(string location)
     {
         if (!IsReference(location)) return false;
 
@@ -111,7 +111,7 @@ public partial class MediaReferences
         }
     }
 
-    public partial Stream OpenRead(string location)
+    private partial Stream OpenReadCore(string location)
     {
         if (!IsReference(location)) return File.OpenRead(location);
 

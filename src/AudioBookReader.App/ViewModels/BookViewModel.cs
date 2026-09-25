@@ -297,10 +297,20 @@ public partial class BookViewModel(
 
     public bool CanStartAlignment => CanAlign && IsPaired && !IsAligning && !MeasuresWhileReading;
 
-    /// <summary>Whether this device can align at all — see <see cref="SpeechSupport"/>.</summary>
-    public bool CanAlign => SpeechSupport.IsAvailable;
+    /// <summary>
+    /// Whether this book can be aligned here: the device must be able to recognise speech (see
+    /// <see cref="SpeechSupport"/>), and the audio must be on the device — recognition reads it in
+    /// short bursts for hours, which a book played from the server does not have to give.
+    /// </summary>
+    public bool CanAlign => SpeechSupport.IsAvailable && !StreamedAudio.Is(_book?.AudioPath);
 
     public bool CannotAlign => !CanAlign;
+
+    /// <summary>Why not, in words, when alignment is not on offer.</summary>
+    public string AlignmentUnavailableReason =>
+        !SpeechSupport.IsAvailable ? Strings.Details_AlignmentUnsupported
+        : StreamedAudio.Is(_book?.AudioPath) ? Strings.Details_StreamedNoAlign
+        : "";
 
     /// <summary>Chapters holding real anchors — not chapters merely visited by a run.</summary>
     [ObservableProperty]
@@ -502,6 +512,9 @@ public partial class BookViewModel(
 
         OnPropertyChanged(nameof(CanStartAlignment));
         OnPropertyChanged(nameof(CanClearAlignment));
+        OnPropertyChanged(nameof(CanAlign));
+        OnPropertyChanged(nameof(CannotAlign));
+        OnPropertyChanged(nameof(AlignmentUnavailableReason));
 
         await RefreshAlignmentProgressAsync();
 

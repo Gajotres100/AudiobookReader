@@ -150,6 +150,13 @@ public partial class ServerBookViewModel : ObservableObject
 
     public bool WantsEbook { get; private set; } = true;
 
+    /// <summary>Whether the audio could be played from the server instead of downloaded.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsStream))]
+    public partial bool CanStream { get; set; }
+
+    public bool ShowsStream => CanStream && IsIdle;
+
     /// <summary>What the button says, which is what it will do — the whole book, or the half of it
     /// that is missing.</summary>
     [ObservableProperty]
@@ -178,6 +185,7 @@ public partial class ServerBookViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
     [NotifyPropertyChangedFor(nameof(ShowsHalfChoice))]
+    [NotifyPropertyChangedFor(nameof(ShowsStream))]
     public partial bool IsDownloading { get; set; }
 
     public bool IsIdle => !IsDownloading;
@@ -292,8 +300,10 @@ public partial class ServerBookViewModel : ObservableObject
         var splitAudio = _detail.AudioFiles.Count > 1;
 
         // Wanted means the server has it and this phone does not. A book already here with its
-        // narration still wants the text the server keeps beside it.
-        WantsAudio = serverHasAudio && here?.HasAudio != true;
+        // narration still wants the text the server keeps beside it — and a book that only plays
+        // from the server still wants its audio, for listening offline or for aligning.
+        var streamedHere = StreamedAudio.Is(here?.AudioPath);
+        WantsAudio = serverHasAudio && (here?.HasAudio != true || streamedHere);
         WantsEbook = serverHasEbook && here?.HasText != true;
 
         // Split audio stops the audio and nothing else. A book the server keeps in forty files
@@ -315,6 +325,10 @@ public partial class ServerBookViewModel : ObservableObject
         // Only worth offering when there is genuinely a choice to make.
         CanChooseHalf = WantsAudio && WantsEbook;
 
+        // Listening from the server needs the same one-file audio a download does, and is pointless
+        // for a book that already does.
+        CanStream = WantsAudio && !streamedHere;
+
         // Red, and only for something genuinely in the way.
         Obstacle = !serverHasAudio && !serverHasEbook
             ? Strings.Server_NothingToDownload
@@ -326,6 +340,8 @@ public partial class ServerBookViewModel : ObservableObject
         // between a button that looks redundant and one that says what it is for.
         Note = here is null
             ? ""
+            : streamedHere
+                ? Strings.ServerBook_StreamedHere
             : !CanDownload && Obstacle.Length == 0
                 ? Strings.ServerBook_AlreadyHere
                 : (WantsEbook, WantsAudio) switch
@@ -368,6 +384,53 @@ public partial class ServerBookViewModel : ObservableObject
 
     [RelayCommand]
     private Task DownloadEbookOnlyAsync() => StartAsync(audio: false, ebook: true);
+
+    /// <summary>
+    /// Adds the book to play from the server, bringing down only its text.
+    ///
+    /// Done here rather than through the download service: there is no gigabyte to carry, only three
+    /// small pieces of the audio for its fingerprint and the ebook, so it is over in seconds and has
+    /// nothing to survive the screen locking for.
+    /// </summary>
+    [RelayCommand]
+    private async Task StreamAsync()
+    {
+        if (_detail is null || IsDownloading) return;
+
+        if (_downloads.Status.IsRunning)
+        {
+            Status = Strings.Download_AlreadyRunning;
+            return;
+        }
+
+        IsDownloading = true;
+        Progress = 0;
+        Percent = "";
+        Status = Strings.Server_PreparingStream;
+
+        try
+        {
+            var progress = new Progress<ImportProgress>(p =>
+            {
+                Status = p.Message;
+                Progress = p.Fraction;
+            });
+
+            BookId = await _server.AddStreamingAsync(ItemId, progress, wantEbook: WantsEbook, attachTo: BookId);
+
+            Status = Strings.ServerBook_StreamReady;
+            await ReconsiderAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("adding a book to stream", ex);
+            Status = ex.Message;
+        }
+        finally
+        {
+            IsDownloading = false;
+        }
+    }
 
     private async Task StartAsync(bool audio, bool ebook)
     {

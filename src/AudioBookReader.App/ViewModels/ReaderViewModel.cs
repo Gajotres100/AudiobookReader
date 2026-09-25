@@ -32,7 +32,8 @@ public partial class ReaderViewModel(
     /// Whether this book measures the passage being read as it is read, rather than having been
     /// aligned in advance. A property of the book, chosen on its own page.
     /// </summary>
-    private bool MeasuresWhileReading => SpeechSupport.IsAvailable && _book?.MeasureWhileReading == true;
+    private bool MeasuresWhileReading =>
+        SpeechSupport.IsAvailable && !StreamedAudio.Is(_book?.AudioPath) && _book?.MeasureWhileReading == true;
     private BookText? _text;
     private BookSync? _sync;
     private IDispatcherTimer? _ticker;

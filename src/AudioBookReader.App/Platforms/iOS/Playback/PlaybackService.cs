@@ -243,16 +243,77 @@ public sealed class PlaybackService
 
     private void ReplaceItem(string audioPath)
     {
-        _item = new AVPlayerItem(SecurityScopedBookmarks.UrlFor(audioPath))
-        {
-            // Preserves pitch while the rate changes, the same reason Android pins PlaybackParameters'
-            // pitch at 1 — TimeDomain is tuned for speech, unlike the costlier Spectral meant for music.
-            AudioTimePitchAlgorithm = AVAudioTimePitchAlgorithm.TimeDomain,
-        };
+        var streamed = StreamedAudio.Is(audioPath);
+
+        _item = streamed ? StreamedItem(audioPath) : new AVPlayerItem(SecurityScopedBookmarks.UrlFor(audioPath));
+
+        // Preserves pitch while the rate changes, the same reason Android pins PlaybackParameters'
+        // pitch at 1 — TimeDomain is tuned for speech, unlike the costlier Spectral meant for music.
+        _item.AudioTimePitchAlgorithm = AVAudioTimePitchAlgorithm.TimeDomain;
 
         _player.ReplaceCurrentItemWithPlayerItem(_item);
         _loadedPath = audioPath;
         _publishedReady = false;
+        _signedAt = streamed ? DateTime.UtcNow : null;
+    }
+
+    /// <summary>When the item playing from the server was signed, or null for a local file.</summary>
+    private DateTime? _signedAt;
+
+    /// <summary>
+    /// An item that plays from the Audiobookshelf server, with the sign-in in its request headers.
+    ///
+    /// AVFoundation fixes the headers for the life of the item, and an access token lasts an hour, so
+    /// <see cref="Tick"/> builds a fresh one before that runs out — Android instead signs each request
+    /// as it goes. The token is fetched off the main thread and waited for here: rarely more than a
+    /// moment, and only when a renewal is actually due.
+    /// </summary>
+    private static AVPlayerItem StreamedItem(string location)
+    {
+        var source = StreamedAudio.Source;
+        var url = source?.UrlFor(location) ?? location;
+
+        string? token = null;
+        try
+        {
+            token = source is null ? null : Task.Run(() => source.FreshTokenAsync()).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("signing the streamed book", ex);
+        }
+
+        NSDictionary? options = null;
+
+        if (token is not null)
+        {
+            var headers = NSDictionary.FromObjectAndKey(new NSString($"Bearer {token}"), new NSString("Authorization"));
+            options = NSDictionary.FromObjectAndKey(headers, new NSString("AVURLAssetHTTPHeaderFieldsKey"));
+        }
+
+        return new AVPlayerItem(new AVUrlAsset(NSUrl.FromString(url)!, options));
+    }
+
+    /// <summary>Re-signs a streamed book before its token runs out, or after the server refused it.</summary>
+    private void RenewStreamIfDue(AVPlayerItemStatus? status)
+    {
+        if (_signedAt is not { } signed || _loadedPath is not { } path || _pendingSeekMs is not null) return;
+
+        var failed = status == AVPlayerItemStatus.Failed;
+        var ageing = DateTime.UtcNow - signed > TimeSpan.FromMinutes(45);
+
+        // A refusal is retried at most once a minute, so a server that is simply gone is not asked
+        // five times a second.
+        if (!ageing && !(failed && DateTime.UtcNow - signed > TimeSpan.FromMinutes(1))) return;
+
+        var at = PositionMs;
+        var playing = IsPlaying;
+
+        AppLog.Info($"player: re-signing the streamed book ({(failed ? "refused" : "token ageing")})");
+
+        ReplaceItem(path);
+        _pendingSeekMs = at;
+        _playWhenReady = playing;
     }
 
     // ---- Transport ----
@@ -342,6 +403,7 @@ public sealed class PlaybackService
 
         _item = null;
         _loadedPath = null;
+        _signedAt = null;
         CurrentBookId = null;
         _chapterStarts = [];
         MPNowPlayingInfoCenter.DefaultCenter.NowPlaying = new MPNowPlayingInfo();
@@ -427,6 +489,9 @@ public sealed class PlaybackService
         {
             LastError = null;
         }
+
+        RenewStreamIfDue(status);
+        status = _item?.Status;
 
         if (status == AVPlayerItemStatus.ReadyToPlay)
         {

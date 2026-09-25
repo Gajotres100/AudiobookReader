@@ -670,6 +670,21 @@
   <data name="Details_AlignmentUnsupported" xml:space="preserve">
     <value>Aligning the text with the narration is not possible on this device: speech recognition needs a 64-bit system, and this one is 32-bit. Listening and reading work as usual.</value>
   </data>
+  <data name="Server_PreparingStream" xml:space="preserve">
+    <value>Preparing to play from the server…</value>
+  </data>
+  <data name="ServerBook_Stream" xml:space="preserve">
+    <value>Listen from the server, no download</value>
+  </data>
+  <data name="ServerBook_StreamReady" xml:space="preserve">
+    <value>Ready — it plays from the server and takes no space here.</value>
+  </data>
+  <data name="Details_StreamedNoAlign" xml:space="preserve">
+    <value>This book plays from the server. To align the text with the narration, download the audio first: open the book on the server page and download it.</value>
+  </data>
+  <data name="ServerBook_StreamedHere" xml:space="preserve">
+    <value>This book already plays from the server. Download the audio to listen offline or to align the text with it.</value>
+  </data>
   <data name="Picker_Unavailable" xml:space="preserve">
     <value>This device has no file picker.
 

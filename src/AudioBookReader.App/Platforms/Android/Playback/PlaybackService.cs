@@ -47,6 +47,12 @@ public class PlaybackService : MediaLibraryService
         builder.SetSeekBackIncrementMs(10_000);
         builder.SetSeekForwardIncrementMs(10_000);
 
+        // Files and content references as before; addresses on the Audiobookshelf server with the
+        // sign-in attached to every request, for books played from there rather than downloaded.
+        builder.SetMediaSourceFactory(
+            new AndroidX.Media3.ExoPlayer.Source.DefaultMediaSourceFactory(this)
+                .SetDataSourceFactory(StreamingSources())!);
+
         _player = builder.Build()!;
 
         // Speed changes must not turn the narrator into a chipmunk. The second argument is pitch:
@@ -772,12 +778,63 @@ public class PlaybackService : MediaLibraryService
             ? global::Android.Net.Uri.FromFile(new Java.IO.File(coverPath))
             : null;
 
-    /// <summary>A book is either kept in app storage or referenced where the user has it, so the
-    /// location is either a path or a content URI and only the first needs wrapping.</summary>
-    private static global::Android.Net.Uri ResolveUri(string audioPath) =>
-        audioPath.StartsWith("content://", StringComparison.OrdinalIgnoreCase)
+    /// <summary>A book is kept in app storage, referenced where the user has it, or played from the
+    /// server — a path, a content URI, or an address worked out from the <c>abs://</c> location.</summary>
+    private static global::Android.Net.Uri ResolveUri(string audioPath)
+    {
+        if (StreamedAudio.Is(audioPath))
+            return global::Android.Net.Uri.Parse(StreamedAudio.Source?.UrlFor(audioPath) ?? audioPath)!;
+
+        return audioPath.StartsWith("content://", StringComparison.OrdinalIgnoreCase)
             ? global::Android.Net.Uri.Parse(audioPath)!
             : global::Android.Net.Uri.FromFile(new Java.IO.File(audioPath))!;
+    }
+
+    /// <summary>
+    /// Where the player gets its bytes: files and content references as ever, and the network with
+    /// the sign-in added to each request.
+    ///
+    /// Per request, not once: a book is fetched in pieces for as long as it plays, and an access
+    /// token lasts an hour. A header fixed when the book was loaded would have stopped the narration
+    /// dead an hour in.
+    /// </summary>
+    private AndroidX.Media3.DataSource.IDataSourceFactory StreamingSources()
+    {
+        var http = new AndroidX.Media3.DataSource.DefaultHttpDataSource.Factory()
+            .SetAllowCrossProtocolRedirects(true)!;
+
+        var signedIn = new AndroidX.Media3.DataSource.ResolvingDataSource.Factory(http, new SignIn());
+
+        return new AndroidX.Media3.DataSource.DefaultDataSource.Factory(this, signedIn);
+    }
+
+    /// <summary>Adds a current access token to each request the player makes to the server.</summary>
+    private sealed class SignIn : Java.Lang.Object, AndroidX.Media3.DataSource.ResolvingDataSource.IResolver
+    {
+        public AndroidX.Media3.DataSource.DataSpec ResolveDataSpec(AndroidX.Media3.DataSource.DataSpec? spec)
+        {
+            if (spec?.Uri?.Scheme is not ("http" or "https") || StreamedAudio.Source is not { } source) return spec!;
+
+            try
+            {
+                // Blocking is fine here: this runs on the player's loading thread, never the UI's,
+                // and waits at most for one token renewal.
+                var token = source.FreshTokenAsync().GetAwaiter().GetResult();
+                if (token is null) return spec;
+
+                return spec.WithAdditionalHeaders(
+                    new Dictionary<string, string> { ["Authorization"] = $"Bearer {token}" })!;
+            }
+            catch (Exception ex)
+            {
+                // Sent without, and the server's refusal becomes the player's error, which says so.
+                AppLog.Error("signing a streaming request", ex);
+                return spec;
+            }
+        }
+
+        public global::Android.Net.Uri ResolveReportedUri(global::Android.Net.Uri? uri) => uri!;
+    }
 
     public void Play() => OnPlayer(() =>
     {

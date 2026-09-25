@@ -94,11 +94,15 @@
                             line, inside its own outline, and the summary sits under the option it
                             is actually about.
                         -->
-                        <!--  A 32-bit television cannot run speech recognition; say so instead of offering switches that do nothing.  -->
+                        <!--
+                            Why alignment is not on offer, instead of switches that do nothing: a
+                            32-bit television cannot run speech recognition, and a book played from
+                            the server has no audio on the device to listen to.
+                        -->
                         <Label
                             IsVisible="{Binding CannotAlign}"
                             Style="{StaticResource Muted}"
-                            Text="{x:Static s:Strings.Details_AlignmentUnsupported}" />
+                            Text="{Binding AlignmentUnavailableReason}" />
 
                         <Border IsVisible="{Binding CanAlign}" Style="{StaticResource Choice}">
                             <VerticalStackLayout Spacing="10">

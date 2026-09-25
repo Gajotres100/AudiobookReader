@@ -547,7 +547,32 @@ public class BookImporter(
         }
     }
 
-    private static async Task<string> SaveCoverAsync(byte[] cover, string name, CancellationToken ct)
+    /// <summary>
+    /// Adds audio that stays on the server — nothing downloaded, nothing probed.
+    ///
+    /// The server has already read the file and says what the chapters and duration are, so the
+    /// tag reading an ordinary import does (minutes, on one television, for one book) is skipped
+    /// entirely. The hash is taken from the server in three small pieces and matches what a
+    /// downloaded copy of the same file would give, so an alignment made elsewhere still fits.
+    /// </summary>
+    public async Task<Book> ImportStreamedAudioAsync(
+        AudioAttachment attachment,
+        int? attachTo = null)
+    {
+        using var busy = Busy();
+
+        AppLog.Info($"audio import: streamed '{attachment.Path}'");
+
+        var imported = attachTo is { } bookId
+            ? await library.AttachAudioAsync(bookId, attachment)
+            : await library.CreateFromAudioAsync(attachment);
+
+        ShelfChanged();
+        return imported;
+    }
+
+    /// <summary>Keeps a cover picture with the library — from a file, or from the server for a streamed book.</summary>
+    internal static async Task<string> SaveCoverAsync(byte[] cover, string name, CancellationToken ct)
     {
         Directory.CreateDirectory(AppPaths.Covers);
 

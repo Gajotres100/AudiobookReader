@@ -205,9 +205,38 @@ public class AudiobookshelfClient(HttpClient http)
         return tokens;
     }
 
+    /// <summary>
+    /// One refresh at a time.
+    ///
+    /// The server rotates the refresh token each time it is used, so two refreshes racing — a
+    /// streaming player and a page both finding the hour up at once — would spend it twice, and the
+    /// second would find it already spent and sign the user out.
+    /// </summary>
+    private readonly SemaphoreSlim _refreshing = new(1, 1);
+
     /// <summary>Trades the refresh token for a fresh access token.</summary>
+    /// <param name="stale">The access token that was found wanting; a refresh already done since is not repeated.</param>
     /// <returns>True when it worked and the call that prompted it is worth retrying.</returns>
-    private async Task<bool> RefreshAsync(CancellationToken ct)
+    private async Task<bool> RefreshAsync(CancellationToken ct, string? stale = null)
+    {
+        var observed = stale ?? _token;
+
+        await _refreshing.WaitAsync(ct);
+
+        try
+        {
+            // Someone else refreshed while this waited, and the token they got is the answer.
+            if (_token is not null && _token != observed) return true;
+
+            return await RefreshCoreAsync(ct);
+        }
+        finally
+        {
+            _refreshing.Release();
+        }
+    }
+
+    private async Task<bool> RefreshCoreAsync(CancellationToken ct)
     {
         if (_refreshToken is not { Length: > 0 } refresh) return false;
 
@@ -308,6 +337,79 @@ public class AudiobookshelfClient(HttpClient http)
             .ToList();
 
         return new ServerBookDetail(book, audio, ebook, chapters);
+    }
+
+    /// <summary>
+    /// Where one of an item's files can be played from.
+    ///
+    /// Without a token in it on purpose: a player asks for a book in pieces for as long as it is
+    /// listened to, far longer than an access token lasts, so the caller adds a current one to each
+    /// request (see <see cref="FreshTokenAsync"/>) rather than baking in one that expires mid-chapter.
+    /// </summary>
+    public string FileUrl(string itemId, string ino) =>
+        Url($"/api/items/{Uri.EscapeDataString(itemId)}/file/{Uri.EscapeDataString(ino)}");
+
+    /// <summary>Opens one of an item's files from a byte offset onwards, for reading as it arrives.</summary>
+    public Task<HttpResponseMessage> OpenFileAsync(string itemId, string ino, long from, CancellationToken ct = default) =>
+        SendAsync(
+            () =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, FileUrl(itemId, ino));
+                request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(from, null);
+                return request;
+            },
+            authenticated: true,
+            ct,
+            completion: HttpCompletionOption.ResponseHeadersRead);
+
+    /// <summary>The item's cover image, copied into a stream the caller owns.</summary>
+    public Task DownloadCoverAsync(string itemId, Stream destination, CancellationToken ct = default) =>
+        CopyAsync($"/api/items/{Uri.EscapeDataString(itemId)}/cover", destination, null, ct);
+
+    /// <summary>
+    /// An access token good for a while yet, renewing it first when it is about to run out.
+    ///
+    /// For the one caller that cannot retry on its own: a player fetching the book in pieces. Every
+    /// other request here renews on a refusal and tries again; a player would instead stop dead an
+    /// hour into the book with an error. Renewed a few minutes early, so the piece in flight at the
+    /// hour mark never meets an expired token.
+    /// </summary>
+    public async Task<string?> FreshTokenAsync(CancellationToken ct = default)
+    {
+        var token = _token;
+
+        if (token is not null
+            && ExpiresAt(token) is { } expires
+            && expires - DateTimeOffset.UtcNow < TimeSpan.FromMinutes(5))
+        {
+            await RefreshAsync(ct, token);
+        }
+
+        return _token;
+    }
+
+    /// <summary>When a signed token runs out, read from the token itself. Null for a token that never does.</summary>
+    private static DateTimeOffset? ExpiresAt(string token)
+    {
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length < 2) return null;
+
+            var payload = parts[1].Replace('-', '+').Replace('_', '/');
+            payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+
+            using var json = JsonDocument.Parse(Convert.FromBase64String(payload));
+
+            return json.RootElement.TryGetProperty("exp", out var exp) && exp.TryGetInt64(out var seconds)
+                ? DateTimeOffset.FromUnixTimeSeconds(seconds)
+                : null;
+        }
+        catch (Exception)
+        {
+            // Not a signed token at all — an older server's long-lived API key — and nothing to renew.
+            return null;
+        }
     }
 
     /// <summary>Where an item's cover can be fetched from, token included, for a view to load.</summary>
@@ -423,12 +525,13 @@ public class AudiobookshelfClient(HttpClient http)
         bool mayRefresh = true)
     {
         var request = build();
+        var used = _token;
 
         if (authenticated)
         {
-            if (_token is null) throw new ServerException(CoreStrings.Server_NotSignedIn, HttpStatusCode.Unauthorized);
+            if (used is null) throw new ServerException(CoreStrings.Server_NotSignedIn, HttpStatusCode.Unauthorized);
 
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _token);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", used);
         }
 
         HttpResponseMessage response;
@@ -457,7 +560,7 @@ public class AudiobookshelfClient(HttpClient http)
         {
             response.Dispose();
 
-            if (await RefreshAsync(ct))
+            if (await RefreshAsync(ct, used))
                 return await SendAsync(build, authenticated, ct, tolerate, completion, mayRefresh: false);
 
             throw new ServerException(

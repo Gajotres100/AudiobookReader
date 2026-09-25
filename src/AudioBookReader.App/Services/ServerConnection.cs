@@ -1,5 +1,7 @@
 using AudioBookReader.App.Resources.Strings;
+using AudioBookReader.Core.Books;
 using AudioBookReader.Core.Data;
+using AudioBookReader.Core.Models;
 using AudioBookReader.Core.Servers;
 
 namespace AudioBookReader.App.Services;
@@ -15,7 +17,7 @@ public class ServerConnection(
     ServerAccount account,
     BookImporter importer,
     DownloadFolder folder,
-    LibraryDatabase database)
+    LibraryDatabase database) : IStreamSource
 {
     private readonly AudiobookshelfClient _client = new(new HttpClient(BuildHandler(account))
     {
@@ -317,6 +319,160 @@ public class ServerConnection(
             if (!finished) foreach (var location in written) Discard(location);
             else foreach (var location in written) DiscardIfTemporary(location);
         }
+    }
+
+    /// <summary>
+    /// Adds a book to the library that plays from the server, downloading only its text.
+    ///
+    /// For a device short of space — a television with a few hundred megabytes free cannot hold a
+    /// ten-hour book at all — and for anyone who would rather not keep a gigabyte for something they
+    /// will listen to once. The text still comes down, because it is small and the reader needs it
+    /// page by page; the audio stays where it is and is fetched as it plays.
+    /// </summary>
+    /// <param name="attachTo">A book already here that this completes, as for a download.</param>
+    public async Task<int> AddStreamingAsync(
+        string itemId,
+        IProgress<ImportProgress>? progress = null,
+        CancellationToken ct = default,
+        bool wantEbook = true,
+        int? attachTo = null)
+    {
+        var detail = await Wrap(() => _client.GetBookAsync(itemId, ct));
+        var book = detail.Book;
+
+        // One file, for the same reason a download needs one: a book is one timeline to this app.
+        if (detail.AudioFiles.Count != 1)
+            throw new NotSupportedException(
+                detail.AudioFiles.Count == 0
+                    ? Strings.Server_NothingToDownload
+                    : string.Format(Strings.Server_SplitFilesLong, detail.AudioFiles.Count));
+
+        var file = detail.AudioFiles[0];
+        var location = StreamedAudio.Location(itemId, file.Ino);
+
+        progress?.Report(new ImportProgress(Strings.Server_PreparingStream, 0));
+
+        // The same hash a downloaded copy of this file would get, from three small pieces of it.
+        string hash;
+        await using (var stream = await OpenStreamAsync(location, ct))
+            hash = await ContentHash.ComputeAsync(stream, ct);
+
+        var durationMs = (long)Math.Round(
+            (file.DurationSeconds > 0 ? file.DurationSeconds : book.DurationSeconds) * 1000);
+
+        var attachment = new AudioAttachment(
+            location,
+            hash,
+            durationMs,
+            ChaptersOf(detail, durationMs),
+            book.Title,
+            book.Author,
+            await SaveCoverAsync(itemId, book.Title, ct));
+
+        var imported = await importer.ImportStreamedAudioAsync(attachment, attachTo);
+        var id = imported.Id;
+
+        if (wantEbook && detail.Ebook is { } ebook)
+        {
+            var written = new List<string>();
+            var finished = false;
+
+            try
+            {
+                var path = await DownloadAsync(
+                    null,
+                    ebook.FileName,
+                    (to, report) => _client.DownloadEbookAsync(itemId, to, report, ct),
+                    string.Format(Strings.Server_DownloadingText, book.Title),
+                    progress,
+                    ct);
+
+                written.Add(path);
+
+                await importer.ImportEbookAsync(new PickedMedia(path, ebook.FileName), id, progress, ct);
+                finished = true;
+            }
+            finally
+            {
+                if (!finished) foreach (var path in written) Discard(path);
+                else foreach (var path in written) DiscardIfTemporary(path);
+            }
+        }
+
+        await database.LinkToServerAsync(id, itemId);
+        return id;
+    }
+
+    /// <summary>The server's chapter marks as the library keeps them, or the whole book as one when it has none.</summary>
+    private static List<Chapter> ChaptersOf(ServerBookDetail detail, long durationMs)
+    {
+        var chapters = detail.Chapters
+            .Select((c, i) => new Chapter
+            {
+                Index = i,
+                Title = c.Title,
+                StartMs = (long)Math.Round(c.StartSeconds * 1000),
+                EndMs = (long)Math.Round(c.EndSeconds * 1000),
+            })
+            .Where(c => c.EndMs > c.StartMs)
+            .ToList();
+
+        if (chapters.Count > 0) return chapters;
+
+        return [new Chapter { Index = 0, Title = detail.Book.Title, StartMs = 0, EndMs = durationMs }];
+    }
+
+    /// <summary>The server's cover for the item, kept with the library, or null when it has none to give.</summary>
+    private async Task<string?> SaveCoverAsync(string itemId, string title, CancellationToken ct)
+    {
+        try
+        {
+            using var cover = new MemoryStream();
+            await _client.DownloadCoverAsync(itemId, cover, ct);
+
+            return cover.Length > 0
+                ? await BookImporter.SaveCoverAsync(cover.ToArray(), title, ct)
+                : null;
+        }
+        catch (Exception ex)
+        {
+            // A book with no cover is still a book.
+            AppLog.Info($"server: no cover for {itemId} ({ex.Message})");
+            return null;
+        }
+    }
+
+    // ---- Streaming, for the player and for copying a streamed book in ----
+
+    /// <summary>Puts the stored connection back first, for a book played before any server page was opened.</summary>
+    private async Task EnsureRestoredAsync()
+    {
+        if (!IsConnected || !_client.IsSignedIn) await RestoreAsync();
+    }
+
+    string? IStreamSource.UrlFor(string location) =>
+        StreamedAudio.TryParse(location, out var itemId, out var ino) && account.Url is { } url
+            ? AudiobookshelfClient.Normalise(url)
+              + $"/api/items/{Uri.EscapeDataString(itemId)}/file/{Uri.EscapeDataString(ino)}"
+            : null;
+
+    async Task<string?> IStreamSource.FreshTokenAsync(CancellationToken ct)
+    {
+        await EnsureRestoredAsync();
+        return await _client.FreshTokenAsync(ct);
+    }
+
+    Task<Stream> IStreamSource.OpenAsync(string location, CancellationToken ct) => OpenStreamAsync(location, ct);
+
+    private async Task<Stream> OpenStreamAsync(string location, CancellationToken ct)
+    {
+        if (!StreamedAudio.TryParse(location, out var itemId, out var ino))
+            throw new ArgumentException($"Not a streamed location: {location}", nameof(location));
+
+        await EnsureRestoredAsync();
+
+        return await Wrap(() => HttpRangeStream.OpenAsync(
+            (from, token) => _client.OpenFileAsync(itemId, ino, from, token), ct));
     }
 
     /// <summary>
