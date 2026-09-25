@@ -562,6 +562,9 @@ public partial class BookViewModel(
         if (playback.BookId == BookId && playback.DurationMs > 0)
         {
             AdoptPlayerState();
+
+            // Back to a book left paused here, which another device may have carried on with since.
+            if (!playback.IsPlaying) _ = OfferPositionFromElsewhereAsync();
             return;
         }
 
@@ -597,12 +600,14 @@ public partial class BookViewModel(
     /// not be thrown forward again by a phone left in a drawer. Asked once the book is already loaded
     /// where this device left it, so a slow network never holds up pressing play.
     /// </summary>
-    private async Task OfferPositionFromElsewhereAsync()
+    /// <param name="patience">How long the server gets to answer; short when play is waiting on it.</param>
+    private async Task OfferPositionFromElsewhereAsync(TimeSpan? patience = null)
     {
         try
         {
             if (_book is null || ProgressSync.Current is not { } sync) return;
-            if (await sync.FindNewerAsync(_book, forText: false) is not { AudioMs: { } at }) return;
+            if (await sync.FindNewerAsync(_book, forText: false, patience: patience) is not { AudioMs: { } at } elsewhere)
+                return;
 
             // Left, or moved to another book, while the server was being asked.
             if (playback.BookId != BookId) return;
@@ -613,14 +618,14 @@ public partial class BookViewModel(
                 Strings.Sync_ElsewhereGo,
                 Strings.Sync_ElsewhereStay);
 
-            if (go)
-            {
-                playback.SeekTo(at);
-                PositionMs = at;
-            }
+            // Either way it has been answered, which is what stops this same place being offered again.
+            sync.Acknowledge(elsewhere);
 
-            // Either way this device has now decided, which is what stops the question coming back.
-            await database.SaveReadingStateAsync(BookId, PositionMs, speed: playback.Speed);
+            if (!go) return;
+
+            playback.SeekTo(at);
+            PositionMs = at;
+            await database.SaveReadingStateAsync(BookId, at, speed: playback.Speed);
         }
         catch (Exception ex)
         {
@@ -747,8 +752,12 @@ public partial class BookViewModel(
     // ---- Transport commands ----
 
     [RelayCommand]
-    private void TogglePlay()
+    private async Task TogglePlayAsync()
     {
+        // About to start: another device may have carried on with this book while it sat paused
+        // here. Asked with a short fuse, since play is waiting on the answer.
+        if (!playback.IsPlaying) await OfferPositionFromElsewhereAsync(TimeSpan.FromSeconds(2));
+
         playback.TogglePlayPause();
         IsPlaying = playback.IsPlaying;
     }

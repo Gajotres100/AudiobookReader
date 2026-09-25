@@ -219,6 +219,11 @@ public partial class ReaderViewModel(
     {
         if (!await EnsurePlaybackLoadedAsync()) return;
 
+        // About to start a book that follows its narration: another device may have carried on
+        // with it since. Asked with a short fuse, since play is waiting on the answer.
+        if (!playback.IsPlaying && _holding is null && CanFollow)
+            await OfferPlaceFromElsewhereAsync(TimeSpan.FromSeconds(2));
+
         if (_holding is not null) _toggledWhileHolding = true;
 
         playback.TogglePlayPause();
@@ -796,7 +801,8 @@ public partial class ReaderViewModel(
     /// that is compared; otherwise the page. Asked after the book is already open where this device
     /// left it, so a slow or absent network never holds up reading.
     /// </summary>
-    private async Task OfferPlaceFromElsewhereAsync()
+    /// <param name="patience">How long the server gets to answer; short when play is waiting on it.</param>
+    private async Task OfferPlaceFromElsewhereAsync(TimeSpan? patience = null)
     {
         try
         {
@@ -806,20 +812,25 @@ public partial class ReaderViewModel(
             string message;
             int offset;
             long? audioMs = null;
+            ElsewherePosition elsewhere;
 
             if (CanFollow && _sync is not null)
             {
-                if (await sync.FindNewerAsync(_book, forText: false) is not { AudioMs: { } at }) return;
+                if (await sync.FindNewerAsync(_book, forText: false, patience: patience) is not { AudioMs: { } at } heard)
+                    return;
                 if (_sync.CharOffsetAt(at) is not { } placed) return;
 
+                elsewhere = heard;
                 offset = placed;
                 audioMs = at;
                 message = string.Format(Strings.Sync_ElsewhereAudio, Clock(at), Clock(playback.PositionMs));
             }
             else
             {
-                if (await sync.FindNewerAsync(_book, forText: true, length) is not { TextOffset: { } there }) return;
+                if (await sync.FindNewerAsync(_book, forText: true, length, patience) is not { TextOffset: { } there } read)
+                    return;
 
+                elsewhere = read;
                 offset = there;
                 var here = _lastSentence >= 0 && _lastSentence < _text.Sentences.Count
                     ? _text.Sentences[_lastSentence].Start
@@ -830,13 +841,10 @@ public partial class ReaderViewModel(
             var go = await Shell.Current.DisplayAlertAsync(
                 Strings.Sync_ElsewhereTitle, message, Strings.Sync_ElsewhereGo, Strings.Sync_ElsewhereStay);
 
-            if (!go)
-            {
-                // Staying counts as this device's choice, so the same question is not asked again
-                // next time for a place already turned down.
-                await SavePositionAsync(null);
-                return;
-            }
+            // Either way it has been answered, which is what stops this same place being offered again.
+            sync.Acknowledge(elsewhere);
+
+            if (!go) return;
 
             if (audioMs is { } ms) playback.SeekTo(ms);
 
