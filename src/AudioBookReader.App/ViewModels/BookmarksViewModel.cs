@@ -219,8 +219,8 @@ public partial class BookmarksViewModel(
     {
         if (row is null) return;
 
-        var confirmed = await Shell.Current.DisplayAlertAsync(
-            Strings.Dialog_DeleteBookmarkTitle, row.Where, Strings.Common_Delete, Strings.Common_Cancel);
+        var confirmed = await Dialogs.AskAsync(
+            Strings.Dialog_DeleteBookmarkTitle, row.Where, Strings.Common_Delete, Strings.Common_Cancel, destructive: true);
 
         if (!confirmed) return;
 

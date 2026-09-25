@@ -313,7 +313,7 @@ public partial class LibraryViewModel : ObservableObject
     [RelayCommand]
     private static async Task PremiumAsync()
     {
-        var yes = await Shell.Current.DisplayAlertAsync(
+        var yes = await Dialogs.AskAsync(
             Strings.Premium_ConfirmTitle, Strings.Premium_ConfirmBody, Strings.Common_Yes, Strings.Common_No);
 
         if (yes) await Shell.Current.Navigation.PushModalAsync(new PremiumPage());

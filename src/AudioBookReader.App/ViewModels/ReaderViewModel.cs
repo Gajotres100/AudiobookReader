@@ -314,7 +314,7 @@ public partial class ReaderViewModel(
 
     private async Task PickAsync(string title, string[] options, Action<int> chosen)
     {
-        var choice = await Shell.Current.DisplayActionSheetAsync(title, Strings.Common_Cancel, null, options);
+        var choice = await Dialogs.ChooseAsync(title, Strings.Common_Cancel, null, options);
 
         var index = Array.IndexOf(options, choice);
         if (index < 0) return;
@@ -838,7 +838,7 @@ public partial class ReaderViewModel(
                 message = string.Format(Strings.Sync_ElsewhereText, Percent(there, length), Percent(here, length));
             }
 
-            var go = await Shell.Current.DisplayAlertAsync(
+            var go = await Dialogs.AskAsync(
                 Strings.Sync_ElsewhereTitle, message, Strings.Sync_ElsewhereGo, Strings.Sync_ElsewhereStay);
 
             // Either way it has been answered, which is what stops this same place being offered again.
@@ -938,7 +938,7 @@ public partial class ReaderViewModel(
         // Numbered so that chapters sharing a title stay distinguishable in the list.
         var labels = _readerChapters.Select((c, i) => $"{i + 1}. {c.Title}").ToArray();
 
-        var choice = await Shell.Current.DisplayActionSheetAsync(
+        var choice = await Dialogs.ChooseAsync(
             Strings.Chapter_Pick, Strings.Common_Cancel, null, labels);
         var index = Array.IndexOf(labels, choice);
         if (index < 0) return;

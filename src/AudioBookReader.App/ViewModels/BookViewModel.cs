@@ -612,7 +612,7 @@ public partial class BookViewModel(
             // Left, or moved to another book, while the server was being asked.
             if (playback.BookId != BookId) return;
 
-            var go = await Shell.Current.DisplayAlertAsync(
+            var go = await Dialogs.AskAsync(
                 Strings.Sync_ElsewhereTitle,
                 string.Format(Strings.Sync_ElsewhereAudio, Clock(at), Clock(PositionMs)),
                 Strings.Sync_ElsewhereGo,
@@ -879,7 +879,7 @@ public partial class BookViewModel(
 
         var cancel = Strings.Common_Cancel;
 
-        var choice = await Shell.Current.DisplayActionSheetAsync(
+        var choice = await Dialogs.ChooseAsync(
             Strings.Player_SleepAfterTitle,
             cancel,
             // Only offered while a timer is actually running.
@@ -1124,8 +1124,8 @@ public partial class BookViewModel(
     {
         if (file is null)
         {
-            var yes = await Shell.Current.DisplayAlertAsync(
-                title, body, Strings.Common_Delete, Strings.Common_Cancel);
+            var yes = await Dialogs.AskAsync(
+                title, body, Strings.Common_Delete, Strings.Common_Cancel, destructive: true);
 
             return yes ? new DeleteChoice(AlsoFile: false) : null;
         }
@@ -1315,11 +1315,12 @@ public partial class BookViewModel(
     [RelayCommand]
     private Task ClearAlignmentAsync() => GuardAsync(async () =>
     {
-        var confirmed = await Shell.Current.DisplayAlertAsync(
+        var confirmed = await Dialogs.AskAsync(
             Strings.Dialog_ClearTitle,
             string.Format(Strings.Dialog_ClearBody, AlignedChapterCount, Chapters.Count),
             Strings.Common_Delete,
-            Strings.Common_Cancel);
+            Strings.Common_Cancel,
+            destructive: true);
 
         if (!confirmed) return;
 

@@ -115,11 +115,10 @@ public class MainActivity : MauiAppCompatActivity
             {
                 try
                 {
-                    if (Shell.Current is { } shell)
-                        await shell.DisplayAlertAsync(
-                            null,
-                            AudioBookReader.App.Resources.Strings.Strings.Picker_Unavailable,
-                            AudioBookReader.App.Resources.Strings.Strings.Common_Close);
+                    await Dialogs.ShowAsync(
+                        null,
+                        AudioBookReader.App.Resources.Strings.Strings.Picker_Unavailable,
+                        AudioBookReader.App.Resources.Strings.Strings.Common_Close);
                 }
                 catch (Exception ex)
                 {
