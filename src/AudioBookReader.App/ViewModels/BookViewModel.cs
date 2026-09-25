@@ -215,7 +215,7 @@ public partial class BookViewModel(
     public partial bool MeasuresWhileReading { get; set; }
 
     [ObservableProperty]
-    public partial bool AlignsInAdvance { get; set; } = true;
+    public partial bool AlignsInAdvance { get; set; }
 
     /// <summary>Guards against the two toggles setting each other back and forth forever.</summary>
     private bool _switchingMode;

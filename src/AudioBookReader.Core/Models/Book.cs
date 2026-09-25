@@ -88,8 +88,11 @@ public class Book
     /// A book you will listen to straight through is worth mapping in advance; one you will dip in
     /// and out of is not, and measuring only what you actually reach is both faster to start and
     /// more accurate where it counts.
+    ///
+    /// On for a new book: it starts following at once, where aligning in advance first makes you
+    /// wait. Books already in the library keep what is stored for them.
     /// </summary>
-    public bool MeasureWhileReading { get; set; }
+    public bool MeasureWhileReading { get; set; } = true;
 
     /// <summary>
     /// The language of the text, as a code recognition understands, or null when it is not clear.
