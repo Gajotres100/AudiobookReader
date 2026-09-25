@@ -60,6 +60,7 @@ public static class Dialogs
 
         if (navigation is null) return onBack;
 
+        page.Host = navigation;
         await MainThread.InvokeOnMainThreadAsync(() => navigation.PushModalAsync(page, animated: false));
         return await page.Answer;
     }

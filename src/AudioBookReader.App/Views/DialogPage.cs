@@ -79,17 +79,33 @@ public sealed class DialogPage : ContentPage
             _first ??= button;
         }
 
-        Content = new Border
+        // Sized to what it holds, and centred. A scroll view left to itself takes all the height it
+        // is offered, which stretched a two-button question down the whole screen; in an Auto row it
+        // is measured by its content instead, capped so a long list of chapters still scrolls.
+        var display = DeviceDisplay.Current.MainDisplayInfo;
+        var screenHeight = display.Density > 0 ? display.Height / display.Density : 800;
+
+        var card = new Border
         {
             Style = Find<Style>("Card"),
-            Content = new ScrollView { Content = content },
+            Content = new ScrollView { Content = content, MaximumHeightRequest = screenHeight * 0.8 },
             MaximumWidthRequest = 560,
-            Margin = new Thickness(20),
             Padding = new Thickness(20, 18),
-            VerticalOptions = LayoutOptions.Center,
             HorizontalOptions = LayoutOptions.Fill,
         };
+
+        var frame = new Grid
+        {
+            Padding = new Thickness(20),
+            RowDefinitions = [new RowDefinition(GridLength.Star), new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
+        };
+
+        frame.Add(card, 0, 1);
+        Content = frame;
     }
+
+    /// <summary>The navigation that opened this, and so the one that closes it.</summary>
+    internal INavigation? Host { get; set; }
 
     private static T? Find<T>(string key) where T : class =>
         Application.Current?.Resources.TryGetValue(key, out var value) == true ? value as T : null;
@@ -98,8 +114,10 @@ public sealed class DialogPage : ContentPage
     {
         base.OnAppearing();
 
-        // Where a remote starts: on the answer the dialog is asking for.
-        _first?.Focus();
+        // Where a remote starts: on the answer the dialog is asking for. Only on a television —
+        // on a touch screen a focused button takes its first tap as focus rather than as a press,
+        // so the main answer needed pressing twice.
+        if (DeviceInfo.Current.Idiom == DeviceIdiom.TV) _first?.Focus();
     }
 
     protected override bool OnBackButtonPressed()
@@ -112,17 +130,40 @@ public sealed class DialogPage : ContentPage
     // taking that as "cancel" would answer a question nobody had answered, then leave the card on
     // screen with buttons that no longer did anything.
 
+    private bool _answered;
+
+    /// <summary>
+    /// Closes the card first and only then hands over the answer.
+    ///
+    /// The other way round, whoever was waiting carried on at once — while the card was still on
+    /// top — and an answer that opens another page (Premium's "yes") had that page closed by the
+    /// card's own closing a moment later, so the button looked as if it had done nothing.
+    /// </summary>
     private async Task AnswerAsync(string? answer)
     {
-        if (!_answer.TrySetResult(answer)) return;
+        if (_answered) return;
+        _answered = true;
+
+        AppLog.Info($"dialog: answered '{answer}'");
 
         try
         {
-            if (Navigation.ModalStack.Contains(this)) await Navigation.PopModalAsync(animated: false);
+            // Through the navigation that opened it. The page's own sees a different modal stack
+            // under Shell, so asking it whether this was on top answered no and nothing was closed.
+            var navigation = Host ?? Navigation;
+
+            if (navigation.ModalStack.LastOrDefault() is { } top && !ReferenceEquals(top, this))
+                AppLog.Info($"dialog: not on top of the modal stack ({top.GetType().Name} is)");
+
+            await navigation.PopModalAsync(animated: false);
         }
         catch (Exception ex)
         {
             AppLog.Error("closing a dialog", ex);
+        }
+        finally
+        {
+            _answer.TrySetResult(answer);
         }
     }
 }
