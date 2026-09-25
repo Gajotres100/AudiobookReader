@@ -86,6 +86,8 @@ public static class Strings
     public static string Details_LocatePageNotFound => Get(nameof(Details_LocatePageNotFound));
     /// <summary>Camera permission was declined</summary>
     public static string Details_LocatePageNoPermission => Get(nameof(Details_LocatePageNoPermission));
+    /// <summary>Button that opens the system's settings page for this app</summary>
+    public static string Details_OpenAppSettings => Get(nameof(Details_OpenAppSettings));
     /// <summary>Generic failure reading or searching the photo</summary>
     public static string Details_LocatePageError => Get(nameof(Details_LocatePageError));
     /// <summary>Delete book</summary>

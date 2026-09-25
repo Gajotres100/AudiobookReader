@@ -153,7 +153,10 @@
     <value>This passage wasn't found in the book. It may be from a different edition or translation.</value>
   </data>
   <data name="Details_LocatePageNoPermission" xml:space="preserve">
-    <value>Camera access was declined. You can allow it from the phone's app settings.</value>
+    <value>Camera access was declined. It can be allowed again in this app's settings.</value>
+  </data>
+  <data name="Details_OpenAppSettings" xml:space="preserve">
+    <value>Open app settings</value>
   </data>
   <data name="Details_LocatePageError" xml:space="preserve">
     <value>Something went wrong reading that photo.</value>

@@ -1164,6 +1164,26 @@ public partial class BookViewModel(
 
     public bool CanLocatePage => HasText && !IsLocatingPage;
 
+    /// <summary>
+    /// The camera was refused, and only the system's settings can undo that — once declined, neither
+    /// Android nor iOS will ask again, so the way there is offered right under the explanation.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool CameraRefused { get; set; }
+
+    [RelayCommand]
+    private static void OpenAppSettings()
+    {
+        try
+        {
+            AppInfo.Current.ShowSettingsUI();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("opening the app's settings", ex);
+        }
+    }
+
     [RelayCommand]
     private async Task LocatePageAsync()
     {
@@ -1191,6 +1211,7 @@ public partial class BookViewModel(
         {
             AppLog.Error($"permission for the {chosen} photo source", ex);
             PageLocatorNote = Strings.Details_LocatePageNoPermission;
+            CameraRefused = true;
             return;
         }
         catch (FeatureNotSupportedException ex)
@@ -1210,6 +1231,7 @@ public partial class BookViewModel(
 
         IsLocatingPage = true;
         PageLocatorNote = "";
+        CameraRefused = false;
 
         try
         {

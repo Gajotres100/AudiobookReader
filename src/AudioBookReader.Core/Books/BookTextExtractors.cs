@@ -18,9 +18,9 @@ public class BookTextExtractors(IEnumerable<IBookTextExtractor>? extractors = nu
     private readonly List<IBookTextExtractor> _extractors =
         extractors?.ToList() is { Count: > 0 } supplied
             ? supplied
-            : [new EpubTextExtractor(), new PlainTextExtractor()];
+            : [new EpubTextExtractor(), new PlainTextExtractor(), new PdfTextExtractor()];
 
-    public IReadOnlyList<string> SupportedExtensions { get; } = [".epub", ".txt"];
+    public IReadOnlyList<string> SupportedExtensions { get; } = [".epub", ".txt", ".pdf"];
 
     public bool CanHandle(string path) => _extractors.Any(e => e.CanHandle(path));
 
@@ -154,8 +154,11 @@ public class BookTextExtractors(IEnumerable<IBookTextExtractor>? extractors = nu
         // EPUB is a zip container: "PK\x03\x04".
         var isZip = header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04;
 
-        return isZip
-            ? _extractors.FirstOrDefault(e => e is EpubTextExtractor)
-            : null;
+        if (isZip) return _extractors.FirstOrDefault(e => e is EpubTextExtractor);
+
+        // PDF: "%PDF".
+        var isPdf = header[0] == 0x25 && header[1] == 0x50 && header[2] == 0x44 && header[3] == 0x46;
+
+        return isPdf ? _extractors.FirstOrDefault(e => e is PdfTextExtractor) : null;
     }
 }

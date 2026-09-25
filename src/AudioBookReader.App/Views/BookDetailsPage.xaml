@@ -289,6 +289,13 @@
                             IsVisible="{Binding HasPageLocatorNote}"
                             Style="{StaticResource Muted}"
                             Text="{Binding PageLocatorNote}" />
+
+                        <!--  Once refused, only the system's settings can give the camera back.  -->
+                        <Button
+                            Command="{Binding OpenAppSettingsCommand}"
+                            IsVisible="{Binding CameraRefused}"
+                            Style="{StaticResource Secondary}"
+                            Text="{x:Static s:Strings.Details_OpenAppSettings}" />
                     </VerticalStackLayout>
                 </Border>
 

@@ -148,7 +148,10 @@
     <value>Ovaj odlomak nije pronađen u knjizi. Možda je riječ o drugom izdanju ili prijevodu.</value>
   </data>
   <data name="Details_LocatePageNoPermission" xml:space="preserve">
-    <value>Pristup kameri je odbijen. Možeš ga dopustiti u postavkama aplikacije na telefonu.</value>
+    <value>Pristup kameri je odbijen. Možeš ga ponovo dopustiti u postavkama aplikacije.</value>
+  </data>
+  <data name="Details_OpenAppSettings" xml:space="preserve">
+    <value>Otvori postavke aplikacije</value>
   </data>
   <data name="Details_LocatePageError" xml:space="preserve">
     <value>Nešto je pošlo po krivu pri čitanju te fotografije.</value>
