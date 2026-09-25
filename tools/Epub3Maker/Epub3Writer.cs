@@ -37,7 +37,7 @@ public static partial class Epub3Writer
     public static WriteReport Write(
         string epubPath,
         ExtractedBook book,
-        SyncMap map,
+        IReadOnlyDictionary<int, SentenceTime> times,
         string audioPath,
         long audioDurationMs,
         string outputPath,
@@ -82,7 +82,7 @@ public static partial class Epub3Writer
                 replaced[entry] = xhtml;
             }
 
-            var clips = ClipsFor(text, i, map, audioDurationMs);
+            var clips = ClipsFor(text, i, times, audioDurationMs);
             if (clips.Count == 0) continue;
 
             timed += clips.Count;
@@ -191,19 +191,40 @@ public static partial class Epub3Writer
     private readonly record struct Clip(int Sentence, long BeginMs, long EndMs);
 
     /// <summary>
-    /// When each sentence of one document is spoken, as far as the map knows. A sentence ends where
-    /// the next one begins, so the highlight moves on without a gap; sentences the map does not
-    /// reach are left out, and a reading system simply does not highlight them.
+    /// The timed sentences of one document, in reading order, never overlapping the one before.
+    /// Sentences with no time are left out, and a reading system simply does not highlight them.
     /// </summary>
-    private static List<Clip> ClipsFor(BookText text, int spineIndex, SyncMap map, long durationMs)
+    private static List<Clip> ClipsFor(BookText text, int spineIndex, IReadOnlyDictionary<int, SentenceTime> times, long durationMs)
     {
         var clips = new List<Clip>();
         var previousEnd = 0L;
 
+        foreach (var sentence in text.Sentences)
+        {
+            if (sentence.SpineIndex != spineIndex || !times.TryGetValue(sentence.Index, out var time)) continue;
+
+            var begin = Math.Clamp(Math.Max(time.BeginMs, previousEnd), 0, durationMs);
+            var end = Math.Clamp(time.EndMs, 0, durationMs);
+            if (end <= begin) continue;
+
+            clips.Add(new Clip(sentence.Index, begin, end));
+            previousEnd = end;
+        }
+
+        return clips;
+    }
+
+    /// <summary>
+    /// Sentence times read off a sync map — the phone's, or the whisper aligner's — where the
+    /// sentence starts and where the next one starts, as far as the map reaches.
+    /// </summary>
+    public static Dictionary<int, SentenceTime> TimesFromMap(BookText text, SyncMap map)
+    {
+        var times = new Dictionary<int, SentenceTime>();
+
         for (var i = 0; i < text.Sentences.Count; i++)
         {
             var sentence = text.Sentences[i];
-            if (sentence.SpineIndex != spineIndex) continue;
 
             var chapter = map.Chapters.FirstOrDefault(c => c.CoversChar(sentence.Start) && c.CoversChar(Math.Max(sentence.Start, sentence.End - 1)));
             if (chapter is null || !chapter.TryGetAudioMs(sentence.Start, out var begin)) continue;
@@ -212,17 +233,11 @@ public static partial class Epub3Writer
                 ? text.Sentences[i + 1].Start
                 : sentence.End;
 
-            if (!chapter.TryGetAudioMs(endChar, out var end)) continue;
-
-            begin = Math.Clamp(Math.Max(begin, previousEnd), 0, durationMs);
-            end = Math.Clamp(end, 0, durationMs);
-            if (end <= begin) continue;
-
-            clips.Add(new Clip(sentence.Index, begin, end));
-            previousEnd = end;
+            if (chapter.TryGetAudioMs(endChar, out var end) && end > begin)
+                times[sentence.Index] = new SentenceTime(begin, end);
         }
 
-        return clips;
+        return times;
     }
 
     private static string BuildSmil(string documentEntry, string smilEntry, string audioEntry, List<Clip> clips)

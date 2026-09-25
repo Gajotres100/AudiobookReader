@@ -44,6 +44,7 @@ public class EpubTextExtractor : IBookTextExtractor
                 TextStart = documents[i].TextStart,
                 TextEnd = documents[i].TextEnd,
                 Html = HtmlTextPipeline.Render(documents[i], plainText, sentences),
+                Anchors = documents[i].AnchorOffsets,
             });
         }
 

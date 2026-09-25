@@ -76,6 +76,47 @@ public static class FfmpegDecoder
         return MemoryMarshal.Cast<byte, float>(bytes).ToArray();
     }
 
+    /// <summary>The whole file as one stream of 16 kHz mono floats, read as it is decoded.</summary>
+    public static PcmStream OpenStream(string path)
+    {
+        var info = new ProcessStartInfo(Executable)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        foreach (var argument in new[] { "-nostdin", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", "16000", "-f", "f32le", "pipe:1" })
+            info.ArgumentList.Add(argument);
+
+        var process = Process.Start(info) ?? throw new InvalidOperationException("FFmpeg did not start.");
+
+        // Drained on the side, or a chatty FFmpeg fills the pipe and stops producing audio.
+        _ = process.StandardError.ReadToEndAsync();
+
+        return new PcmStream(process);
+    }
+
+    public sealed class PcmStream(Process process) : IDisposable
+    {
+        public Stream Stream { get; } = process.StandardOutput.BaseStream;
+
+        public void Dispose()
+        {
+            try
+            {
+                if (!process.HasExited) process.Kill();
+            }
+            catch (InvalidOperationException)
+            {
+                // Already gone.
+            }
+
+            process.Dispose();
+        }
+    }
+
     private static string Seconds(long ms) =>
         (ms / 1000.0).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
 }

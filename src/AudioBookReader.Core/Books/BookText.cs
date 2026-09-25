@@ -36,6 +36,13 @@ public record SpineDocument
     /// of them rather than assuming one element per sentence.
     /// </summary>
     public required string Html { get; init; }
+
+    /// <summary>
+    /// Where each element carrying an <c>id</c> begins in <see cref="BookText.PlainText"/>. What an
+    /// EPUB 3 Media Overlay points at is exactly such an id, so this is how a ready-made overlay
+    /// becomes anchors. Empty for formats that have none.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> Anchors { get; init; } = new Dictionary<string, int>();
 }
 
 /// <summary>

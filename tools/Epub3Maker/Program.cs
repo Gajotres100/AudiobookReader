@@ -78,6 +78,39 @@ static async Task<int> RunAsync(Options options, CancellationToken ct)
 
     if (audio.DurationMs <= 0) throw new InvalidDataException("Audio datoteci se ne može pročitati trajanje.");
 
+    Dictionary<int, SentenceTime> times;
+
+    if (options.Map is null && !options.Whisper)
+    {
+        // ---- Forced alignment, letter by letter ----
+
+        if (!FfmpegDecoder.IsAvailable())
+            throw new InvalidOperationException("FFmpeg nije pronađen. Instaliraj ga (winget install Gyan.FFmpeg) ili zadaj --ffmpeg <putanja>.");
+
+        using var model = await MmsModel.LoadAsync(ct);
+
+        Console.WriteLine($"Slušam knjigu (MMS, {Environment.ProcessorCount} niti)…");
+        var clock = Stopwatch.StartNew();
+
+        var emissions = await Task.Run(() => model.Emissions(options.Audio, audio.DurationMs, done =>
+        {
+            var speed = clock.Elapsed.TotalSeconds > 0 ? done * audio.DurationMs / 1000.0 / clock.Elapsed.TotalSeconds : 0;
+            var left = done > 0.001 ? TimeSpan.FromSeconds(clock.Elapsed.TotalSeconds / done * (1 - done)) : TimeSpan.Zero;
+            Console.Write($"\r  {done:P1}  {speed:0.0}x  još ~{Duration((long)left.TotalMilliseconds)}      ");
+        }, ct), ct);
+
+        Console.WriteLine();
+        Console.WriteLine($"Preslušano za {Duration((long)clock.Elapsed.TotalMilliseconds)}. Poravnavam slovo po slovo…");
+
+        var (ctcTimes, ctcReport) = CtcAligner.Align(extracted.Text, emissions, Log);
+        times = ctcTimes;
+
+        Console.WriteLine($"  {ctcReport.Anchors} sidara, {ctcReport.Segments} odsječaka poravnato" +
+                          (ctcReport.SkippedSegments > 0 ? $", {ctcReport.SkippedSegments} preskočeno (tekst koji se ne čita ili ne odgovara)" : ""));
+
+        return Finish(options, extracted, times, audio.DurationMs, Log);
+    }
+
     var audioHash = await ContentHash.ComputeAsync(options.Audio, ct);
     var ebookHash = await ContentHash.ComputeAsync(options.Ebook, ct);
 
@@ -171,12 +204,21 @@ static async Task<int> RunAsync(Options options, CancellationToken ct)
     if (map is null || map.Chapters.All(c => c.IsEmpty))
         throw new InvalidOperationException("Poravnanje nije pronašlo nijedno mjesto u tekstu. Jesu li audio i e-knjiga ista knjiga?");
 
+    times = Epub3Writer.TimesFromMap(extracted.Text, map);
+    return Finish(options, extracted, times, audio.DurationMs, Log);
+}
+
+static int Finish(Options options, ExtractedBook extracted, Dictionary<int, SentenceTime> times, long durationMs, Action<string> Log)
+{
+    if (times.Count == 0)
+        throw new InvalidOperationException("Poravnanje nije pronašlo nijedno mjesto u tekstu. Jesu li audio i e-knjiga ista knjiga?");
+
     // ---- The EPUB 3 ----
 
     Console.Write("Zapisujem EPUB 3… ");
 
     var report = Epub3Writer.Write(
-        options.Ebook, extracted, map, options.Audio, audio.DurationMs, options.Output,
+        options.Ebook, extracted, times, options.Audio, durationMs, options.Output,
         warning => { Console.WriteLine(); Console.WriteLine("  upozorenje: " + warning); Log("warning: " + warning); });
 
     Console.WriteLine("gotovo.");
@@ -209,7 +251,7 @@ sealed class SynchronousProgress<T>(Action<T> report) : IProgress<T>
     }
 }
 
-sealed record Options(string Ebook, string Audio, string Output, string Model, bool Fast, string? Map, string? Language)
+sealed record Options(string Ebook, string Audio, string Output, string Model, bool Fast, string? Map, string? Language, bool Whisper)
 {
     public static Options? Parse(string[] args)
     {
@@ -217,6 +259,7 @@ sealed record Options(string Ebook, string Audio, string Output, string Model, b
         string? output = null, map = null, language = null;
         var model = "base";
         var fast = false;
+        var whisper = false;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -226,7 +269,8 @@ sealed record Options(string Ebook, string Audio, string Output, string Model, b
             {
                 case "-o" or "--izlaz" or "--output": output = Next(); break;
                 case "-m" or "--model": model = Next(); break;
-                case "--brzo" or "--fast": fast = true; break;
+                case "--brzo" or "--fast": fast = true; whisper = true; break;
+                case "--whisper": whisper = true; break;
                 case "--karta" or "--map": map = Next(); break;
                 case "--jezik" or "--language": language = Next(); break;
                 case "--ffmpeg": FfmpegDecoder.Executable = Next(); break;
@@ -258,7 +302,7 @@ sealed record Options(string Ebook, string Audio, string Output, string Model, b
             Path.GetDirectoryName(ebook)!,
             Path.GetFileNameWithoutExtension(ebook) + " - EPUB3.epub");
 
-        return new Options(ebook, audio, Path.GetFullPath(output), model, fast, map is null ? null : Path.GetFullPath(map), language);
+        return new Options(ebook, audio, Path.GetFullPath(output), model, fast, map is null ? null : Path.GetFullPath(map), language, whisper);
     }
 
     public static void PrintUsage()
@@ -269,10 +313,13 @@ sealed record Options(string Ebook, string Audio, string Output, string Model, b
             Upotreba:
               epub3maker <knjiga.epub> <audioknjiga.m4b|.mp3> [opcije]
 
+            Zadano poravnava Metinim MMS modelom slovo po slovo (najpreciznije, ~360 MB, preuzima se jednom).
+
             Opcije:
               -o, --izlaz <datoteka>   gdje zapisati (zadano: "<ime knjige> - EPUB3.epub" pokraj e-knjige)
-              -m, --model <ime>        tiny | base | small | medium  (zadano: base; veći = točnije i sporije)
-              --brzo                   uzorkuje kao mobitel (10 s svake minute) umjesto da sluša cijelu knjigu
+              --whisper                poravnaj Whisperom kao aplikacija (sidra + interpolacija) umjesto MMS-a
+              -m, --model <ime>        Whisper model: tiny | base | small | medium  (zadano: base)
+              --brzo                   Whisper, uzorkuje kao mobitel (10 s svake minute)
               --karta <book-N.sync.json>  koristi poravnanje napravljeno na mobitelu, bez slušanja
               --jezik <hr|en|…>        jezik naracije, ako ga ne prepozna sam
               --ffmpeg <putanja>       ffmpeg.exe, ako nije u PATH-u

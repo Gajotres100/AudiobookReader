@@ -21,17 +21,22 @@ public static class Models
     public static string FileName(string model, string? language) =>
         language == "en" ? $"ggml-{model}.en.bin" : $"ggml-{model}.bin";
 
-    public static async Task<string> EnsureAsync(string model, string? language, CancellationToken ct)
+    public static Task<string> EnsureAsync(string model, string? language, CancellationToken ct)
     {
         var name = FileName(model, language);
+        return EnsureFileAsync($"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{name}", name, ct);
+    }
+
+    /// <summary>A model file, downloaded the first time it is needed and kept.</summary>
+    public static async Task<string> EnsureFileAsync(string url, string name, CancellationToken ct)
+    {
         var path = Path.Combine(Directory, name);
 
         if (File.Exists(path)) return path;
 
         System.IO.Directory.CreateDirectory(Directory);
 
-        var url = $"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{name}";
-        Console.WriteLine($"Preuzimam model {name} …");
+        Console.WriteLine($"Preuzimam model {name} (jednom) …");
 
         using var http = new HttpClient { Timeout = TimeSpan.FromHours(1) };
         using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
