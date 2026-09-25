@@ -99,7 +99,7 @@ public class BookImporter(
 
             var imported = attachTo is { } bookId
                 ? await library.AttachAudioAsync(bookId, attachment)
-                : await library.CreateFromAudioAsync(attachment);
+                : await RememberNameAsync(await library.CreateFromAudioAsync(attachment), picked.FileName);
 
             ShelfChanged();
             return imported;
@@ -242,13 +242,27 @@ public class BookImporter(
 
             return attachTo is { } bookId
                 ? await library.AttachTextAsync(bookId, attachment)
-                : await library.CreateFromTextAsync(attachment);
+                : await RememberNameAsync(await library.CreateFromTextAsync(attachment), picked.FileName);
         }
         catch
         {
             TryDelete(path);
             throw;
         }
+    }
+
+    /// <summary>
+    /// The book already on the shelf that a file of this name completes — the audiobook for an
+    /// ebook called the same, or the other way round — or null when there is no single such book.
+    /// </summary>
+    public async Task<int?> FindPartnerAsync(string fileName, bool isAudio) =>
+        BookNames.FindPartner(await database.GetBooksAsync(), fileName, isAudio)?.Id;
+
+    private async Task<Book> RememberNameAsync(Book book, string fileName)
+    {
+        book.SourceName = Path.GetFileNameWithoutExtension(fileName);
+        await database.UpdateBookAsync(book);
+        return book;
     }
 
     /// <summary>

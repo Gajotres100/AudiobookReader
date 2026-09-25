@@ -197,13 +197,36 @@ public partial class LibraryViewModel : ObservableObject
     private Task ImportAudioAsync() => ImportAsync(
         _picker.PickAudioAsync(),
         Strings.Progress_LoadingAudiobook,
-        (picked, progress, ct) => _importer.ImportAudioAsync(picked, null, progress, ct));
+        (picked, progress, ct) => ImportOrCompleteAsync(picked, isAudio: true, progress, ct));
 
     [RelayCommand]
     private Task ImportEbookAsync() => ImportAsync(
         _picker.PickEbookAsync(),
         Strings.Progress_ReadingEbook,
-        (picked, progress, ct) => _importer.ImportEbookAsync(picked, null, progress, ct));
+        (picked, progress, ct) => ImportOrCompleteAsync(picked, isAudio: false, progress, ct));
+
+    /// <summary>
+    /// Adds the file as a book of its own — unless a book already here is waiting for exactly this
+    /// half. "Torch.epub" added after "Torch.m4b" joins it, the same as adding it from the book's
+    /// own page would, instead of standing next to it as a second, text-only Torch.
+    /// </summary>
+    private async Task<Book> ImportOrCompleteAsync(
+        PickedMedia picked, bool isAudio, IProgress<ImportProgress> progress, CancellationToken ct)
+    {
+        var partner = await _importer.FindPartnerAsync(picked.FileName, isAudio);
+        if (partner is { } id) AppLog.Info($"import: '{picked.FileName}' completes book {id}");
+
+        var book = isAudio
+            ? await _importer.ImportAudioAsync(picked, partner, progress, ct)
+            : await _importer.ImportEbookAsync(picked, partner, progress, ct);
+
+        // Now a read-along, and alignment wants the audio as a local copy — as when the second half
+        // is added from the book's page.
+        if (partner is not null && book.IsPaired)
+            book = await _importer.EnsureLocalAudioAsync(book.Id, progress, ct) ?? book;
+
+        return book;
+    }
 
     private async Task ImportAsync(
         Task<PickedMedia?> pick,

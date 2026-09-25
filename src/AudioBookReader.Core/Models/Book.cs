@@ -49,6 +49,15 @@ public class Book
     [Indexed]
     public string? EbookPath { get; set; }
 
+    /// <summary>
+    /// The name of the file the book was first added from, as the user saw it.
+    ///
+    /// Kept because the stored paths do not always say: audio left where the user keeps it is a
+    /// document URI that may be nothing but a number. It is how a second file with the same name
+    /// finds this book to join instead of becoming a book of its own.
+    /// </summary>
+    public string? SourceName { get; set; }
+
     public string Title { get; set; } = "";
     public string? Author { get; set; }
     public string? CoverPath { get; set; }
