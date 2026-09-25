@@ -419,7 +419,7 @@ public class PdfTextExtractor : IBookTextExtractor
             if (document.NumberOfPages == 0) return null;
 
             var image = document.GetPage(1).GetImages()
-                .OrderByDescending(i => i.Bounds.Width * i.Bounds.Height)
+                .OrderByDescending(i => i.BoundingBox.Width * i.BoundingBox.Height)
                 .FirstOrDefault();
 
             if (image is null) return null;
