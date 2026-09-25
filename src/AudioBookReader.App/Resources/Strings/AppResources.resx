@@ -1153,4 +1153,10 @@ You can also add books from an Audiobookshelf server (saving them to app storage
   <data name="Reader_BookPageOf" xml:space="preserve">
     <value>{0} / {1} overall</value>
   </data>
+  <data name="Import_OverlayManyFiles" xml:space="preserve">
+    <value>This EPUB 3 keeps its narration in several audio files, one per chapter. Only books with a single recording can be imported for now.</value>
+  </data>
+  <data name="Progress_UnpackingAudio" xml:space="preserve">
+    <value>Taking the narration out of the book…</value>
+  </data>
 </root>

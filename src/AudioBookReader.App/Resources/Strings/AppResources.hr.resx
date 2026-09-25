@@ -1093,4 +1093,10 @@ Knjige možeš dodati i s Audiobookshelf servera (spremi ih u memoriju aplikacij
   <data name="Reader_BookPageOf" xml:space="preserve">
     <value>{0} / {1} ukupno</value>
   </data>
+  <data name="Import_OverlayManyFiles" xml:space="preserve">
+    <value>Ovaj EPUB 3 drži naraciju u više audio datoteka, po jednu za poglavlje. Za sada se mogu uvesti samo knjige s jednom snimkom.</value>
+  </data>
+  <data name="Progress_UnpackingAudio" xml:space="preserve">
+    <value>Vadim naraciju iz knjige…</value>
+  </data>
 </root>

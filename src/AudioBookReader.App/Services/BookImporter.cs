@@ -213,8 +213,22 @@ public class BookImporter(
         var fileName = picked.FileName;
         var path = await CopyInAsync(source, fileName, progress, ct);
 
+        // The narration an EPUB 3 carries inside it, once taken out, and where it sat in the package.
+        string? narration = null;
+        string? narrationEntry = null;
+
         try
         {
+            if (MediaOverlayPackage.AudioFiles(path) is { } overlayAudio && await TakesNarrationAsync(attachTo))
+            {
+                // One recording is what a book here plays; a package split into a file per chapter
+                // would need joining first, and saying so beats importing half of it.
+                if (overlayAudio.Count > 1) throw new NotSupportedException(Strings.Import_OverlayManyFiles);
+
+                narrationEntry = overlayAudio[0];
+                (path, narration) = await SplitNarrationAsync(path, narrationEntry, fileName, progress, ct);
+            }
+
             progress?.Report(new ImportProgress(Strings.Progress_ReadingText, 1));
 
             var extracted = await extractors.ExtractAsync(path, ct);
@@ -240,15 +254,103 @@ public class BookImporter(
                 TextLanguage.Detect(extracted.Text.PlainText),
                 coverPath);
 
-            return attachTo is { } bookId
+            var book = attachTo is { } bookId
                 ? await library.AttachTextAsync(bookId, attachment)
                 : await RememberNameAsync(await library.CreateFromTextAsync(attachment), picked.FileName);
+
+            return narration is null
+                ? book
+                : await AdoptNarrationAsync(book, path, narration, narrationEntry!, extracted, progress, ct);
         }
         catch
         {
             TryDelete(path);
+            if (narration is not null) TryDelete(narration);
             throw;
         }
+    }
+
+    // ---- EPUB 3 with its own narration ----
+
+    /// <summary>
+    /// Whether the narration inside an EPUB 3 should become the book's audio: always for a new
+    /// book, and for an existing one only when it has none. An audiobook already attached is the
+    /// user's choice and is not replaced by one that happened to come along with the text.
+    /// </summary>
+    private async Task<bool> TakesNarrationAsync(int? attachTo) =>
+        attachTo is not { } id || await database.GetBookAsync(id) is not { HasAudio: true };
+
+    /// <summary>
+    /// Takes the recording out of the package into a file of its own and keeps the book without
+    /// it. Both halves are needed apart: the player wants a file, and the ebook reader loads the
+    /// whole package into memory, hours of audio included, were it left in.
+    /// </summary>
+    private static async Task<(string Book, string Audio)> SplitNarrationAsync(
+        string package, string entry, string fileName, IProgress<ImportProgress>? progress, CancellationToken ct)
+    {
+        progress?.Report(new ImportProgress(Strings.Progress_UnpackingAudio, 0));
+
+        var stem = Path.GetFileNameWithoutExtension(fileName);
+        var audioPath = UniquePath(AppPaths.Books, SafeName(stem + Path.GetExtension(entry)));
+        var bookPath = UniquePath(AppPaths.Books, SafeName(stem + ".epub"));
+
+        try
+        {
+            await Task.Run(async () =>
+            {
+                await using var audio = File.Create(audioPath);
+                await MediaOverlayPackage.SplitAsync(package, entry, audio, bookPath, ct);
+            }, ct);
+        }
+        catch
+        {
+            TryDelete(audioPath);
+            TryDelete(bookPath);
+            throw;
+        }
+
+        // The package held everything twice over once split; only the halves are kept.
+        TryDelete(package);
+
+        AppLog.Info($"epub 3 narration: '{entry}' taken out to '{audioPath}'");
+        return (bookPath, audioPath);
+    }
+
+    /// <summary>
+    /// Gives the book the narration and turns the package's own timings into its alignment, so it
+    /// opens already following along: no listening, no waiting.
+    /// </summary>
+    private async Task<Book> AdoptNarrationAsync(
+        Book book, string ebookPath, string audioPath, string entry, ExtractedBook extracted,
+        IProgress<ImportProgress>? progress, CancellationToken ct)
+    {
+        progress?.Report(new ImportProgress(Strings.Progress_ReadingChapters, 1));
+
+        var info = await ProbeAsync(audioPath, Path.GetFileName(audioPath), referenced: false, ct);
+        if (info.DurationMs <= 0) throw new NotSupportedException(Strings.Import_NotAudio);
+
+        var hash = await HashAsync(audioPath, ct);
+        var coverPath = book.CoverPath is null && info.Cover is { Length: > 0 }
+            ? await SaveCoverAsync(info.Cover, Path.GetFileNameWithoutExtension(audioPath), ct)
+            : null;
+
+        book = await library.AttachAudioAsync(book.Id, new AudioAttachment(
+            audioPath, hash, info.DurationMs, info.Chapters, info.Title, info.Author, coverPath));
+
+        var anchors = await Task.Run(() => MediaOverlayPackage.ReadAnchors(ebookPath, extracted.Text, entry), ct);
+        var chapters = await database.GetChaptersAsync(book.Id);
+        var (map, ranges) = MediaOverlayPackage.BuildMap(
+            anchors, chapters, extracted.Text.PlainText.Length, book.AudioHash, book.EbookHash);
+
+        // Aligned already, all of it: measuring while reading would only redo what the book brought.
+        book.MeasureWhileReading = false;
+        await database.UpdateBookAsync(book);
+
+        var adopted = await library.AdoptAlignmentAsync(book.Id, map, ranges);
+        AppLog.Info($"epub 3 narration: {anchors.Count} timings over {map.Chapters.Count} chapters, adopted {adopted}");
+
+        ShelfChanged();
+        return await database.GetBookAsync(book.Id) ?? book;
     }
 
     /// <summary>

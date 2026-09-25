@@ -88,6 +88,10 @@ public static class Strings
     public static string Details_LocatePageNoPermission => Get(nameof(Details_LocatePageNoPermission));
     /// <summary>Button that opens the system's settings page for this app</summary>
     public static string Details_OpenAppSettings => Get(nameof(Details_OpenAppSettings));
+    /// <summary>An EPUB 3 whose narration is split over several audio files</summary>
+    public static string Import_OverlayManyFiles => Get(nameof(Import_OverlayManyFiles));
+    /// <summary>Progress while the audio inside an EPUB 3 is extracted</summary>
+    public static string Progress_UnpackingAudio => Get(nameof(Progress_UnpackingAudio));
     /// <summary>Generic failure reading or searching the photo</summary>
     public static string Details_LocatePageError => Get(nameof(Details_LocatePageError));
     /// <summary>Delete book</summary>

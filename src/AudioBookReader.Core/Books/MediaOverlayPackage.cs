@@ -159,8 +159,8 @@ public static class MediaOverlayPackage
             var from = chapter.StartMs ?? 0;
             var to = chapter.EndMs ?? long.MaxValue;
 
-            var inside = anchors.Where(a => a.AudioMs >= from && a.AudioMs < to).ToList();
-            if (inside.Count > 0) map.SetChapter(ChapterSyncMap.FromAnchors(chapter.Index, inside));
+            var inside = Monotone(anchors.Where(a => a.AudioMs >= from && a.AudioMs < to));
+            if (inside.Count > 0) map.SetChapter(new ChapterSyncMap { ChapterIndex = chapter.Index, Anchors = inside });
 
             starts.Add((chapter.Index, inside.Count > 0 ? inside.Min(a => a.CharOffset) : null));
         }
@@ -182,6 +182,27 @@ public static class MediaOverlayPackage
         }
 
         return (map, ranges);
+    }
+
+    /// <summary>
+    /// The anchors in time order, keeping only those that also move forward through the text.
+    ///
+    /// Not the map's own outlier filter, which weighs every anchor against every other: that is
+    /// right for a few dozen guesses per chapter and far too slow for an overlay timing every
+    /// sentence of a chapter-less ten-hour recording. An overlay is measured, not guessed; the only
+    /// thing to guard against is a stray entry pointing backwards.
+    /// </summary>
+    private static List<Anchor> Monotone(IEnumerable<Anchor> anchors)
+    {
+        var kept = new List<Anchor>();
+
+        foreach (var anchor in anchors.OrderBy(a => a.AudioMs).ThenBy(a => a.CharOffset))
+        {
+            if (kept.Count > 0 && (anchor.AudioMs <= kept[^1].AudioMs || anchor.CharOffset <= kept[^1].CharOffset)) continue;
+            kept.Add(anchor);
+        }
+
+        return kept;
     }
 
     // ---- The overlay files ----
