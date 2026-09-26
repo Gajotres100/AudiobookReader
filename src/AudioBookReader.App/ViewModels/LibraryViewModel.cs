@@ -36,6 +36,14 @@ public class BookCard(Book book, ReadingState? state)
         _ => "",
     };
 
+    /// <summary>
+    /// Came whole as an EPUB 3 with its own narration. Marked with the EP3 icon instead of the
+    /// headphones and the book: it is not two halves put together, it is one thing.
+    /// </summary>
+    public bool IsReadAlong { get; } = book.IsReadAlong;
+
+    public bool ShowsMediaBadge => !IsReadAlong;
+
     /// <summary>Whether the audio stays on the server.</summary>
     public bool IsStreamed { get; } = StreamedAudio.Is(book.AudioPath);
 

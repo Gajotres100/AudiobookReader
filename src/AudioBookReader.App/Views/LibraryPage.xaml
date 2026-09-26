@@ -220,8 +220,18 @@
                             <Label
                                 Grid.Column="2"
                                 FontSize="15"
+                                IsVisible="{Binding ShowsMediaBadge}"
                                 Text="{Binding MediaBadge}"
                                 VerticalOptions="Center" />
+
+                            <!--  An EPUB 3 read-along: the same mark as the button that brought it in.  -->
+                            <Image
+                                Grid.Column="2"
+                                HeightRequest="30"
+                                IsVisible="{Binding IsReadAlong}"
+                                Source="readalong.png"
+                                VerticalOptions="Center"
+                                WidthRequest="30" />
                         </Grid>
                     </SwipeView>
                 </DataTemplate>
