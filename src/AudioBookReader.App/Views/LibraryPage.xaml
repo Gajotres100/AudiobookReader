@@ -34,35 +34,23 @@
                 VerticalOptions="Center" />
 
             <!--
-                A book that arrives whole: text, narration and alignment in one EPUB 3. Drawn unlike
-                the plain icons beside it, because it is unlike them — it is not half of a book.
+                A book that arrives whole: text, narration and alignment in one EPUB 3. The app's own
+                icon with a "3" on it, because that is what such a file is: the whole idea of this
+                app, already done, in one file.
             -->
-            <Button
+            <ImageButton
                 Grid.Column="1"
-                Margin="0,0,6,0"
-                Padding="10,0"
-                BorderWidth="0"
+                Margin="0,0,4,0"
+                Padding="4"
+                BackgroundColor="Transparent"
                 Command="{Binding ImportReadAlongCommand}"
-                CornerRadius="15"
-                FontFamily="OpenSansSemibold"
-                FontSize="13"
-                HeightRequest="30"
+                CornerRadius="10"
+                HeightRequest="44"
                 SemanticProperties.Description="{x:Static s:Strings.Library_ImportReadAlong}"
-                Text="EP3"
-                TextColor="#FFFDF8"
+                Source="readalong.png"
                 ToolTipProperties.Text="{x:Static s:Strings.Library_ImportReadAlong}"
-                VerticalOptions="Center">
-                <Button.Background>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                        <GradientStop Offset="0" Color="#F2B84B" />
-                        <GradientStop Offset="0.55" Color="#D0801A" />
-                        <GradientStop Offset="1" Color="#8E4F00" />
-                    </LinearGradientBrush>
-                </Button.Background>
-                <Button.Shadow>
-                    <Shadow Brush="#B26A00" Opacity="0.45" Radius="8" Offset="0,2" />
-                </Button.Shadow>
-            </Button>
+                VerticalOptions="Center"
+                WidthRequest="44" />
 
             <Button
                 Grid.Column="2"

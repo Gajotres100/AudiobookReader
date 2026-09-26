@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!--
+    The EP3 button: the app's own icon, small, with a "3" stuck on its corner.
+
+    An EPUB 3 read-along is exactly what the launcher icon draws — a book whose left page is text
+    and whose right page is a voice — only arriving as one file. So the button borrows that picture
+    rather than inventing another, and the badge says which kind of file it takes.
+
+    Same palette and the same rules as the launcher icon: flat shapes, no gradients, nothing thinner
+    than it has to be, so it holds up at toolbar size in either theme.
+  -->
+
+  <!--  The brass tile, as the launcher icon's background.  -->
+  <rect x="2" y="8" width="50" height="50" rx="12" fill="#B26A00" />
+
+  <!--  The book from appiconfg.svg, scaled into the tile.  -->
+  <g transform="translate(8 20.8) scale(0.1532) translate(-104 -143)">
+    <g fill="#FBF8F2">
+      <path d="M 228 158 C 197 143, 148 141, 104 154 L 104 298 C 148 285, 197 287, 228 302 Z" />
+      <path d="M 228 158 C 259 143, 308 141, 352 154 L 352 298 C 308 285, 259 287, 228 302 Z" />
+    </g>
+    <path d="M 228 158 L 228 302" stroke="#E4D9C4" stroke-width="7" stroke-linecap="round" />
+    <g fill="#241F1A">
+      <rect x="126" y="188" width="82" height="11" rx="5.5" />
+      <rect x="126" y="212" width="82" height="11" rx="5.5" />
+      <rect x="126" y="236" width="82" height="11" rx="5.5" />
+      <rect x="126" y="260" width="52" height="11" rx="5.5" />
+      <rect x="250" y="211" width="13" height="34" rx="6.5" />
+      <rect x="272" y="195" width="13" height="66" rx="6.5" />
+      <rect x="294" y="180" width="13" height="96" rx="6.5" />
+      <rect x="316" y="199" width="13" height="58" rx="6.5" />
+      <rect x="338" y="214" width="13" height="28" rx="6.5" />
+    </g>
+  </g>
+
+  <!--
+    The badge. Ink, with a paper-coloured ring that cuts it cleanly off the tile, and the 3 drawn
+    as a path so it looks the same wherever the SVG is rasterised, font or no font.
+  -->
+  <circle cx="51" cy="13" r="10.5" fill="#241F1A" stroke="#FBF8F2" stroke-width="2.5" />
+  <path d="M 47.3 8.4 H 54.4 L 50.9 12.6 C 53.6 12.6 55 14.2 55 16.1 C 55 18.3 53.3 19.7 51 19.7 C 49.3 19.7 48 18.9 47.3 17.7"
+        fill="none" stroke="#FBF8F2" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
