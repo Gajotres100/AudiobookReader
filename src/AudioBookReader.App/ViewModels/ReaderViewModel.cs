@@ -524,7 +524,6 @@ public partial class ReaderViewModel(
     }
 
     private int _lastNotedSentence = -1;
-    private DateTime _lastPositionNoted = DateTime.MinValue;
 
     /// <summary>
     /// Turning pages while reading silently is progress too, and until now only crossing a
@@ -548,11 +547,12 @@ public partial class ReaderViewModel(
         // corrections must not be overridden by the page reports its document load produces.
         if (_holding is not null) return;
 
+        // Every page, not at most one every few seconds: the last turn before closing the book is
+        // the one that matters, and a throttle dropped exactly that one whenever pages were
+        // turned quickly. Seeking a paused player is cheap.
         if (topSentence == _lastNotedSentence) return;
-        if (DateTime.UtcNow - _lastPositionNoted < TimeSpan.FromSeconds(3)) return;
 
         _lastNotedSentence = topSentence;
-        _lastPositionNoted = DateTime.UtcNow;
 
         if (AudioPositionForSentence(topSentence) is not { } at) return;
 
@@ -1092,6 +1092,7 @@ public partial class ReaderViewModel(
             _holding = settling;
 
             await SettleSeekAsync(resume: wasPlaying, settling.Token);
+            ReleaseHolding(settling);
             return;
         }
 
@@ -1105,6 +1106,23 @@ public partial class ReaderViewModel(
         _holding = holding;
 
         await HoldUntilMeasuredAsync(textStart, resume: wasPlaying, blockPlayWhileCorrecting, holding.Token);
+        ReleaseHolding(holding);
+    }
+
+    /// <summary>
+    /// Lets go of a hold that has finished, unless a newer move has already replaced it.
+    ///
+    /// A hold that was never let go of kept the reader thinking the voice was still being placed,
+    /// so turning pages in silence never moved it on: opening the book, reading from page three to
+    /// page seven and closing it reopened on page three, every time, on any book aligned in
+    /// advance — an EPUB 3 read-along always is.
+    /// </summary>
+    private void ReleaseHolding(CancellationTokenSource finished)
+    {
+        if (!ReferenceEquals(_holding, finished)) return;
+
+        _holding = null;
+        finished.Dispose();
     }
 
     /// <summary>How far off the target the voice may start, in milliseconds. About one sentence.</summary>

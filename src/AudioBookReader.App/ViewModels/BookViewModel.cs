@@ -81,19 +81,20 @@ public partial class BookViewModel(
 
     /// <summary>
     /// The book came whole as an EPUB 3 with its own narration. Its files and its alignment came
-    /// together and only make sense together, so the page offers nothing to change — just delete.
+    /// together and only make sense together, so the page offers nothing to change them — only
+    /// finding a page from a photo, and delete.
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsAlignmentCard))]
     [NotifyPropertyChangedFor(nameof(ShowsFilesCard))]
-    [NotifyPropertyChangedFor(nameof(ShowsPageFinder))]
     public partial bool IsReadAlong { get; set; }
 
     public bool ShowsAlignmentCard => IsPaired && !IsReadAlong;
 
     public bool ShowsFilesCard => !IsReadAlong;
 
-    public bool ShowsPageFinder => HasText && !IsReadAlong;
+    /// <summary>A read-along keeps this one: finding the page from a photo changes nothing about the book.</summary>
+    public bool ShowsPageFinder => HasText;
 
     public bool HasNoAudio => !HasAudio;
 
