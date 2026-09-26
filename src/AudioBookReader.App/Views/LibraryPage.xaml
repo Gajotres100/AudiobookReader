@@ -25,7 +25,7 @@
         <Grid
             Grid.Row="0"
             Padding="20,16,12,8"
-            ColumnDefinitions="*,Auto,Auto,Auto,Auto">
+            ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto">
 
             <Label
                 Grid.Column="0"
@@ -33,20 +33,51 @@
                 Text="{x:Static s:Strings.Library_Title}"
                 VerticalOptions="Center" />
 
+            <!--
+                A book that arrives whole: text, narration and alignment in one EPUB 3. Drawn unlike
+                the plain icons beside it, because it is unlike them — it is not half of a book.
+            -->
             <Button
                 Grid.Column="1"
+                Margin="0,0,6,0"
+                Padding="10,0"
+                BorderWidth="0"
+                Command="{Binding ImportReadAlongCommand}"
+                CornerRadius="15"
+                FontFamily="OpenSansSemibold"
+                FontSize="13"
+                HeightRequest="30"
+                SemanticProperties.Description="{x:Static s:Strings.Library_ImportReadAlong}"
+                Text="EP3"
+                TextColor="#FFFDF8"
+                ToolTipProperties.Text="{x:Static s:Strings.Library_ImportReadAlong}"
+                VerticalOptions="Center">
+                <Button.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Offset="0" Color="#F2B84B" />
+                        <GradientStop Offset="0.55" Color="#D0801A" />
+                        <GradientStop Offset="1" Color="#8E4F00" />
+                    </LinearGradientBrush>
+                </Button.Background>
+                <Button.Shadow>
+                    <Shadow Brush="#B26A00" Opacity="0.45" Radius="8" Offset="0,2" />
+                </Button.Shadow>
+            </Button>
+
+            <Button
+                Grid.Column="2"
                 Command="{Binding ImportAudioCommand}"
                 Style="{StaticResource Icon}"
                 Text="🎧" />
 
             <Button
-                Grid.Column="2"
+                Grid.Column="3"
                 Command="{Binding ImportEbookCommand}"
                 Style="{StaticResource Icon}"
                 Text="📖" />
 
             <Button
-                Grid.Column="3"
+                Grid.Column="4"
                 Command="{Binding OpenServerCommand}"
                 Style="{StaticResource Icon}"
                 Text="☁" />
@@ -57,7 +88,7 @@
                 anything behind it to buy.
             -->
             <Button
-                Grid.Column="4"
+                Grid.Column="5"
                 Command="{Binding PremiumCommand}"
                 Style="{StaticResource Icon}"
                 Text="$" />

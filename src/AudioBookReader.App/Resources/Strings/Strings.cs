@@ -90,6 +90,12 @@ public static class Strings
     public static string Details_OpenAppSettings => Get(nameof(Details_OpenAppSettings));
     /// <summary>An EPUB 3 whose narration is split over several audio files</summary>
     public static string Import_OverlayManyFiles => Get(nameof(Import_OverlayManyFiles));
+    /// <summary>The EP3 button in the library header</summary>
+    public static string Library_ImportReadAlong => Get(nameof(Library_ImportReadAlong));
+    /// <summary>Picker prompt for an EPUB 3 with narration</summary>
+    public static string Picker_ChooseReadAlong => Get(nameof(Picker_ChooseReadAlong));
+    /// <summary>An EPUB chosen with the EP3 button that carries no narration</summary>
+    public static string Import_NotReadAlong => Get(nameof(Import_NotReadAlong));
     /// <summary>Progress while the audio inside an EPUB 3 is extracted</summary>
     public static string Progress_UnpackingAudio => Get(nameof(Progress_UnpackingAudio));
     /// <summary>Generic failure reading or searching the photo</summary>

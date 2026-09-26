@@ -114,6 +114,13 @@ public class Book
     [Indexed]
     public string? ServerItemId { get; set; }
 
+    /// <summary>
+    /// Arrived as an EPUB 3 carrying its own narration and timings: text, audio and alignment all
+    /// came together and belong together, so there is nothing to add, swap or align — only to read
+    /// and listen, or to delete.
+    /// </summary>
+    public bool IsReadAlong { get; set; }
+
     public DateTime AddedUtc { get; set; }
     public DateTime? LastOpenedUtc { get; set; }
 

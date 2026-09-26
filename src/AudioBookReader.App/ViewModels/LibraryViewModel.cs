@@ -205,6 +205,12 @@ public partial class LibraryViewModel : ObservableObject
         Strings.Progress_ReadingEbook,
         (picked, progress, ct) => ImportOrCompleteAsync(picked, isAudio: false, progress, ct));
 
+    [RelayCommand]
+    private Task ImportReadAlongAsync() => ImportAsync(
+        _picker.PickEbookAsync(Strings.Picker_ChooseReadAlong),
+        Strings.Progress_ReadingEbook,
+        (picked, progress, ct) => _importer.ImportReadAlongAsync(picked, progress, ct));
+
     /// <summary>
     /// Adds the file as a book of its own — unless a book already here is waiting for exactly this
     /// half. "Torch.epub" added after "Torch.m4b" joins it, the same as adding it from the book's

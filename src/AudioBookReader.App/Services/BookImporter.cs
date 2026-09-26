@@ -204,7 +204,26 @@ public class BookImporter(
         PickedMedia picked,
         int? attachTo = null,
         IProgress<ImportProgress>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default) =>
+        await ImportEbookAsync(picked, attachTo, readAlongOnly: false, progress, ct);
+
+    /// <summary>
+    /// Imports an EPUB 3 that carries its own narration, as a book of its own, and refuses anything
+    /// else — the one button that is only for these, so a plain EPUB chosen there by mistake says
+    /// so instead of quietly becoming an ordinary ebook.
+    /// </summary>
+    public Task<Book> ImportReadAlongAsync(
+        PickedMedia picked,
+        IProgress<ImportProgress>? progress = null,
+        CancellationToken ct = default) =>
+        ImportEbookAsync(picked, attachTo: null, readAlongOnly: true, progress, ct);
+
+    private async Task<Book> ImportEbookAsync(
+        PickedMedia picked,
+        int? attachTo,
+        bool readAlongOnly,
+        IProgress<ImportProgress>? progress,
+        CancellationToken ct)
     {
         using var busy = Busy();
 
@@ -219,7 +238,12 @@ public class BookImporter(
 
         try
         {
-            if (MediaOverlayPackage.AudioFiles(path) is { } overlayAudio && await TakesNarrationAsync(attachTo))
+            var overlayAudio = MediaOverlayPackage.AudioFiles(path);
+
+            if (readAlongOnly && overlayAudio is null)
+                throw new NotSupportedException(Strings.Import_NotReadAlong);
+
+            if (overlayAudio is not null && await TakesNarrationAsync(attachTo))
             {
                 // One recording is what a book here plays; a package split into a file per chapter
                 // would need joining first, and saying so beats importing half of it.
@@ -344,6 +368,7 @@ public class BookImporter(
 
         // Aligned already, all of it: measuring while reading would only redo what the book brought.
         book.MeasureWhileReading = false;
+        book.IsReadAlong = true;
         await database.UpdateBookAsync(book);
 
         var adopted = await library.AdoptAlignmentAsync(book.Id, map, ranges);

@@ -1159,4 +1159,13 @@ You can also add books from an Audiobookshelf server (saving them to app storage
   <data name="Progress_UnpackingAudio" xml:space="preserve">
     <value>Taking the narration out of the book…</value>
   </data>
+  <data name="Library_ImportReadAlong" xml:space="preserve">
+    <value>Add an EPUB 3 with narration</value>
+  </data>
+  <data name="Picker_ChooseReadAlong" xml:space="preserve">
+    <value>Choose an EPUB 3 with narration</value>
+  </data>
+  <data name="Import_NotReadAlong" xml:space="preserve">
+    <value>This EPUB has no narration inside it. Add it with the book button as an ordinary ebook.</value>
+  </data>
 </root>

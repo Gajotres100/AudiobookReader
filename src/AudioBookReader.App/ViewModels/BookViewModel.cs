@@ -69,13 +69,31 @@ public partial class BookViewModel(
     [NotifyPropertyChangedFor(nameof(CanRemoveAudio))]
     [NotifyPropertyChangedFor(nameof(CanRemoveText))]
     [NotifyPropertyChangedFor(nameof(CanLocatePage))]
+    [NotifyPropertyChangedFor(nameof(ShowsPageFinder))]
     public partial bool HasText { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanStartAlignment))]
     [NotifyPropertyChangedFor(nameof(CanClearAlignment))]
     [NotifyPropertyChangedFor(nameof(CanShareAlignment))]
+    [NotifyPropertyChangedFor(nameof(ShowsAlignmentCard))]
     public partial bool IsPaired { get; set; }
+
+    /// <summary>
+    /// The book came whole as an EPUB 3 with its own narration. Its files and its alignment came
+    /// together and only make sense together, so the page offers nothing to change — just delete.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsAlignmentCard))]
+    [NotifyPropertyChangedFor(nameof(ShowsFilesCard))]
+    [NotifyPropertyChangedFor(nameof(ShowsPageFinder))]
+    public partial bool IsReadAlong { get; set; }
+
+    public bool ShowsAlignmentCard => IsPaired && !IsReadAlong;
+
+    public bool ShowsFilesCard => !IsReadAlong;
+
+    public bool ShowsPageFinder => HasText && !IsReadAlong;
 
     public bool HasNoAudio => !HasAudio;
 
@@ -490,6 +508,7 @@ public partial class BookViewModel(
         HasAudio = _book.HasAudio;
         HasText = _book.HasText;
         IsPaired = _book.IsPaired;
+        IsReadAlong = _book.IsReadAlong;
 
         _chapters = await database.GetChaptersAsync(BookId);
 

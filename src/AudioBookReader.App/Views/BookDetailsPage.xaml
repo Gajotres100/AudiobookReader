@@ -65,7 +65,7 @@
 
                 <!--  ======== Alignment ========  -->
 
-                <Border IsVisible="{Binding IsPaired}" Style="{StaticResource Card}">
+                <Border IsVisible="{Binding ShowsAlignmentCard}" Style="{StaticResource Card}">
                     <VerticalStackLayout Spacing="14">
 
                         <!--  The heading, and the way to find out what any of it means.  -->
@@ -230,7 +230,7 @@
 
                 <!--  ======== Files ========  -->
 
-                <Border Style="{StaticResource Card}">
+                <Border IsVisible="{Binding ShowsFilesCard}" Style="{StaticResource Card}">
                     <VerticalStackLayout Spacing="10">
 
                         <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Details_FilesSection}" />
@@ -260,7 +260,7 @@
 
                 <!--  ======== Find a page from a photo, once there is text to search ========  -->
 
-                <Border IsVisible="{Binding HasText}" Style="{StaticResource Card}">
+                <Border IsVisible="{Binding ShowsPageFinder}" Style="{StaticResource Card}">
                     <VerticalStackLayout Spacing="10">
 
                         <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Details_PageFinderSection}" />
