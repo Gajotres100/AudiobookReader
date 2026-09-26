@@ -7,24 +7,39 @@ using AudioBookReader.Core.Servers;
 namespace AudioBookReader.App.Services;
 
 /// <summary>
-/// The app's connection to an Audiobookshelf server.
+/// The app's connection to one Audiobookshelf server.
 ///
-/// One of these for the whole app, because the token and the connection are one thing and every
-/// screen that asks about the server is asking about the same one. It wraps the Core client with
-/// the stored account, so no screen has to know how signing in works or where the token is kept.
+/// One of these per configured server, kept by <see cref="ServerConnections"/>, because the token and
+/// the connection are one thing. It wraps the Core client with that server's stored account, so no
+/// screen has to know how signing in works or where the token is kept.
 /// </summary>
 public class ServerConnection(
     ServerAccount account,
     BookImporter importer,
     DownloadFolder folder,
-    LibraryDatabase database) : IStreamSource
+    LibraryDatabase database)
 {
-    private readonly AudiobookshelfClient _client = new(new HttpClient(BuildHandler(account))
+    private AudiobookshelfClient? _clientInstance;
+
+    /// <summary>
+    /// Built on first use rather than with this object, so that trusting a self-signed certificate
+    /// — switched on in the sign-in form of a server being added — is in force for that very first
+    /// connection instead of from the next launch.
+    /// </summary>
+    private AudiobookshelfClient _client => _clientInstance ??= new(new HttpClient(BuildHandler(account))
     {
         // Long, because a library scan on a server with a few thousand titles is not fast, and a
         // download of a whole audiobook is slower still.
         Timeout = TimeSpan.FromMinutes(30),
     });
+
+    /// <summary>Which of the configured servers this is; stored with every book that came from it.</summary>
+    public string Id => account.Id;
+
+    /// <summary>How the server is shown to the user.</summary>
+    public string Name => account.DisplayName;
+
+    public ServerAccount Account => account;
 
     /// <summary>
     /// The default handler, unless the user has explicitly said this one server's certificate
@@ -41,7 +56,7 @@ public class ServerConnection(
 
         if (account.TrustAnyCertificate)
         {
-            AppLog.Info("server: certificate validation disabled for this connection (user opt-in)");
+            AppLog.Info($"server {account.Id}: certificate validation disabled for this connection (user opt-in)");
             handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
         }
 
@@ -310,7 +325,7 @@ public class ServerConnection(
 
             // Remembered so this book is recognised the next time its item is opened, instead of
             // being matched on a title the two sides spell differently.
-            await database.LinkToServerAsync(id, itemId);
+            await database.LinkToServerAsync(id, itemId, Id);
 
             return id;
         }
@@ -348,7 +363,7 @@ public class ServerConnection(
                     : string.Format(Strings.Server_SplitFilesLong, detail.AudioFiles.Count));
 
         var file = detail.AudioFiles[0];
-        var location = StreamedAudio.Location(itemId, file.Ino);
+        var location = StreamedAudio.Location(Id, itemId, file.Ino);
 
         progress?.Report(new ImportProgress(Strings.Server_PreparingStream, 0));
 
@@ -357,7 +372,7 @@ public class ServerConnection(
         // not allow to touch the network from the UI thread this was started on.
         var hash = await Task.Run(async () =>
         {
-            await using var stream = await OpenStreamAsync(location, ct);
+            await using var stream = await OpenStreamAsync(itemId, file.Ino, ct);
             return await ContentHash.ComputeAsync(stream, ct);
         }, ct);
 
@@ -403,7 +418,7 @@ public class ServerConnection(
             }
         }
 
-        await database.LinkToServerAsync(id, itemId);
+        await database.LinkToServerAsync(id, itemId, Id);
         return id;
     }
 
@@ -485,25 +500,26 @@ public class ServerConnection(
         if (!IsConnected || !_client.IsSignedIn) await RestoreAsync();
     }
 
-    string? IStreamSource.UrlFor(string location) =>
-        StreamedAudio.TryParse(location, out var itemId, out var ino) && account.Url is { } url
+    /// <summary>The address a file of this server plays from, without credentials.</summary>
+    public string? StreamUrl(string itemId, string ino) =>
+        account.Url is { } url
             ? AudiobookshelfClient.Normalise(url)
               + $"/api/items/{Uri.EscapeDataString(itemId)}/file/{Uri.EscapeDataString(ino)}"
             : null;
 
-    async Task<string?> IStreamSource.FreshTokenAsync(CancellationToken ct)
+    /// <summary>Whether an address worked out from a streamed book points at this server.</summary>
+    public bool Serves(string address) =>
+        account.Url is { } url
+        && address.StartsWith(AudiobookshelfClient.Normalise(url) + "/", StringComparison.OrdinalIgnoreCase);
+
+    public async Task<string?> FreshTokenAsync(CancellationToken ct = default)
     {
         await EnsureRestoredAsync();
         return await _client.FreshTokenAsync(ct);
     }
 
-    Task<Stream> IStreamSource.OpenAsync(string location, CancellationToken ct) => OpenStreamAsync(location, ct);
-
-    private async Task<Stream> OpenStreamAsync(string location, CancellationToken ct)
+    public async Task<Stream> OpenStreamAsync(string itemId, string ino, CancellationToken ct = default)
     {
-        if (!StreamedAudio.TryParse(location, out var itemId, out var ino))
-            throw new ArgumentException($"Not a streamed location: {location}", nameof(location));
-
         await EnsureRestoredAsync();
 
         return await Wrap(() => HttpRangeStream.OpenAsync(

@@ -19,8 +19,16 @@ namespace AudioBookReader.App.ViewModels;
 [QueryProperty(nameof(ItemId), "id")]
 public partial class ServerBookViewModel : ObservableObject
 {
-    private readonly ServerConnection _server;
+    private readonly ServerConnections _servers;
+    private ServerConnection? _serverInstance;
     private readonly LibraryDatabase _database;
+
+    /// <summary>
+    /// The server this book is on: the one being browsed when the page was opened. Held once, so a
+    /// switch made elsewhere while this page is open cannot send its download to another server.
+    /// </summary>
+    private ServerConnection _server =>
+        _serverInstance ??= _servers.Active ?? throw new InvalidOperationException(Strings.Server_Gone);
     private readonly DownloadQueue _downloads;
     private readonly CarConnection _car;
 
@@ -33,12 +41,12 @@ public partial class ServerBookViewModel : ObservableObject
     /// over a book that is already half here.
     /// </summary>
     public ServerBookViewModel(
-        ServerConnection server,
+        ServerConnections servers,
         LibraryDatabase database,
         DownloadQueue downloads,
         CarConnection car)
     {
-        _server = server;
+        _servers = servers;
         _database = database;
         _downloads = downloads;
         _car = car;
@@ -255,7 +263,10 @@ public partial class ServerBookViewModel : ObservableObject
             // anything was recording it.
             var books = await _database.GetBooksAsync();
 
-            var here = books.FirstOrDefault(b => b.ServerItemId == ItemId)
+            // The item id together with the server it is on: two servers can each hold a copy of the
+            // same book, and each copy is its own.
+            var here = books.FirstOrDefault(b =>
+                           b.ServerItemId == ItemId && (b.ServerId ?? ServerAccount.LegacyId) == _server.Id)
                 ?? books.FirstOrDefault(b =>
                     string.Equals(b.Title, book.Title, StringComparison.CurrentCultureIgnoreCase));
 
@@ -453,7 +464,7 @@ public partial class ServerBookViewModel : ObservableObject
 
         // Handed to a service and forgotten. Everything from here arrives through the queue, which
         // is what lets it carry on with this page closed and the screen locked.
-        _downloads.Start(ItemId, Title, toAppStorage, audio, ebook, BookId);
+        _downloads.Start(_server.Id, ItemId, Title, toAppStorage, audio, ebook, BookId);
     }
 
     /// <summary>

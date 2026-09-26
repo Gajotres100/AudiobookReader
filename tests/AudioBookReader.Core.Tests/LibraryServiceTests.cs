@@ -536,11 +536,14 @@ public class LibraryServiceTests : IAsyncLifetime, IDisposable
     {
         var book = await _service.CreateFromAudioAsync(Audio());
 
-        await _database.LinkToServerAsync(book!.Id, "li_9f3c1");
+        await _database.LinkToServerAsync(book!.Id, "li_9f3c1", "a1b2c3d4");
 
         var reloaded = await _database.GetBookAsync(book.Id);
 
         Assert.Equal("li_9f3c1", reloaded!.ServerItemId);
+
+        // And which of the servers it is on: two servers can each hold a copy of the same book.
+        Assert.Equal("a1b2c3d4", reloaded.ServerId);
     }
 
     /// <summary>
@@ -556,7 +559,7 @@ public class LibraryServiceTests : IAsyncLifetime, IDisposable
         book.SyncState = SyncState.InProgress;
         await _database.UpdateBookAsync(book);
 
-        await _database.LinkToServerAsync(book.Id, "li_9f3c1");
+        await _database.LinkToServerAsync(book.Id, "li_9f3c1", "a1b2c3d4");
 
         var reloaded = await _database.GetBookAsync(book.Id);
 

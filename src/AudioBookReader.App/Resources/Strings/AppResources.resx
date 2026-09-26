@@ -1168,4 +1168,31 @@ You can also add books from an Audiobookshelf server (saving them to app storage
   <data name="Import_NotReadAlong" xml:space="preserve">
     <value>This EPUB has no narration inside it. Add it with the book button as an ordinary ebook.</value>
   </data>
+  <data name="Server_AddServer" xml:space="preserve">
+    <value>Add another server</value>
+  </data>
+  <data name="Server_AddServerShort" xml:space="preserve">
+    <value>+ Server</value>
+  </data>
+  <data name="Server_NewServer" xml:space="preserve">
+    <value>New server</value>
+  </data>
+  <data name="Server_Name" xml:space="preserve">
+    <value>Name (optional)</value>
+  </data>
+  <data name="Server_NamePlaceholder" xml:space="preserve">
+    <value>e.g. Home, Office</value>
+  </data>
+  <data name="Server_Gone" xml:space="preserve">
+    <value>The server this book is on is no longer set up. Add it again on the server screen.</value>
+  </data>
+  <data name="Reader_TranslateDictionary" xml:space="preserve">
+    <value>Dictionary</value>
+  </data>
+  <data name="Reader_TranslateOnline" xml:space="preserve">
+    <value>Translate (Google)</value>
+  </data>
+  <data name="Reader_TranslateShare" xml:space="preserve">
+    <value>Send to an app…</value>
+  </data>
 </root>

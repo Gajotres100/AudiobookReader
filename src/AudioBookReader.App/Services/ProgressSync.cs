@@ -20,7 +20,7 @@ public record ElsewherePosition(int BookId, long? AudioMs, int? TextOffset, Date
 /// Quiet about failure: a phone on a train is offline half the time, and every missed update is
 /// followed by another one.
 /// </summary>
-public sealed class ProgressSync(ServerConnection server, LibraryDatabase database)
+public sealed class ProgressSync(ServerConnections servers, LibraryDatabase database)
 {
     /// <summary>Reached by the players, which are built by the platform rather than handed services.</summary>
     internal static ProgressSync? Current { get; set; }
@@ -58,7 +58,7 @@ public sealed class ProgressSync(ServerConnection server, LibraryDatabase databa
 
     private void Note((int BookId, bool Text) key, double value, double total, bool now)
     {
-        if (!server.IsConfigured || total <= 0) return;
+        if (!servers.IsConfigured || total <= 0) return;
 
         TimeSpan? wait = null;
         var send = false;
@@ -120,7 +120,8 @@ public sealed class ProgressSync(ServerConnection server, LibraryDatabase databa
     {
         try
         {
-            if ((await database.GetBookAsync(key.BookId))?.ServerItemId is not { } itemId) return;
+            if (await database.GetBookAsync(key.BookId) is not { ServerItemId: { } itemId } book) return;
+            if (servers.ForBook(book) is not { } server) return;
 
             if (key.Text)
                 await server.SetEbookProgressAsync(itemId, value / total);
@@ -167,7 +168,8 @@ public sealed class ProgressSync(ServerConnection server, LibraryDatabase databa
     public async Task<ElsewherePosition?> FindNewerAsync(
         Book book, bool forText, int textLength = 0, TimeSpan? patience = null)
     {
-        if (book.ServerItemId is not { } itemId || !server.IsConfigured) return null;
+        if (book.ServerItemId is not { } itemId || servers.ForBook(book) is not { Account.IsConfigured: true } server)
+            return null;
 
         try
         {

@@ -1108,4 +1108,31 @@ Knjige možeš dodati i s Audiobookshelf servera (spremi ih u memoriju aplikacij
   <data name="Import_NotReadAlong" xml:space="preserve">
     <value>U ovom EPUB-u nema naracije. Dodaj ga gumbom s knjigom kao običnu e-knjigu.</value>
   </data>
+  <data name="Server_AddServer" xml:space="preserve">
+    <value>Dodaj još jedan server</value>
+  </data>
+  <data name="Server_AddServerShort" xml:space="preserve">
+    <value>+ Server</value>
+  </data>
+  <data name="Server_NewServer" xml:space="preserve">
+    <value>Novi server</value>
+  </data>
+  <data name="Server_Name" xml:space="preserve">
+    <value>Naziv (neobavezno)</value>
+  </data>
+  <data name="Server_NamePlaceholder" xml:space="preserve">
+    <value>npr. Kuća, Posao</value>
+  </data>
+  <data name="Server_Gone" xml:space="preserve">
+    <value>Server na kojem je ova knjiga više nije postavljen. Dodaj ga ponovo na ekranu servera.</value>
+  </data>
+  <data name="Reader_TranslateDictionary" xml:space="preserve">
+    <value>Rječnik</value>
+  </data>
+  <data name="Reader_TranslateOnline" xml:space="preserve">
+    <value>Prevedi (Google)</value>
+  </data>
+  <data name="Reader_TranslateShare" xml:space="preserve">
+    <value>Pošalji u aplikaciju…</value>
+  </data>
 </root>

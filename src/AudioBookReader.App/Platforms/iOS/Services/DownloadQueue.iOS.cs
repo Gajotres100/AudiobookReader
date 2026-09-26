@@ -17,7 +17,7 @@ public partial class DownloadQueue
     private CancellationTokenSource? _cancellation;
 
     private partial void StartCore(
-        string itemId, string title, bool toAppStorage, bool wantAudio, bool wantEbook, int? attachTo)
+        string serverId, string itemId, string title, bool toAppStorage, bool wantAudio, bool wantEbook, int? attachTo)
     {
         _cancellation?.Cancel();
         var cancellation = new CancellationTokenSource();
@@ -26,12 +26,13 @@ public partial class DownloadQueue
         // Task.Run for the reason Android's DownloadService gives: this is called from the UI
         // thread, and without it every continuation in the import — tag reading and hashing a
         // file of hundreds of megabytes included — would resume there and freeze the screen.
-        _ = Task.Run(() => RunAsync(itemId, title, toAppStorage, wantAudio, wantEbook, attachTo, cancellation.Token));
+        _ = Task.Run(() => RunAsync(serverId, itemId, title, toAppStorage, wantAudio, wantEbook, attachTo, cancellation.Token));
     }
 
     public partial void Stop() => _cancellation?.Cancel();
 
     private async Task RunAsync(
+        string serverId,
         string itemId,
         string title,
         bool toAppStorage,
@@ -42,8 +43,10 @@ public partial class DownloadQueue
     {
         try
         {
-            var server = IPlatformApplication.Current?.Services.GetService<ServerConnection>();
-            if (server is null) throw new InvalidOperationException("The app is not started; nothing to download with.");
+            var servers = IPlatformApplication.Current?.Services.GetService<ServerConnections>()
+                          ?? throw new InvalidOperationException("The app is not started; nothing to download with.");
+
+            var server = servers.For(serverId) ?? throw new InvalidOperationException(Strings.Server_Gone);
 
             if (!server.IsConnected) await server.RestoreAsync();
 

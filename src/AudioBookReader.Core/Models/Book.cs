@@ -115,6 +115,12 @@ public class Book
     public string? ServerItemId { get; set; }
 
     /// <summary>
+    /// Which of the configured servers <see cref="ServerItemId"/> is on. Null for a book linked
+    /// before several servers could be kept, which came from the first one.
+    /// </summary>
+    public string? ServerId { get; set; }
+
+    /// <summary>
     /// Arrived as an EPUB 3 carrying its own narration and timings: text, audio and alignment all
     /// came together and belong together, so there is nothing to add, swap or align — only to read
     /// and listen, or to delete.

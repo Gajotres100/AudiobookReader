@@ -28,7 +28,7 @@ public partial class AppShell : Shell
 		// Deferred rather than run inline: the shell has no navigation stack to send anywhere
 		// until it has actually finished appearing, and posting it is what lets that happen first.
 		if (!_openedServerOnStart
-			&& IPlatformApplication.Current?.Services.GetService<ServerAccount>() is
+			&& IPlatformApplication.Current?.Services.GetService<ServerConnections>() is
 				{ IsConfigured: true, OpenServerOnStart: true })
 		{
 			_openedServerOnStart = true;
@@ -102,7 +102,7 @@ public partial class AppShell : Shell
 	/// </summary>
 	private static async Task<bool> ServerReachableInTimeAsync()
 	{
-		if (IPlatformApplication.Current?.Services.GetService<ServerConnection>() is not { } server)
+		if (IPlatformApplication.Current?.Services.GetService<ServerConnections>()?.Active is not { } server)
 			return false;
 
 		var attempt = server.RestoreAsync();

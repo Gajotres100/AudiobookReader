@@ -20,7 +20,7 @@
         The sign-in half disappears once connected. It is a thing you do once.
     -->
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="14,10">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Padding="14,10">
 
         <Grid
             Grid.Row="0"
@@ -67,13 +67,82 @@
                 Text="⟳" />
         </Grid>
 
+        <!--
+            The servers, one pill each, and a way to add another up to five. The highlighted one is
+            the one on screen; every book remembers which one it came from regardless.
+        -->
+        <ScrollView
+            Grid.Row="1"
+            HorizontalScrollBarVisibility="Never"
+            IsVisible="{Binding ShowsServers}"
+            Orientation="Horizontal">
+            <HorizontalStackLayout Padding="0,6,0,2" Spacing="8">
+                <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Servers}" Spacing="8">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ServerChip">
+                            <Border
+                                Padding="14,6"
+                                StrokeShape="RoundRectangle 16"
+                                StrokeThickness="1">
+                                <Border.Triggers>
+                                    <DataTrigger
+                                        Binding="{Binding IsActive}"
+                                        TargetType="Border"
+                                        Value="True">
+                                        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Accent}, Dark={StaticResource AccentDark}}" />
+                                        <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Accent}, Dark={StaticResource AccentDark}}" />
+                                    </DataTrigger>
+                                    <DataTrigger
+                                        Binding="{Binding IsActive}"
+                                        TargetType="Border"
+                                        Value="False">
+                                        <Setter Property="BackgroundColor" Value="Transparent" />
+                                        <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Line}, Dark={StaticResource LineDark}}" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Path=BindingContext.SwitchServerCommand, Source={x:Reference ServerRoot}}"
+                                        CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <Label
+                                    FontFamily="OpenSansSemibold"
+                                    FontSize="13"
+                                    Text="{Binding Name}">
+                                    <Label.Triggers>
+                                        <DataTrigger
+                                            Binding="{Binding IsActive}"
+                                            TargetType="Label"
+                                            Value="True">
+                                            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource OnAccent}, Dark={StaticResource OnAccentDark}}" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </HorizontalStackLayout>
+
+                <Button
+                    Command="{Binding AddServerCommand}"
+                    IsVisible="{Binding CanAddServer}"
+                    SemanticProperties.Description="{x:Static s:Strings.Server_AddServer}"
+                    Style="{StaticResource IconWide}"
+                    Text="{x:Static s:Strings.Server_AddServerShort}" />
+            </HorizontalStackLayout>
+        </ScrollView>
+
         <!--  Signing in. A card, so it reads as one form rather than a column of loose fields.  -->
         <Border
-            Grid.Row="1"
+            Grid.Row="2"
             IsVisible="{Binding IsDisconnected}"
             Margin="0,8"
             Style="{StaticResource Card}">
             <VerticalStackLayout Spacing="10">
+
+                <!--  What to call it, so several servers can be told apart. Optional.  -->
+                <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Server_Name}" />
+                <Entry Placeholder="{x:Static s:Strings.Server_NamePlaceholder}" Text="{Binding ServerName}" />
 
                 <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Server_Address}" />
 
@@ -188,7 +257,7 @@
 
         <!--  Which library on the server, with the whole row to show its name in.  -->
         <Picker
-            Grid.Row="1"
+            Grid.Row="2"
             IsVisible="{Binding IsConnected}"
             ItemDisplayBinding="{Binding Name}"
             ItemsSource="{Binding Libraries}"
@@ -208,7 +277,7 @@
             without building the rest.
         -->
         <CollectionView
-            Grid.Row="2"
+            Grid.Row="3"
             ItemSizingStrategy="MeasureFirstItem"
             ItemsSource="{Binding Shelves}"
             Margin="0,8"
@@ -297,7 +366,7 @@
         </CollectionView>
 
         <!--  What is happening, and the way to stop it  -->
-        <VerticalStackLayout Grid.Row="3" Spacing="6">
+        <VerticalStackLayout Grid.Row="4" Spacing="6">
             <HorizontalStackLayout IsVisible="{Binding HasStatus}" Spacing="10">
                 <ActivityIndicator
                     HeightRequest="14"

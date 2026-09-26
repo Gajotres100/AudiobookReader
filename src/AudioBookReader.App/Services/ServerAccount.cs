@@ -1,7 +1,7 @@
 namespace AudioBookReader.App.Services;
 
 /// <summary>
-/// Remembers which server the app talks to, and holds the key to it.
+/// Remembers one server the app talks to, and holds the key to it.
 ///
 /// Two different kinds of secret, kept in two different places on purpose.
 ///
@@ -14,30 +14,26 @@ namespace AudioBookReader.App.Services;
 /// and a book app can easily go a month unopened. Without the password that means typing everything
 /// again; with it the app quietly signs itself back in. The choice belongs to whoever owns the
 /// phone, so it is a switch rather than a decision made here.
+///
+/// One of these per server. The first — and, before several could be kept, the only — one uses the
+/// original key names, so a server set up before that change carries on signed in as it was.
 /// </summary>
-public class ServerAccount
+public class ServerAccount(string id)
 {
-    private const string UrlKey = "server.url";
-    private const string TokenKey = "server.token";
-    private const string RefreshKey = "server.refresh";
-    private const string UserKey = "server.username";
-    private const string PasswordKey = "server.password";
-    private const string TrustAnyCertificateKey = "server.trustAnyCertificate";
-    private const string OpenOnStartKey = "server.openOnStart";
+    /// <summary>The server that was the only one, kept under the key names it always had.</summary>
+    public const string LegacyId = "default";
 
-    /// <summary>
-    /// Land on the server shelf instead of the local library when the app starts.
-    ///
-    /// Only meaningful once a server is configured — offering it earlier would be a switch for a
-    /// screen the user cannot reach yet. Checked once, at the app's own startup, rather than on
-    /// every rebuild of the shell a language change causes: the point is "when I open the app", not
-    /// "whenever the shell happens to be rebuilt".
-    /// </summary>
-    public bool OpenServerOnStart
-    {
-        get => Preferences.Default.Get(OpenOnStartKey, false);
-        set => Preferences.Default.Set(OpenOnStartKey, value);
-    }
+    public string Id { get; } = id;
+
+    private string Key(string name) => Id == LegacyId ? $"server.{name}" : $"server.{Id}.{name}";
+
+    private string UrlKey => Key("url");
+    private string NameKey => Key("name");
+    private string TokenKey => Key("token");
+    private string RefreshKey => Key("refresh");
+    private string UserKey => Key("username");
+    private string PasswordKey => Key("password");
+    private string TrustAnyCertificateKey => Key("trustAnyCertificate");
 
     /// <summary>
     /// Skip certificate validation for this connection — for a self-signed server with no other way
@@ -55,7 +51,7 @@ public class ServerAccount
         set => Preferences.Default.Set(TrustAnyCertificateKey, value);
     }
 
-    /// <summary>Raised when the app connects or disconnects, so screens can show the change.</summary>
+    /// <summary>Raised when this server is connected or forgotten, so screens can show the change.</summary>
     public event EventHandler? Changed;
 
     public string? Url
@@ -67,6 +63,26 @@ public class ServerAccount
             else Preferences.Default.Set(UrlKey, value);
         }
     }
+
+    /// <summary>What the user called it, when they called it anything.</summary>
+    public string? Name
+    {
+        get => Preferences.Default.Get<string?>(NameKey, null);
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) Preferences.Default.Remove(NameKey);
+            else Preferences.Default.Set(NameKey, value.Trim());
+        }
+    }
+
+    /// <summary>
+    /// How the server is shown: its given name, or else the host from its address — which is
+    /// usually enough to tell a home server from a friend's.
+    /// </summary>
+    public string DisplayName =>
+        Name
+        ?? (Uri.TryCreate(Url, UriKind.Absolute, out var uri) ? uri.Host : Url)
+        ?? "";
 
     public bool IsConfigured => !string.IsNullOrEmpty(Url);
 
@@ -86,7 +102,7 @@ public class ServerAccount
         }
         catch (Exception ex)
         {
-            AppLog.Info($"server tokens unreadable ({ex.GetType().Name}); treating them as absent");
+            AppLog.Info($"server {Id}: tokens unreadable ({ex.GetType().Name}); treating them as absent");
             return (null, null);
         }
     }
@@ -110,7 +126,7 @@ public class ServerAccount
         {
             // A keystore that will not write is a signed-in session that lasts until the app is
             // closed. Worth saying, not worth failing over.
-            AppLog.Info($"server tokens not stored ({ex.GetType().Name})");
+            AppLog.Info($"server {Id}: tokens not stored ({ex.GetType().Name})");
         }
     }
 
@@ -135,7 +151,7 @@ public class ServerAccount
         }
         catch (Exception ex)
         {
-            AppLog.Info($"server sign-in not stored ({ex.GetType().Name})");
+            AppLog.Info($"server {Id}: sign-in not stored ({ex.GetType().Name})");
         }
     }
 
@@ -155,7 +171,7 @@ public class ServerAccount
         }
         catch (Exception ex)
         {
-            AppLog.Info($"server sign-in unreadable ({ex.GetType().Name}); treating it as absent");
+            AppLog.Info($"server {Id}: sign-in unreadable ({ex.GetType().Name}); treating it as absent");
             return (null, null);
         }
     }
@@ -167,6 +183,8 @@ public class ServerAccount
     public void Forget()
     {
         Url = null;
+        Name = null;
+        Preferences.Default.Remove(TrustAnyCertificateKey);
         SecureStorage.Default.Remove(TokenKey);
         SecureStorage.Default.Remove(RefreshKey);
         ForgetSignIn();

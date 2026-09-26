@@ -70,7 +70,9 @@ public partial class DownloadQueue
     /// <param name="wantAudio">Whether the narration is among what is missing here.</param>
     /// <param name="wantEbook">Whether the text is.</param>
     /// <param name="attachTo">The library entry this completes, when it completes one.</param>
+    /// <param name="serverId">The server the book is on — not necessarily the one shown when it finishes.</param>
     public bool Start(
+        string serverId,
         string itemId,
         string title,
         bool toAppStorage,
@@ -85,12 +87,12 @@ public partial class DownloadQueue
         // otherwise change on screen, and a button that visibly does nothing reads as a hang.
         Report(new DownloadStatus(itemId, title, DownloadPhase.Starting, Strings.Download_Preparing));
 
-        StartCore(itemId, title, toAppStorage, wantAudio, wantEbook, attachTo);
+        StartCore(serverId, itemId, title, toAppStorage, wantAudio, wantEbook, attachTo);
         return true;
     }
 
     private partial void StartCore(
-        string itemId, string title, bool toAppStorage, bool wantAudio, bool wantEbook, int? attachTo);
+        string serverId, string itemId, string title, bool toAppStorage, bool wantAudio, bool wantEbook, int? attachTo);
 
     /// <summary>Asks the running download to stop. What it had written is deleted.</summary>
     public partial void Stop();

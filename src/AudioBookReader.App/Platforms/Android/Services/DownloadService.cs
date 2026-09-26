@@ -24,6 +24,7 @@ public class DownloadService : Service
 {
     public const string ActionStart = "com.gajotres.audiobookreader.DOWNLOAD_START";
     public const string ActionStop = "com.gajotres.audiobookreader.DOWNLOAD_STOP";
+    public const string ExtraServerId = "serverId";
     public const string ExtraItemId = "itemId";
     public const string ExtraTitle = "title";
     public const string ExtraAppStorage = "appStorage";
@@ -52,6 +53,7 @@ public class DownloadService : Service
             return StartCommandResult.NotSticky;
         }
 
+        var serverId = intent?.GetStringExtra(ExtraServerId);
         var itemId = intent?.GetStringExtra(ExtraItemId);
         var title = intent?.GetStringExtra(ExtraTitle) ?? "";
         var toAppStorage = intent?.GetBooleanExtra(ExtraAppStorage, false) ?? false;
@@ -74,7 +76,7 @@ public class DownloadService : Service
         // without Task.Run every continuation in the import — tag reading and hashing included —
         // would resume on the UI thread.
         _ = Task.Run(() => RunAsync(
-            itemId, title, toAppStorage, wantAudio, wantEbook, attachTo, _cancellation.Token));
+            serverId, itemId, title, toAppStorage, wantAudio, wantEbook, attachTo, _cancellation.Token));
 
         // Not sticky: a transfer killed with the process should resume because someone asked again,
         // not because Android replayed a stale intent at a file that is no longer there.
@@ -82,6 +84,7 @@ public class DownloadService : Service
     }
 
     private async Task RunAsync(
+        string? serverId,
         string itemId,
         string title,
         bool toAppStorage,
@@ -100,7 +103,8 @@ public class DownloadService : Service
 
             AcquireWakeLock();
 
-            var server = services.GetRequiredService<ServerConnection>();
+            var server = services.GetRequiredService<ServerConnections>().For(serverId)
+                         ?? throw new InvalidOperationException(Strings.Server_Gone);
 
             // Restored rather than assumed: the service can be brought up by the system with no
             // page having run, and then the client holds no address and no token.

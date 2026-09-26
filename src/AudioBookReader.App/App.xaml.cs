@@ -12,7 +12,7 @@ public partial class App : Application
 	protected override Window CreateWindow(IActivationState? activationState)
 	{
 		// The player and the file references reach books played from the server through this.
-		Services.StreamedAudio.Source = activationState?.Context.Services.GetService<Services.ServerConnection>();
+		Services.StreamedAudio.Source = activationState?.Context.Services.GetService<Services.ServerConnections>();
 
 		// And report where each book has got to, for other devices to pick up.
 		Services.ProgressSync.Current = activationState?.Context.Services.GetService<Services.ProgressSync>();

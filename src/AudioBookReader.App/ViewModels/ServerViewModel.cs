@@ -59,8 +59,31 @@ public class Shelf(string name, IReadOnlyList<ServerBookRow> books) : List<Serve
         : string.Format(Strings.Server_BookCount, books.Count);
 }
 
-public partial class ServerViewModel(ServerConnection server, ServerAccount account) : ObservableObject
+/// <summary>One configured server, as the row at the top of the server screen shows it.</summary>
+public record ServerChip(string Id, string Name, bool IsActive);
+
+public partial class ServerViewModel(ServerConnections servers) : ObservableObject
 {
+    /// <summary>
+    /// The server on screen. There is always one: with none configured, a new one is started, and
+    /// its sign-in form is what the screen shows.
+    /// </summary>
+    private ServerConnection server => servers.Active ?? servers.Add()!;
+
+    /// <summary>The servers to switch between, up to five.</summary>
+    public ObservableCollection<ServerChip> Servers { get; } = [];
+
+    /// <summary>Shown once there is anything to switch between or add to.</summary>
+    [ObservableProperty]
+    public partial bool ShowsServers { get; set; }
+
+    [ObservableProperty]
+    public partial bool CanAddServer { get; set; }
+
+    /// <summary>What to call a server being added, so five of them can be told apart. Optional.</summary>
+    [ObservableProperty]
+    public partial string ServerName { get; set; } = "";
+
     /// <summary>
     /// The shelves, in the order they are read: the newest arrivals, then each series, then
     /// everything belonging to no series.
@@ -119,7 +142,7 @@ public partial class ServerViewModel(ServerConnection server, ServerAccount acco
     [ObservableProperty]
     public partial bool TrustAnyCertificate { get; set; }
 
-    partial void OnTrustAnyCertificateChanged(bool value) => account.TrustAnyCertificate = value;
+    partial void OnTrustAnyCertificateChanged(bool value) => server.Account.TrustAnyCertificate = value;
 
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
@@ -153,10 +176,13 @@ public partial class ServerViewModel(ServerConnection server, ServerAccount acco
 
     public async Task LoadAsync()
     {
+        ShowServers();
+
         Url = server.Url ?? "";
+        ServerName = server.Account.Name ?? "";
         // Reflects what was chosen last time, and starts on for a server never connected to.
         RemembersSignIn = await server.RemembersSignInAsync() || server.Url is null;
-        TrustAnyCertificate = account.TrustAnyCertificate;
+        TrustAnyCertificate = server.Account.TrustAnyCertificate;
 
         IsConnected = await server.RestoreAsync();
 
@@ -199,27 +225,85 @@ public partial class ServerViewModel(ServerConnection server, ServerAccount acco
             await server.SignInAsync(Url.Trim(), Username.Trim(), Password, RemembersSignIn);
         }
 
+        server.Account.Name = ServerName;
+
         // Kept nowhere else, and cleared from the screen the moment it has been exchanged for a
         // token. Nothing in this app writes a password down.
         Password = "";
         Token = "";
 
         IsConnected = true;
+        ShowServers();
+
         await RefreshAsync();
+    }
+
+    /// <summary>Rebuilds the row of servers from what is configured now.</summary>
+    private void ShowServers()
+    {
+        var active = server.Id;
+
+        Servers.Clear();
+        foreach (var each in servers.All)
+            Servers.Add(new ServerChip(
+                each.Id,
+                each.Account.IsConfigured ? each.Name : Strings.Server_NewServer,
+                each.Id == active));
+
+        CanAddServer = servers.CanAdd;
+        ShowsServers = servers.IsConfigured;
+    }
+
+    /// <summary>Shows another server's shelves, or its sign-in if it has not been signed in to yet.</summary>
+    [RelayCommand]
+    private async Task SwitchServerAsync(ServerChip? chip)
+    {
+        if (chip is null || chip.Id == server.Id) return;
+
+        servers.Activate(chip.Id);
+        Forget();
+
+        await LoadAsync();
+    }
+
+    /// <summary>Starts adding another server: an empty sign-in form, kept only once it connects.</summary>
+    [RelayCommand]
+    private async Task AddServerAsync()
+    {
+        if (servers.Add() is null) return;
+
+        Forget();
+        Url = Username = Password = Token = ServerName = "";
+
+        await LoadAsync();
+    }
+
+    /// <summary>Clears what the screen shows of the server it is leaving.</summary>
+    private void Forget()
+    {
+        IsConnected = false;
+        ConnectError = "";
+        Status = "";
+
+        Shelves.Clear();
+        Libraries.Clear();
+        SelectedLibrary = null;
     }
 
     [RelayCommand]
     private Task CloseAsync() => Shell.Current.GoToAsync("..");
 
+    /// <summary>
+    /// Forgets the server on screen, and moves to another if there is one. Books that came from it
+    /// stay in the library.
+    /// </summary>
     [RelayCommand]
-    private void Disconnect()
+    private async Task DisconnectAsync()
     {
-        server.Disconnect();
+        servers.Remove(server.Id);
+        Forget();
 
-        IsConnected = false;
-
-        Shelves.Clear();
-        Libraries.Clear();
+        await LoadAsync();
 
         Status = Strings.Server_Disconnected;
     }

@@ -832,7 +832,7 @@ public class PlaybackService : MediaLibraryService
             {
                 // Blocking is fine here: this runs on the player's loading thread, never the UI's,
                 // and waits at most for one token renewal.
-                var token = source.FreshTokenAsync().GetAwaiter().GetResult();
+                var token = source.FreshTokenAsync(spec.Uri.ToString()!).GetAwaiter().GetResult();
                 if (token is null) return spec;
 
                 return spec.WithAdditionalHeaders(

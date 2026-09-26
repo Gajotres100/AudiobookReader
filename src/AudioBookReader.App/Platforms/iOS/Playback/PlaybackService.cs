@@ -276,7 +276,7 @@ public sealed class PlaybackService
         string? token = null;
         try
         {
-            token = source is null ? null : Task.Run(() => source.FreshTokenAsync()).GetAwaiter().GetResult();
+            token = source is null ? null : Task.Run(() => source.FreshTokenAsync(location)).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {

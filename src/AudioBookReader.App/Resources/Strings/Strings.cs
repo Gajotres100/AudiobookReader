@@ -90,6 +90,15 @@ public static class Strings
     public static string Details_OpenAppSettings => Get(nameof(Details_OpenAppSettings));
     /// <summary>An EPUB 3 whose narration is split over several audio files</summary>
     public static string Import_OverlayManyFiles => Get(nameof(Import_OverlayManyFiles));
+    /// <summary>Adding another Audiobookshelf server</summary>
+    public static string Server_AddServer => Get(nameof(Server_AddServer));
+    public static string Server_AddServerShort => Get(nameof(Server_AddServerShort));
+    /// <summary>A server being added, before it has a name</summary>
+    public static string Server_NewServer => Get(nameof(Server_NewServer));
+    public static string Server_Name => Get(nameof(Server_Name));
+    public static string Server_NamePlaceholder => Get(nameof(Server_NamePlaceholder));
+    /// <summary>A book's server has been removed</summary>
+    public static string Server_Gone => Get(nameof(Server_Gone));
     /// <summary>The EP3 button in the library header</summary>
     public static string Library_ImportReadAlong => Get(nameof(Library_ImportReadAlong));
     /// <summary>Picker prompt for an EPUB 3 with narration</summary>
@@ -671,6 +680,12 @@ public static class Strings
     public static string Dialog_ClearBody => Get(nameof(Dialog_ClearBody));
     /// <summary>Title of the app chooser for translating a word.</summary>
     public static string Reader_TranslateChooser => Get(nameof(Reader_TranslateChooser));
+    /// <summary>iOS: look the selection up in the system dictionary</summary>
+    public static string Reader_TranslateDictionary => Get(nameof(Reader_TranslateDictionary));
+    /// <summary>iOS: open Google Translate with the selection</summary>
+    public static string Reader_TranslateOnline => Get(nameof(Reader_TranslateOnline));
+    /// <summary>iOS: the share sheet, for any installed app that takes text</summary>
+    public static string Reader_TranslateShare => Get(nameof(Reader_TranslateShare));
 
     public static string Reader_TranslateAction => Get(nameof(Reader_TranslateAction));
 

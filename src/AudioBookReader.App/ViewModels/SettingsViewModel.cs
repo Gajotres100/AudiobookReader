@@ -50,7 +50,7 @@ public record RecognitionOption(string Id, string Name, string Detail, bool IsSe
 /// </param>
 public record ProbeSpacingOption(long IntervalMs, string Name, string Detail, bool IsSelected);
 
-public partial class SettingsViewModel(AlignmentSettingsStore settings, Language language, ServerAccount account) : ObservableObject
+public partial class SettingsViewModel(AlignmentSettingsStore settings, Language language, ServerConnections servers) : ObservableObject
 {
     public ObservableCollection<BudgetOption> Budgets { get; } = [];
 
@@ -138,12 +138,12 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings, Language
     [ObservableProperty]
     public partial bool OpenServerOnStart { get; set; }
 
-    partial void OnOpenServerOnStartChanged(bool value) => account.OpenServerOnStart = value;
+    partial void OnOpenServerOnStartChanged(bool value) => servers.OpenServerOnStart = value;
 
     public void Load()
     {
-        HasServer = account.IsConfigured;
-        OpenServerOnStart = account.OpenServerOnStart;
+        HasServer = servers.IsConfigured;
+        OpenServerOnStart = servers.OpenServerOnStart;
 
         var current = settings.Budget;
 

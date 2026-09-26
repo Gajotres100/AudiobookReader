@@ -6,12 +6,13 @@ namespace AudioBookReader.App.Services;
 public partial class DownloadQueue
 {
     private partial void StartCore(
-        string itemId, string title, bool toAppStorage, bool wantAudio, bool wantEbook, int? attachTo)
+        string serverId, string itemId, string title, bool toAppStorage, bool wantAudio, bool wantEbook, int? attachTo)
     {
         var context = global::Android.App.Application.Context;
 
         var intent = new Intent(context, typeof(DownloadService))
             .SetAction(DownloadService.ActionStart)
+            .PutExtra(DownloadService.ExtraServerId, serverId)
             .PutExtra(DownloadService.ExtraItemId, itemId)
             .PutExtra(DownloadService.ExtraTitle, title)
             .PutExtra(DownloadService.ExtraAppStorage, toAppStorage)
