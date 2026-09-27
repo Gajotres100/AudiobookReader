@@ -28,7 +28,8 @@ public partial class BookViewModel(
     IOcrService ocr,
     AlignmentSettingsStore alignmentSettings,
     WhisperModelStore models,
-    AlignmentShare share) : ObservableObject, IDisposable
+    AlignmentShare share,
+    MediaReferences references) : ObservableObject, IDisposable
 {
     /// <summary>The speeds the button cycles through. Nothing below 0.75 or above 2 is useful for narration.</summary>
     private static readonly float[] Speeds = [1f, 1.25f, 1.5f, 1.75f, 2f, 0.75f];
@@ -1441,6 +1442,37 @@ public partial class BookViewModel(
         catch (Exception ex)
         {
             AppLog.Error("sending the alignment to another device", ex);
+            ShareStatus = ex.Message;
+        }
+    }
+
+    /// <summary>
+    /// Shows a QR code for this book, for the device that has its alignment to scan. What arrives
+    /// with it is taken for this book without a question; anything for another book is turned away.
+    /// </summary>
+    [RelayCommand]
+    private async Task ReceiveAlignmentAsync()
+    {
+        ShareStatus = "";
+        await Shell.Current.Navigation.PushModalAsync(new Views.ReceiveAlignmentPage(share, BookId, Title));
+    }
+
+    /// <summary>Takes an alignment someone sent as a file, for this book.</summary>
+    [RelayCommand]
+    private async Task ImportAlignmentFileAsync()
+    {
+        try
+        {
+            if (await picker.PickFileAsync(Strings.Share_PickFile) is not { } picked) return;
+
+            await using (var file = await Task.Run(() => references.OpenRead(picked.Location)))
+                ShareStatus = await share.ImportAsync(file);
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("importing an alignment file", ex);
             ShareStatus = ex.Message;
         }
     }

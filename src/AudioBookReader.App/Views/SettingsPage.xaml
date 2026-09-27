@@ -334,21 +334,6 @@
                         Style="{StaticResource Secondary}"
                         Text="{x:Static s:Strings.Settings_ShareLog}" />
 
-                    <!--  Alignments from other devices: shown a QR code to scan, or sent as a file.  -->
-                    <BoxView Style="{StaticResource Divider}" />
-
-                    <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Share_SettingsSection}" />
-
-                    <Button
-                        Command="{Binding ShowQrCommand}"
-                        Style="{StaticResource Secondary}"
-                        Text="{x:Static s:Strings.Share_ReceiveByQr}" />
-
-                    <Button
-                        Command="{Binding ImportAlignmentCommand}"
-                        Style="{StaticResource Secondary}"
-                        Text="{x:Static s:Strings.Share_ImportFile}" />
-
                     <!--  For typing in on a device that cannot find this one by itself.  -->
                     <Label Style="{StaticResource Muted}" Text="{Binding ShareAddressText}" />
                 </VerticalStackLayout>

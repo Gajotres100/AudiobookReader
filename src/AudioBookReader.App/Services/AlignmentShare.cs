@@ -34,6 +34,17 @@ public sealed class AlignmentShare(
     private const string AnswerPrefix = "SYNCBOOK!";
 
     private CancellationTokenSource? _listening;
+    private Task? _accepting;
+
+    /// <summary>
+    /// One package at a time. Two devices sending at once — or one sending twice — would otherwise
+    /// both write the same book's map and chapters, and whichever finished second would win half of
+    /// each.
+    /// </summary>
+    private readonly SemaphoreSlim _considering = new(1, 1);
+
+    /// <summary>The book a QR code was shown for, so what arrives with its key is taken for that book only.</summary>
+    private int? _pairedBook;
 
     // ---- Pairing by QR code ----
 
@@ -50,19 +61,24 @@ public sealed class AlignmentShare(
     /// The code lasts while the QR code is on screen, and a quarter of an hour at most. A package
     /// carrying it is taken without asking — whoever sent it read it off this screen.
     /// </summary>
-    public PairingCode? BeginPairing()
+    public PairingCode? BeginPairing(int? bookId = null)
     {
         var addresses = LocalAddresses();
         if (addresses.Count == 0) return null;
 
         _key = PairingCode.NewKey();
         _keyExpires = DateTime.UtcNow.AddMinutes(15);
+        _pairedBook = bookId;
 
         StartListening();
         return new PairingCode(addresses, TransferPort, _key, DeviceName);
     }
 
-    public void EndPairing() => _key = null;
+    public void EndPairing()
+    {
+        _key = null;
+        _pairedBook = null;
+    }
 
     private bool CarriesTheKey(AlignmentPackage package) =>
         _key is { } key && package.Key == key && DateTime.UtcNow < _keyExpires;
@@ -102,15 +118,23 @@ public sealed class AlignmentShare(
     // ---- Receiving ----
 
     /// <summary>Starts answering discovery and accepting alignments, for as long as the app runs.</summary>
+    /// <summary>
+    /// Listens for alignments — and listens again if listening has stopped.
+    ///
+    /// Asked every time a QR code is shown, not only at start: iOS closes an app's sockets while it
+    /// is in the background, and a listener that died then stayed dead, so a device that had once
+    /// been put away quietly stopped receiving anything at all.
+    /// </summary>
     public void StartListening()
     {
-        if (_listening is not null) return;
+        if (_listening is not null && _accepting is { IsCompleted: false }) return;
 
+        _listening?.Cancel();
         _listening = new CancellationTokenSource();
         var ct = _listening.Token;
 
         _ = Task.Run(() => AnswerDiscoveryAsync(ct), ct);
-        _ = Task.Run(() => AcceptAsync(ct), ct);
+        _accepting = Task.Run(() => AcceptAsync(ct), ct);
     }
 
     private static async Task AnswerDiscoveryAsync(CancellationToken ct)
@@ -144,14 +168,24 @@ public sealed class AlignmentShare(
         try
         {
             var listener = new TcpListener(IPAddress.Any, TransferPort);
+
+            // So a listener started again right after one died can have the port straight back.
+            listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             listener.Start();
 
             using var registration = ct.Register(listener.Stop);
 
-            while (!ct.IsCancellationRequested)
+            try
             {
-                var client = await listener.AcceptTcpClientAsync(ct);
-                _ = Task.Run(() => ReceiveAsync(client, ct), ct);
+                while (!ct.IsCancellationRequested)
+                {
+                    var client = await listener.AcceptTcpClientAsync(ct);
+                    _ = Task.Run(() => ReceiveAsync(client, ct), ct);
+                }
+            }
+            finally
+            {
+                listener.Stop();
             }
         }
         catch (OperationCanceledException)
@@ -189,9 +223,31 @@ public sealed class AlignmentShare(
 
     private async Task<AlignmentReply> ConsiderAsync(AlignmentPackage package)
     {
+        await _considering.WaitAsync();
+
+        try
+        {
+            return await ConsiderOneAsync(package);
+        }
+        finally
+        {
+            _considering.Release();
+        }
+    }
+
+    private async Task<AlignmentReply> ConsiderOneAsync(AlignmentPackage package)
+    {
         if (await library.FindByPairAsync(package.AudioHash, package.EbookHash) is not { } book)
         {
             AppLog.Info($"alignment share: '{package.Title}' from {package.From} — no book made of the same files here");
+            return new AlignmentReply(false, AlignmentTransfer.NoSuchBook);
+        }
+
+        // Shown for one book, taken for that book: an alignment for another sent with this code is
+        // a mistake on the sending side, not something to take quietly for a book nobody opened.
+        if (CarriesTheKey(package) && _pairedBook is { } only && book.Id != only)
+        {
+            AppLog.Info($"alignment share: '{package.Title}' from {package.From} is not the book whose code was shown");
             return new AlignmentReply(false, AlignmentTransfer.NoSuchBook);
         }
 

@@ -16,7 +16,9 @@ public sealed class ReceiveAlignmentPage : ContentPage
     private readonly AlignmentShare _share;
     private readonly Label _status;
 
-    public ReceiveAlignmentPage(AlignmentShare share)
+    /// <param name="bookId">The book to receive for; an alignment for any other is turned away.</param>
+    /// <param name="bookTitle">Its title, so the page says which book it is waiting for.</param>
+    public ReceiveAlignmentPage(AlignmentShare share, int? bookId = null, string? bookTitle = null)
     {
         _share = share;
 
@@ -24,7 +26,7 @@ public sealed class ReceiveAlignmentPage : ContentPage
         if (Resource<Color>("Paper") is { } light && Resource<Color>("PaperDark") is { } dark)
             this.SetAppThemeColor(BackgroundColorProperty, light, dark);
 
-        var code = share.BeginPairing();
+        var code = share.BeginPairing(bookId);
 
         _status = new Label
         {
@@ -55,6 +57,12 @@ public sealed class ReceiveAlignmentPage : ContentPage
                             VerticalOptions = LayoutOptions.Center,
                         }, 1),
                     },
+                },
+                new Label
+                {
+                    Text = bookTitle,
+                    FontFamily = "OpenSansSemibold",
+                    IsVisible = !string.IsNullOrEmpty(bookTitle),
                 },
                 new Label { Text = Strings.Share_QrBody, Style = Style("Muted") },
             },

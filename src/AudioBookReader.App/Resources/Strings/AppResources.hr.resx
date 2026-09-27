@@ -1145,7 +1145,7 @@ Knjige možeš dodati i s Audiobookshelf servera (spremi ih u memoriju aplikacij
     <value>Čitam QR kod…</value>
   </data>
   <data name="Share_QrNotFound" xml:space="preserve">
-    <value>Na fotografiji nema Syncbook QR koda. Na drugom uređaju otvori Postavke → Primi preko QR koda, pa fotografiraj kod izbliza.</value>
+    <value>Na fotografiji nema Syncbook QR koda. Na drugom uređaju otvori detalje knjige i tapni „Primi s drugog uređaja (QR kod)”, pa fotografiraj kod izbliza.</value>
   </data>
   <data name="Share_QrTitle" xml:space="preserve">
     <value>Primi poravnanje</value>
@@ -1166,7 +1166,7 @@ Knjige možeš dodati i s Audiobookshelf servera (spremi ih u memoriju aplikacij
     <value>Poravnanja s drugih uređaja</value>
   </data>
   <data name="Share_ReceiveByQr" xml:space="preserve">
-    <value>Primi preko QR koda</value>
+    <value>Primi s drugog uređaja (QR kod)</value>
   </data>
   <data name="Share_ImportFile" xml:space="preserve">
     <value>Uvezi datoteku s poravnanjem</value>

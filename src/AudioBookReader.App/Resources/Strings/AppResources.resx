@@ -1205,7 +1205,7 @@ You can also add books from an Audiobookshelf server (saving them to app storage
     <value>Reading the QR code…</value>
   </data>
   <data name="Share_QrNotFound" xml:space="preserve">
-    <value>No Syncbook QR code in that photo. On the other device open Settings → Receive by QR code, then photograph the code up close.</value>
+    <value>No Syncbook QR code in that photo. On the other device open the book's details and tap “Receive from another device (QR code)”, then photograph the code up close.</value>
   </data>
   <data name="Share_QrTitle" xml:space="preserve">
     <value>Receive an alignment</value>
@@ -1226,7 +1226,7 @@ You can also add books from an Audiobookshelf server (saving them to app storage
     <value>Alignments from other devices</value>
   </data>
   <data name="Share_ReceiveByQr" xml:space="preserve">
-    <value>Receive by QR code</value>
+    <value>Receive from another device (QR code)</value>
   </data>
   <data name="Share_ImportFile" xml:space="preserve">
     <value>Import an alignment file</value>

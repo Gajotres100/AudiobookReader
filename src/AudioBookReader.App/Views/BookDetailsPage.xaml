@@ -215,6 +215,20 @@
                             Style="{StaticResource Secondary}"
                             Text="{x:Static s:Strings.Share_Button}" />
 
+                        <!--
+                            The other way: this device receives the alignment for this book, shown a
+                            QR code to scan or given the file someone sent.
+                        -->
+                        <Button
+                            Command="{Binding ReceiveAlignmentCommand}"
+                            Style="{StaticResource Secondary}"
+                            Text="{x:Static s:Strings.Share_ReceiveByQr}" />
+
+                        <Button
+                            Command="{Binding ImportAlignmentFileCommand}"
+                            Style="{StaticResource Secondary}"
+                            Text="{x:Static s:Strings.Share_ImportFile}" />
+
                         <Label
                             IsVisible="{Binding HasShareStatus}"
                             Style="{StaticResource Muted}"

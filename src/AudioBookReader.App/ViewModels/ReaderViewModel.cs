@@ -644,6 +644,12 @@ public partial class ReaderViewModel(
     {
         IsBusy = true;
 
+        // Where the time goes on opening, step by step: opening a book was reported as slow, and
+        // the only honest way to find out why is to measure it on the phone it is slow on.
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var laps = new List<string>();
+        void Lap(string step) => laps.Add($"{step} {clock.ElapsedMilliseconds}");
+
         try
         {
             // Read before anything is shown, because showing a document needs it. Once per
@@ -658,8 +664,12 @@ public partial class ReaderViewModel(
             Title = _book.Title;
             HasAudio = _book.HasAudio;
 
+            Lap("db");
+
             var extracted = await extractors.ExtractAsync(_book.EbookPath);
             _text = extracted.Text;
+
+            Lap("text");
 
             _readerChapters = [.. extracted.Chapters];
             ChapterCount = _readerChapters.Count;
@@ -668,6 +678,7 @@ public partial class ReaderViewModel(
             _libraryChapters = chapters;
 
             var map = await syncMaps.LoadAsync(BookId);
+            Lap("map");
 
             // Following requires both media and a map built from this exact pair of files.
             CanFollow = _book.IsPaired
@@ -696,6 +707,8 @@ public partial class ReaderViewModel(
                     title: _book.Title, author: _book.Author, coverPath: _book.CoverPath,
                     chapterStarts: ChapterStarts());
             }
+
+            Lap("player");
 
             if (CanFollow)
             {
@@ -727,8 +740,13 @@ public partial class ReaderViewModel(
                 await liveSync.StartAsync(BookId, owner: this);
             }
 
+            Lap("live");
+
             await ShowStartingDocumentAsync();
             StartTicking();
+
+            Lap("page");
+            AppLog.Info($"reader: opened book {BookId} in {clock.ElapsedMilliseconds} ms ({string.Join(", ", laps)})");
 
             _ = OfferPlaceFromElsewhereAsync();
         }

@@ -336,12 +336,18 @@ public partial class LibraryViewModel : ObservableObject
     /// must stay unread — so while a car screen is attached, every book opens into the player.
     /// </summary>
     [RelayCommand]
-    private Task OpenAsync(BookCard? card) => card switch
+    private Task OpenAsync(BookCard? card)
     {
-        null => Task.CompletedTask,
-        { HasText: true } when !_car.IsConnected => Shell.Current.GoToAsync($"reader?id={card.Id}"),
-        _ => Shell.Current.GoToAsync($"book?id={card.Id}"),
-    };
+        // Logged so a tap that seemed to do nothing can be told from one that arrived and was slow.
+        if (card is not null) AppLog.Info($"library: tapped book {card.Id}");
+
+        return card switch
+        {
+            null => Task.CompletedTask,
+            { HasText: true } when !_car.IsConnected => Shell.Current.GoToAsync($"reader?id={card.Id}"),
+            _ => Shell.Current.GoToAsync($"book?id={card.Id}"),
+        };
+    }
 
     /// <summary>
     /// There is nothing to buy. The app is free and always will be — this exists purely because a
