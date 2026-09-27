@@ -99,6 +99,24 @@ public static class Strings
     public static string Server_NamePlaceholder => Get(nameof(Server_NamePlaceholder));
     /// <summary>A book's server has been removed</summary>
     public static string Server_Gone => Get(nameof(Server_Gone));
+    // Sending alignments by QR code and as a file
+    public static string Share_ScanQr => Get(nameof(Share_ScanQr));
+    public static string Share_AsFile => Get(nameof(Share_AsFile));
+    public static string Share_ReadingQr => Get(nameof(Share_ReadingQr));
+    public static string Share_QrNotFound => Get(nameof(Share_QrNotFound));
+    public static string Share_QrTitle => Get(nameof(Share_QrTitle));
+    public static string Share_QrBody => Get(nameof(Share_QrBody));
+    public static string Share_QrWaiting => Get(nameof(Share_QrWaiting));
+    public static string Share_QrNoNetwork => Get(nameof(Share_QrNoNetwork));
+    public static string Share_QrReceived => Get(nameof(Share_QrReceived));
+    public static string Share_SettingsSection => Get(nameof(Share_SettingsSection));
+    public static string Share_ReceiveByQr => Get(nameof(Share_ReceiveByQr));
+    public static string Share_ImportFile => Get(nameof(Share_ImportFile));
+    public static string Share_PickFile => Get(nameof(Share_PickFile));
+    public static string Share_ImportTitle => Get(nameof(Share_ImportTitle));
+    public static string Share_NotAnAlignment => Get(nameof(Share_NotAnAlignment));
+    public static string Share_FileNoSuchBook => Get(nameof(Share_FileNoSuchBook));
+    public static string Share_FileTaken => Get(nameof(Share_FileTaken));
     /// <summary>The EP3 button in the library header</summary>
     public static string Library_ImportReadAlong => Get(nameof(Library_ImportReadAlong));
     /// <summary>Picker prompt for an EPUB 3 with narration</summary>

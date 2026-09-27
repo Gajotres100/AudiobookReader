@@ -50,7 +50,13 @@ public record RecognitionOption(string Id, string Name, string Detail, bool IsSe
 /// </param>
 public record ProbeSpacingOption(long IntervalMs, string Name, string Detail, bool IsSelected);
 
-public partial class SettingsViewModel(AlignmentSettingsStore settings, Language language, ServerConnections servers) : ObservableObject
+public partial class SettingsViewModel(
+    AlignmentSettingsStore settings,
+    Language language,
+    ServerConnections servers,
+    AlignmentShare share,
+    BookFilePicker picker,
+    MediaReferences references) : ObservableObject
 {
     public ObservableCollection<BudgetOption> Budgets { get; } = [];
 
@@ -216,6 +222,37 @@ public partial class SettingsViewModel(AlignmentSettingsStore settings, Language
         AlignmentShare.LocalAddresses() is { Count: > 0 } addresses
             ? string.Format(Strings.Settings_ShareAddress, string.Join(", ", addresses))
             : Strings.Settings_ShareNoAddress;
+
+    /// <summary>Shows a QR code for another device to scan and send its alignment to.</summary>
+    [RelayCommand]
+    private async Task ShowQrAsync()
+    {
+        await Shell.Current.Navigation.PushModalAsync(new Views.ReceiveAlignmentPage(share));
+    }
+
+    /// <summary>
+    /// Takes an alignment someone sent as a file. It goes to whichever book here is made of the
+    /// same files, so there is nothing to choose but the file.
+    /// </summary>
+    [RelayCommand]
+    private async Task ImportAlignmentAsync()
+    {
+        try
+        {
+            if (await picker.PickFileAsync(Strings.Share_PickFile) is not { } picked) return;
+
+            string message;
+            await using (var file = await Task.Run(() => references.OpenRead(picked.Location)))
+                message = await share.ImportAsync(file);
+
+            await Dialogs.ShowAsync(Strings.Share_ImportTitle, message, Strings.Common_Close);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("importing an alignment file", ex);
+            await Dialogs.ShowAsync(Strings.Share_ImportTitle, ex.Message, Strings.Common_Close);
+        }
+    }
 
     [RelayCommand]
     private async Task ShareLogAsync()

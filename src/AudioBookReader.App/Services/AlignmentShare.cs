@@ -35,6 +35,38 @@ public sealed class AlignmentShare(
 
     private CancellationTokenSource? _listening;
 
+    // ---- Pairing by QR code ----
+
+    private string? _key;
+    private DateTime _keyExpires;
+
+    /// <summary>Raised when an alignment has been taken, with the book's title, for a screen waiting on one.</summary>
+    public event EventHandler<string>? Received;
+
+    /// <summary>
+    /// Starts waiting for an alignment sent by QR code: a fresh one-time code, and where this
+    /// device can be reached. Null when it is on no local network at all.
+    ///
+    /// The code lasts while the QR code is on screen, and a quarter of an hour at most. A package
+    /// carrying it is taken without asking — whoever sent it read it off this screen.
+    /// </summary>
+    public PairingCode? BeginPairing()
+    {
+        var addresses = LocalAddresses();
+        if (addresses.Count == 0) return null;
+
+        _key = PairingCode.NewKey();
+        _keyExpires = DateTime.UtcNow.AddMinutes(15);
+
+        StartListening();
+        return new PairingCode(addresses, TransferPort, _key, DeviceName);
+    }
+
+    public void EndPairing() => _key = null;
+
+    private bool CarriesTheKey(AlignmentPackage package) =>
+        _key is { } key && package.Key == key && DateTime.UtcNow < _keyExpires;
+
     /// <summary>This device as others see it.</summary>
     public static string DeviceName =>
         string.IsNullOrWhiteSpace(DeviceInfo.Current.Name) ? DeviceInfo.Current.Model : DeviceInfo.Current.Name;
@@ -163,7 +195,8 @@ public sealed class AlignmentShare(
             return new AlignmentReply(false, AlignmentTransfer.NoSuchBook);
         }
 
-        var accept = await MainThread.InvokeOnMainThreadAsync(() => Dialogs.AskAsync(
+        // Sent with the code this device is showing: the person asked when they scanned it.
+        var accept = CarriesTheKey(package) || await MainThread.InvokeOnMainThreadAsync(() => Dialogs.AskAsync(
             Strings.Share_ReceiveTitle,
             string.Format(Strings.Share_ReceiveBody, package.From, book.Title),
             Strings.Share_Accept,
@@ -173,6 +206,8 @@ public sealed class AlignmentShare(
 
         var adopted = await library.AdoptAlignmentAsync(book.Id, package.Map, package.Chapters);
         AppLog.Info($"alignment share: '{book.Title}' from {package.From} {(adopted ? "taken" : "refused")}");
+
+        if (adopted) Received?.Invoke(this, book.Title);
 
         return adopted ? new AlignmentReply(true) : new AlignmentReply(false, AlignmentTransfer.NoSuchBook);
     }
@@ -233,19 +268,46 @@ public sealed class AlignmentShare(
     /// Sends a book's alignment and waits for the other device to answer.
     /// </summary>
     /// <returns>The other side's answer; not accepted with a null reason when it could not be reached.</returns>
-    public async Task<AlignmentReply> SendAsync(int bookId, IPAddress to, CancellationToken ct = default)
+    /// <summary>A book's alignment, packed to leave this device.</summary>
+    private async Task<AlignmentPackage> PackAsync(int bookId, string? key = null)
     {
         var book = await database.GetBookAsync(bookId) ?? throw new InvalidOperationException("No such book.");
         var map = await syncMaps.LoadAsync(bookId) ?? throw new InvalidOperationException(Strings.Share_NothingToSend);
 
         var chapters = await database.GetChaptersAsync(bookId);
-        var package = new AlignmentPackage(
+        return new AlignmentPackage(
             DeviceName,
             book.Title,
             book.AudioHash,
             book.EbookHash,
             [.. chapters.Select(c => new ChapterRange(c.Index, c.TextStart, c.TextEnd))],
-            map);
+            map,
+            key);
+    }
+
+    /// <summary>
+    /// Sends to the device whose QR code was scanned, trying each address it listed until one
+    /// answers — it may be on more than one network, and only one of them is shared with this one.
+    /// </summary>
+    public async Task<AlignmentReply> SendAsync(int bookId, PairingCode code, CancellationToken ct = default)
+    {
+        var reply = new AlignmentReply(false);
+
+        foreach (var address in code.Addresses)
+        {
+            reply = await SendAsync(bookId, address, ct, code.Key, code.Port);
+
+            // An answer of any kind means this was the right address; only silence means try the next.
+            if (reply.Accepted || reply.Reason is not null) break;
+        }
+
+        return reply;
+    }
+
+    public async Task<AlignmentReply> SendAsync(
+        int bookId, IPAddress to, CancellationToken ct = default, string? key = null, int port = TransferPort)
+    {
+        var package = await PackAsync(bookId, key);
 
         try
         {
@@ -254,7 +316,7 @@ public sealed class AlignmentShare(
             using (var connecting = CancellationTokenSource.CreateLinkedTokenSource(ct))
             {
                 connecting.CancelAfter(TimeSpan.FromSeconds(5));
-                await client.ConnectAsync(to, TransferPort, connecting.Token);
+                await client.ConnectAsync(to, port, connecting.Token);
             }
 
             var stream = client.GetStream();
@@ -271,5 +333,40 @@ public sealed class AlignmentShare(
             AppLog.Info($"alignment share: sending to {to} failed ({ex.Message})");
             return new AlignmentReply(false);
         }
+    }
+
+    // ---- As a file ----
+
+    /// <summary>
+    /// Writes a book's alignment to a file for sending any way at all, and returns where it is. In
+    /// the cache, since the share sheet copies it wherever it goes.
+    /// </summary>
+    public async Task<string> ExportAsync(int bookId, CancellationToken ct = default)
+    {
+        var package = await PackAsync(bookId);
+        var path = Path.Combine(FileSystem.CacheDirectory, AlignmentFile.FileNameFor(package.Title));
+
+        await using (var file = File.Create(path))
+            await AlignmentFile.WriteAsync(file, package, ct);
+
+        return path;
+    }
+
+    /// <summary>
+    /// Takes an alignment from a file someone sent, for whichever book here is made of the files it
+    /// names. Returns what to tell the person: taken, or why not.
+    /// </summary>
+    public async Task<string> ImportAsync(Stream file, CancellationToken ct = default)
+    {
+        if (await AlignmentFile.ReadAsync(file, ct) is not { } package) return Strings.Share_NotAnAlignment;
+
+        if (await library.FindByPairAsync(package.AudioHash, package.EbookHash) is not { } book)
+            return string.Format(Strings.Share_FileNoSuchBook, package.Title);
+
+        if (!await library.AdoptAlignmentAsync(book.Id, package.Map, package.Chapters))
+            return string.Format(Strings.Share_FileNoSuchBook, package.Title);
+
+        AppLog.Info($"alignment share: '{book.Title}' taken from a file made on {package.From}");
+        return string.Format(Strings.Share_FileTaken, book.Title, package.From);
     }
 }

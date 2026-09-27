@@ -1195,4 +1195,55 @@ You can also add books from an Audiobookshelf server (saving them to app storage
   <data name="Reader_TranslateShare" xml:space="preserve">
     <value>Send to an app…</value>
   </data>
+  <data name="Share_ScanQr" xml:space="preserve">
+    <value>Scan a QR code</value>
+  </data>
+  <data name="Share_AsFile" xml:space="preserve">
+    <value>Send as a file…</value>
+  </data>
+  <data name="Share_ReadingQr" xml:space="preserve">
+    <value>Reading the QR code…</value>
+  </data>
+  <data name="Share_QrNotFound" xml:space="preserve">
+    <value>No Syncbook QR code in that photo. On the other device open Settings → Receive by QR code, then photograph the code up close.</value>
+  </data>
+  <data name="Share_QrTitle" xml:space="preserve">
+    <value>Receive an alignment</value>
+  </data>
+  <data name="Share_QrBody" xml:space="preserve">
+    <value>On the device that has the alignment, open the book's details, tap “Send the alignment to another device” and choose “Scan a QR code”. Both devices must be on the same Wi-Fi.</value>
+  </data>
+  <data name="Share_QrWaiting" xml:space="preserve">
+    <value>Waiting for the other device…</value>
+  </data>
+  <data name="Share_QrNoNetwork" xml:space="preserve">
+    <value>This device isn't on a local network. Connect to Wi-Fi, or send the alignment as a file instead.</value>
+  </data>
+  <data name="Share_QrReceived" xml:space="preserve">
+    <value>Received the alignment for “{0}”.</value>
+  </data>
+  <data name="Share_SettingsSection" xml:space="preserve">
+    <value>Alignments from other devices</value>
+  </data>
+  <data name="Share_ReceiveByQr" xml:space="preserve">
+    <value>Receive by QR code</value>
+  </data>
+  <data name="Share_ImportFile" xml:space="preserve">
+    <value>Import an alignment file</value>
+  </data>
+  <data name="Share_PickFile" xml:space="preserve">
+    <value>Choose an alignment file (.syncbook)</value>
+  </data>
+  <data name="Share_ImportTitle" xml:space="preserve">
+    <value>Alignment file</value>
+  </data>
+  <data name="Share_NotAnAlignment" xml:space="preserve">
+    <value>That file isn't an alignment.</value>
+  </data>
+  <data name="Share_FileNoSuchBook" xml:space="preserve">
+    <value>There's no book here made of the same files as “{0}”. The alignment fits only the same audiobook and ebook it was made for.</value>
+  </data>
+  <data name="Share_FileTaken" xml:space="preserve">
+    <value>“{0}” is aligned now, with the alignment made on {1}.</value>
+  </data>
 </root>

@@ -1135,4 +1135,55 @@ Knjige možeš dodati i s Audiobookshelf servera (spremi ih u memoriju aplikacij
   <data name="Reader_TranslateShare" xml:space="preserve">
     <value>Pošalji u aplikaciju…</value>
   </data>
+  <data name="Share_ScanQr" xml:space="preserve">
+    <value>Skeniraj QR kod</value>
+  </data>
+  <data name="Share_AsFile" xml:space="preserve">
+    <value>Pošalji kao datoteku…</value>
+  </data>
+  <data name="Share_ReadingQr" xml:space="preserve">
+    <value>Čitam QR kod…</value>
+  </data>
+  <data name="Share_QrNotFound" xml:space="preserve">
+    <value>Na fotografiji nema Syncbook QR koda. Na drugom uređaju otvori Postavke → Primi preko QR koda, pa fotografiraj kod izbliza.</value>
+  </data>
+  <data name="Share_QrTitle" xml:space="preserve">
+    <value>Primi poravnanje</value>
+  </data>
+  <data name="Share_QrBody" xml:space="preserve">
+    <value>Na uređaju koji ima poravnanje otvori detalje knjige, tapni „Pošalji poravnanje na drugi uređaj” i odaberi „Skeniraj QR kod”. Oba uređaja moraju biti na istom Wi-Fi-ju.</value>
+  </data>
+  <data name="Share_QrWaiting" xml:space="preserve">
+    <value>Čekam drugi uređaj…</value>
+  </data>
+  <data name="Share_QrNoNetwork" xml:space="preserve">
+    <value>Ovaj uređaj nije u lokalnoj mreži. Spoji se na Wi-Fi ili pošalji poravnanje kao datoteku.</value>
+  </data>
+  <data name="Share_QrReceived" xml:space="preserve">
+    <value>Primljeno poravnanje za „{0}”.</value>
+  </data>
+  <data name="Share_SettingsSection" xml:space="preserve">
+    <value>Poravnanja s drugih uređaja</value>
+  </data>
+  <data name="Share_ReceiveByQr" xml:space="preserve">
+    <value>Primi preko QR koda</value>
+  </data>
+  <data name="Share_ImportFile" xml:space="preserve">
+    <value>Uvezi datoteku s poravnanjem</value>
+  </data>
+  <data name="Share_PickFile" xml:space="preserve">
+    <value>Odaberi datoteku s poravnanjem (.syncbook)</value>
+  </data>
+  <data name="Share_ImportTitle" xml:space="preserve">
+    <value>Datoteka s poravnanjem</value>
+  </data>
+  <data name="Share_NotAnAlignment" xml:space="preserve">
+    <value>Ta datoteka nije poravnanje.</value>
+  </data>
+  <data name="Share_FileNoSuchBook" xml:space="preserve">
+    <value>Ovdje nema knjige od istih datoteka kao „{0}”. Poravnanje odgovara samo istoj audioknjizi i e-knjizi za koje je napravljeno.</value>
+  </data>
+  <data name="Share_FileTaken" xml:space="preserve">
+    <value>„{0}” je sad poravnata, poravnanjem napravljenim na uređaju {1}.</value>
+  </data>
 </root>

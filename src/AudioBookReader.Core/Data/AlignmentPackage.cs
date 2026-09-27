@@ -18,13 +18,18 @@ public record ChapterRange(int Index, int? TextStart, int? TextEnd);
 /// test every map already has to pass.
 /// </summary>
 /// <param name="From">The sending device's name, for the receiver to show.</param>
+/// <param name="Key">
+/// The one-time code the receiver showed in its QR code, when it was sent that way. Proof that the
+/// person sending is standing in front of the receiver, so it is taken without asking.
+/// </param>
 public record AlignmentPackage(
     string From,
     string Title,
     string? AudioHash,
     string? EbookHash,
     List<ChapterRange> Chapters,
-    SyncMap Map);
+    SyncMap Map,
+    string? Key = null);
 
 /// <summary>What the receiving device made of a package.</summary>
 /// <param name="Reason">Why not, when not: <see cref="AlignmentTransfer.NoSuchBook"/> or <see cref="AlignmentTransfer.Declined"/>.</param>

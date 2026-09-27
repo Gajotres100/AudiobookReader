@@ -1383,10 +1383,24 @@ public partial class BookViewModel(
             var labels = devices.Select(d => $"{d.Name} ({d.Address})").ToList();
 
             var choice = await Dialogs.ChooseAsync(
-                Strings.Share_ChooseTitle, Strings.Common_Cancel, null, [.. labels, Strings.Share_TypeAddress]);
+                Strings.Share_ChooseTitle, Strings.Common_Cancel, null,
+                [.. labels, Strings.Share_ScanQr, Strings.Share_TypeAddress, Strings.Share_AsFile]);
 
             IPAddress? to = null;
             var name = "";
+
+            if (choice == Strings.Share_ScanQr)
+            {
+                await SendByQrAsync();
+                return;
+            }
+
+            if (choice == Strings.Share_AsFile)
+            {
+                ShareStatus = "";
+                await SendAsFileAsync();
+                return;
+            }
 
             if (choice == Strings.Share_TypeAddress)
             {
@@ -1429,6 +1443,69 @@ public partial class BookViewModel(
             AppLog.Error("sending the alignment to another device", ex);
             ShareStatus = ex.Message;
         }
+    }
+
+    /// <summary>
+    /// Sends to the device showing a QR code: a photo of the code says where it is and carries the
+    /// key that lets the alignment in without a question on the other side.
+    /// </summary>
+    private async Task SendByQrAsync()
+    {
+        byte[]? photo;
+
+        try
+        {
+            photo = await CapturedPhotoAsync();
+        }
+        catch (PermissionException)
+        {
+            ShareStatus = Strings.Details_LocatePageNoPermission;
+            return;
+        }
+
+        if (photo is null)
+        {
+            ShareStatus = "";
+            return;
+        }
+
+        ShareStatus = Strings.Share_ReadingQr;
+
+        var code = PairingCode.Parse(await Task.Run(() => QrReader.Read(photo)));
+        if (code is null)
+        {
+            ShareStatus = Strings.Share_QrNotFound;
+            return;
+        }
+
+        var name = code.Name.Length > 0 ? code.Name : code.Addresses[0].ToString();
+        ShareStatus = string.Format(Strings.Share_Sending, name);
+
+        var reply = await share.SendAsync(BookId, code);
+
+        ShareStatus = reply.Accepted
+            ? string.Format(Strings.Share_Done, name)
+            : reply.Reason switch
+            {
+                AlignmentTransfer.NoSuchBook => string.Format(Strings.Share_NoSuchBook, name),
+                AlignmentTransfer.Declined => string.Format(Strings.Share_Declined, name),
+                _ => Strings.Share_Unreachable,
+            };
+    }
+
+    /// <summary>
+    /// Hands the alignment to the share sheet as a file: AirDrop, Quick Share, a chat, e-mail —
+    /// whatever reaches the other device, on any network or none in common.
+    /// </summary>
+    private async Task SendAsFileAsync()
+    {
+        var path = await share.ExportAsync(BookId);
+
+        await Share.Default.RequestAsync(new ShareFileRequest
+        {
+            Title = Strings.Share_AsFile,
+            File = new ShareFile(path, "application/octet-stream"),
+        });
     }
 
     /// <summary>

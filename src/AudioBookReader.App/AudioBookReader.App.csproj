@@ -96,8 +96,7 @@
 	     this target sets exactly that, timed via BeforeTargets to land immediately ahead of the
 	     one check it needs to satisfy — the only ordering that is actually guaranteed regardless of
 	     whatever else runs in between. -->
-	<Target Name="_ClearIosPlatformTarget" BeforeTargets="_CheckForMismatchingPlatform"
-	        Condition="'$(TargetFramework)'=='net10.0-ios'">
+	<Target Name="_ClearIosPlatformTarget" BeforeTargets="_CheckForMismatchingPlatform" Condition="'$(TargetFramework)'=='net10.0-ios'">
 		<PropertyGroup>
 			<PlatformTarget>AnyCPU</PlatformTarget>
 		</PropertyGroup>
@@ -122,6 +121,8 @@
 
 		<PackageReference Include="Plugin.Maui.OCR" Version="1.1.1" />
 
+		<PackageReference Include="QRCoder" Version="1.8.0" />
+
 		<!-- Playback: ExoPlayer for the engine, Session for the foreground service, lock screen
 		     controls and headset buttons. Android-only — iOS plays through AVFoundation directly,
 		     which needs no NuGet package at all. -->
@@ -144,6 +145,8 @@
 		     is what keeps a single copy of each class in the package. -->
 		<PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="1.19.0.1" Condition="'$(TargetFramework)'=='net10.0-android'" />
 		<PackageReference Include="Xamarin.AndroidX.Collection.Ktx" Version="1.6.0.1" Condition="'$(TargetFramework)'=='net10.0-android'" />
+		<!-- Reads a photographed QR code on Android; iOS has Vision for that. -->
+		<PackageReference Include="ZXing.Net" Version="0.16.11" Condition="'$(TargetFramework)'=='net10.0-android'" />
 	</ItemGroup>
 
 	<ItemGroup>

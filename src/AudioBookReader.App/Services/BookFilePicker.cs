@@ -33,5 +33,8 @@ public partial class BookFilePicker
     public Task<PickedMedia?> PickEbookAsync(string? prompt = null) =>
         PickAsync(prompt ?? Strings.Picker_ChooseEbook);
 
+    /// <summary>Any file at all — for an alignment someone sent, which has no book of its own to be.</summary>
+    public Task<PickedMedia?> PickFileAsync(string prompt) => PickAsync(prompt);
+
     private partial Task<PickedMedia?> PickAsync(string prompt);
 }
