@@ -113,9 +113,24 @@ public partial class ReaderPage : ContentPage
         if (sender is Slider slider) _viewModel.JumpToPage((int)Math.Round(slider.Value));
     }
 
+    /// <summary>
+    /// Set when one of the app's dialogs went over this page, so that its closing — which arrives
+    /// as this page appearing again — is not taken for the reader being opened afresh.
+    /// </summary>
+    private bool _underDialog;
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        // Back from a dialog this page asked: nothing was left, so nothing is reloaded. Reloading
+        // here reopened the book at the last saved place and undid whatever the dialog had just
+        // chosen — a chapter picked from the list landed back on the chapter being read.
+        if (_underDialog)
+        {
+            _underDialog = false;
+            return;
+        }
 
         // Reading along means looking at the screen without touching it, so the usual idle timeout
         // fights the feature: the display goes dark mid-sentence.
@@ -140,6 +155,13 @@ public partial class ReaderPage : ContentPage
     protected override async void OnDisappearing()
     {
         base.OnDisappearing();
+
+        // A dialog passing over the page: it is still the page being read.
+        if (Dialogs.IsShowing)
+        {
+            _underDialog = true;
+            return;
+        }
 
         DeviceDisplay.Current.KeepScreenOn = false;
 

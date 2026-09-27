@@ -8,6 +8,19 @@ namespace AudioBookReader.App.Services;
 /// </summary>
 public static class Dialogs
 {
+    private static int _showing;
+
+    /// <summary>
+    /// Whether one of these dialogs is on screen.
+    ///
+    /// A dialog is a page pushed over the one that asked, so that page is told it has disappeared
+    /// and, when the dialog closes, that it has appeared again — exactly what it is told when it is
+    /// left and returned to. Pages that save, tear down or reload on those two events check this to
+    /// tell a dialog passing over them from someone actually leaving: the reader reloaded after every
+    /// chapter picked from its own list, and put the book straight back where it had been.
+    /// </summary>
+    public static bool IsShowing => _showing > 0;
+
     /// <summary>A yes-or-no question. True when the first answer was chosen.</summary>
     public static async Task<bool> AskAsync(
         string? title,
@@ -77,7 +90,16 @@ public static class Dialogs
         if (navigation is null) return onBack;
 
         page.Host = navigation;
-        await MainThread.InvokeOnMainThreadAsync(() => navigation.PushModalAsync(page, animated: false));
-        return await page.Answer;
+        Interlocked.Increment(ref _showing);
+
+        try
+        {
+            await MainThread.InvokeOnMainThreadAsync(() => navigation.PushModalAsync(page, animated: false));
+            return await page.Answer;
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _showing);
+        }
     }
 }

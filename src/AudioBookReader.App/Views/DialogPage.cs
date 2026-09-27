@@ -47,6 +47,12 @@ public sealed class DialogPage : ContentPage
         Shell.SetNavBarIsVisible(this, false);
         BackgroundColor = Color.FromArgb("#99000000");
 
+        // Over the page that asked, not instead of it. iOS presents a modal full screen by default
+        // and stops drawing what is underneath, so the dimmed backdrop came out solid black there.
+        Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific.Page.SetModalPresentationStyle(
+            this.On<Microsoft.Maui.Controls.PlatformConfiguration.iOS>(),
+            Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific.UIModalPresentationStyle.OverFullScreen);
+
         var content = new VerticalStackLayout { Spacing = 10 };
 
         if (!string.IsNullOrWhiteSpace(title))

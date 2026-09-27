@@ -13,9 +13,18 @@ public partial class BookPage : ContentPage
         BindingContext = _viewModel = viewModel;
     }
 
+    /// <summary>Set while one of the app's dialogs is over the page; see the reader's.</summary>
+    private bool _underDialog;
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        if (_underDialog)
+        {
+            _underDialog = false;
+            return;
+        }
 
         try
         {
@@ -35,6 +44,14 @@ public partial class BookPage : ContentPage
     protected override async void OnDisappearing()
     {
         base.OnDisappearing();
+
+        // A dialog over the page — the sleep timer, the speed — is not leaving it, and disposing
+        // the view model here left the dialog's answer nothing alive to act on.
+        if (Dialogs.IsShowing)
+        {
+            _underDialog = true;
+            return;
+        }
 
         try
         {

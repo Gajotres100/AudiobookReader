@@ -20,9 +20,18 @@ public partial class BookDetailsPage : ContentPage
         BindingContext = _viewModel = viewModel;
     }
 
+    /// <summary>Set while one of the app's dialogs is over the page; see the reader's.</summary>
+    private bool _underDialog;
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        if (_underDialog)
+        {
+            _underDialog = false;
+            return;
+        }
 
         try
         {
@@ -37,6 +46,14 @@ public partial class BookDetailsPage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+
+        // Asking a question — delete this? send it where? — is not leaving the page.
+        if (Dialogs.IsShowing)
+        {
+            _underDialog = true;
+            return;
+        }
+
         _viewModel.Dispose();
     }
 
