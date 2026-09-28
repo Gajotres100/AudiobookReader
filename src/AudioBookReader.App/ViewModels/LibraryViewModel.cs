@@ -11,9 +11,16 @@ using CommunityToolkit.Mvvm.Input;
 namespace AudioBookReader.App.ViewModels;
 
 /// <summary>One book as the library grid shows it.</summary>
-public class BookCard(Book book, ReadingState? state)
+public partial class BookCard(Book book, ReadingState? state) : ObservableObject
 {
     public int Id { get; } = book.Id;
+
+    /// <summary>The text to read in before opening, so the wait happens here with something showing.</summary>
+    public string? EbookPath { get; } = book.EbookPath;
+
+    /// <summary>Tapped and on its way open: a spinner over the cover says the tap was taken.</summary>
+    [ObservableProperty]
+    public partial bool IsOpening { get; set; }
 
     /// <summary>Decides which of the app's three shapes this book opens into.</summary>
     public bool HasText { get; } = book.HasText;
@@ -371,17 +378,43 @@ public partial class LibraryViewModel : ObservableObject
     /// must stay unread — so while a car screen is attached, every book opens into the player.
     /// </summary>
     [RelayCommand]
-    private Task OpenAsync(BookCard? card)
+    private async Task OpenAsync(BookCard? card)
     {
-        // Logged so a tap that seemed to do nothing can be told from one that arrived and was slow.
-        if (card is not null) AppLog.Info($"library: tapped book {card.Id}");
+        // One book at a time: a second tap while the first is still opening would push the page
+        // twice. The command is refused while it runs, and this covers a tap on the same card.
+        if (card is null || card.IsOpening) return;
 
-        return card switch
+        // Logged so a tap that seemed to do nothing can be told from one that arrived and was slow.
+        AppLog.Info($"library: tapped book {card.Id}");
+
+        card.IsOpening = true;
+
+        try
         {
-            null => Task.CompletedTask,
-            { HasText: true } when !_car.IsConnected => Shell.Current.GoToAsync($"reader?id={card.Id}"),
-            _ => Shell.Current.GoToAsync($"book?id={card.Id}"),
-        };
+            var readsText = card.HasText && !_car.IsConnected;
+
+            // The slow part of opening a book is reading its text — seconds, for a large one. Done
+            // here, under the spinner on the cover, rather than on a reader page that has already
+            // opened and then sits empty; the reader then finds the text ready.
+            if (readsText && card.EbookPath is { } path)
+            {
+                try
+                {
+                    await Task.Run(() => _extractors.ExtractAsync(path));
+                }
+                catch (Exception ex)
+                {
+                    // The reader says what is wrong with a book it cannot read; this was only a head start.
+                    AppLog.Info($"library: reading book {card.Id} ahead failed ({ex.Message})");
+                }
+            }
+
+            await Shell.Current.GoToAsync(readsText ? $"reader?id={card.Id}" : $"book?id={card.Id}");
+        }
+        finally
+        {
+            card.IsOpening = false;
+        }
     }
 
     /// <summary>

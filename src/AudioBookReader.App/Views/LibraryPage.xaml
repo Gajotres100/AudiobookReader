@@ -182,7 +182,24 @@
                                 StrokeThickness="0"
                                 VerticalOptions="Center"
                                 WidthRequest="58">
-                                <Image Source="{Binding CoverPath}" Style="{StaticResource Cover}" />
+                                <Grid>
+                                    <Image Source="{Binding CoverPath}" Style="{StaticResource Cover}" />
+
+                                    <!--
+                                        Over the cover the moment it is tapped, until the book is open:
+                                        a large book takes a few seconds to read in, and with nothing
+                                        moving that read as a tap that had not worked.
+                                    -->
+                                    <Grid BackgroundColor="#80000000" IsVisible="{Binding IsOpening}">
+                                        <ActivityIndicator
+                                            HeightRequest="28"
+                                            HorizontalOptions="Center"
+                                            IsRunning="{Binding IsOpening}"
+                                            VerticalOptions="Center"
+                                            WidthRequest="28"
+                                            Color="White" />
+                                    </Grid>
+                                </Grid>
                             </Border>
 
                             <VerticalStackLayout
