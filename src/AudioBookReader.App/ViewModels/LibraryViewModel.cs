@@ -1,3 +1,4 @@
+using AudioBookReader.Core.Books;
 using AudioBookReader.App.Resources.Strings;
 using System.Collections.ObjectModel;
 using AudioBookReader.App.Services;
@@ -95,6 +96,7 @@ public partial class LibraryViewModel : ObservableObject
     private readonly DownloadQueue _downloads;
     private readonly AlignmentQueue _alignment;
     private readonly CarConnection _car;
+    private readonly BookTextExtractors _extractors;
 
     public LibraryViewModel(
         LibraryDatabase database,
@@ -102,7 +104,8 @@ public partial class LibraryViewModel : ObservableObject
         BookFilePicker picker,
         DownloadQueue downloads,
         AlignmentQueue alignment,
-        CarConnection car)
+        CarConnection car,
+        BookTextExtractors extractors)
     {
         _database = database;
         _importer = importer;
@@ -110,6 +113,7 @@ public partial class LibraryViewModel : ObservableObject
         _downloads = downloads;
         _alignment = alignment;
         _car = car;
+        _extractors = extractors;
     }
 
     /// <summary>
@@ -195,10 +199,41 @@ public partial class LibraryViewModel : ObservableObject
     {
         Books.Clear();
 
-        foreach (var book in await _database.GetBooksAsync())
+        var books = await _database.GetBooksAsync();
+
+        foreach (var book in books)
             Books.Add(new BookCard(book, await _database.GetReadingStateAsync(book.Id)));
 
         OnPropertyChanged(nameof(IsEmpty));
+
+        PrepareMostLikely(books);
+    }
+
+    /// <summary>
+    /// Reads the text of the book most likely to be opened next — the one read last, at the top of
+    /// the shelf — while the shelf is being looked at, so it opens at once instead of after two or
+    /// three seconds of parsing with nothing on screen, which read as a tap that had not worked.
+    ///
+    /// In the background and at no one's expense: the parsed text is shared with the reader when it
+    /// opens, and if the reader asks while this is still going it waits for this rather than
+    /// starting over.
+    /// </summary>
+    private void PrepareMostLikely(IEnumerable<Book> books)
+    {
+        if (books.FirstOrDefault(b => b.HasText)?.EbookPath is not { } path) return;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _extractors.ExtractAsync(path);
+            }
+            catch (Exception ex)
+            {
+                // Only a head start; the reader reports its own failure if the book cannot be read.
+                AppLog.Info($"library: preparing '{Path.GetFileName(path)}' failed ({ex.Message})");
+            }
+        });
     }
 
     [RelayCommand]
