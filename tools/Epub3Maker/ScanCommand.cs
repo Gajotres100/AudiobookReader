@@ -321,15 +321,13 @@ public static class ScanCommand
     {
         // --data is the tool's own folder, and taking it for the library is the likeliest mistake.
         const string Usage =
-            "
-  epub3maker scan <mapa s audioknjigama> --output <mapa za EPUB3> [--data <mapa za modele i napredak>]" +
-            "
-  ili 'library = …' i 'output = …' u epub3maker.conf u --data mapi.";
+            "\n  epub3maker scan <mapa s audioknjigama> --output <mapa za EPUB3> [--data <mapa za modele i napredak>]" +
+            "\n  ili 'library = …' i 'output = …' u epub3maker.conf u --data mapi.";
 
         var library = settings["library"] ?? throw new ArgumentException("Nije zadana mapa s knjigama (prvi argument iza 'scan')." + Usage);
         var output = settings["output"] ?? throw new ArgumentException("Nije zadano kamo idu gotove knjige (--output)." + Usage);
 
-        if (Path.GetFullPath(output).TrimEnd('\', '/').Equals(Paths.Data.TrimEnd('\', '/'), StringComparison.OrdinalIgnoreCase))
+        if (Path.GetFullPath(output).TrimEnd('\\', '/').Equals(Paths.Data.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("--output i --data moraju biti različite mape." + Usage);
 
         if (!Directory.Exists(library)) throw new DirectoryNotFoundException($"Ne postoji mapa: {library}");
