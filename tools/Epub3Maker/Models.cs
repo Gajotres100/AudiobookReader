@@ -11,8 +11,7 @@ public static class Models
 {
     public static readonly string[] Names = ["tiny", "base", "small", "medium"];
 
-    public static string Directory { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Epub3Maker", "models");
+    public static string Directory => Paths.Models;
 
     /// <summary>
     /// The English-only variant for an English book: the same size, faster and more accurate on

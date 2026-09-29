@@ -98,6 +98,57 @@ public static class FfmpegDecoder
         return new PcmStream(process);
     }
 
+    /// <summary>
+    /// Joins an audiobook that comes as a file per chapter or per disc into one file, without
+    /// re-encoding: the EPUB 3 carries one recording, and the app plays one.
+    ///
+    /// Only files of one kind can be joined this way; a folder mixing MP3 and M4A is refused with
+    /// a reason rather than turned into something half-playable.
+    /// </summary>
+    public static async Task JoinAsync(IReadOnlyList<string> files, string target, CancellationToken ct)
+    {
+        var extensions = files.Select(f => Path.GetExtension(f).ToLowerInvariant()).Distinct().ToList();
+        if (extensions.Count > 1)
+            throw new NotSupportedException($"Audio dijelovi su različitih formata ({string.Join(", ", extensions)}) i ne mogu se spojiti bez prekodiranja.");
+
+        var folder = Path.GetDirectoryName(target)!;
+        Directory.CreateDirectory(folder);
+
+        // FFmpeg's concat list quotes names in single quotes; a quote inside one is written '\''.
+        var list = target + ".txt";
+        await File.WriteAllLinesAsync(list, files.Select(f => "file '" + f.Replace("'", "'\\''") + "'"), ct);
+
+        // Named with the real extension so FFmpeg picks the container, and renamed only once whole.
+        var partial = Path.Combine(folder, "part-" + Path.GetFileName(target));
+
+        var info = new ProcessStartInfo(Executable)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        foreach (var argument in new[] { "-nostdin", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", list, "-map", "0:a", "-c", "copy", partial })
+            info.ArgumentList.Add(argument);
+
+        using var process = Process.Start(info) ?? throw new InvalidOperationException("FFmpeg did not start.");
+
+        var errors = process.StandardError.ReadToEndAsync(ct);
+        await process.StandardOutput.ReadToEndAsync(ct);
+        await process.WaitForExitAsync(ct);
+
+        File.Delete(list);
+
+        if (process.ExitCode != 0)
+        {
+            File.Delete(partial);
+            throw new InvalidOperationException($"Spajanje audio dijelova nije uspjelo: {(await errors).Trim()}");
+        }
+
+        File.Move(partial, target, overwrite: true);
+    }
+
     public sealed class PcmStream(Process process) : IDisposable
     {
         public Stream Stream { get; } = process.StandardOutput.BaseStream;

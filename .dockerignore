@@ -1,0 +1,10 @@
+# Only the Core and the tool go into an image; build output from Windows must not, or restore
+# picks up paths from another machine.
+**/bin/
+**/obj/
+.git/
+.vs/
+keystore/
+src/AudioBookReader.App/
+tests/
+docs/

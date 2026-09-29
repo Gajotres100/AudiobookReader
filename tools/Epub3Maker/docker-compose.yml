@@ -1,0 +1,34 @@
+# An example: epub3maker next to Audiobookshelf, making EPUB 3s every night.
+#
+# Change the two paths on the left to where your audiobooks are and where the EPUB 3s should go
+# (add that folder to Audiobookshelf as its own library), then:
+#
+#   docker compose up -d
+#   docker compose logs -f epub3maker
+
+services:
+  epub3maker:
+    image: ghcr.io/gajotres100/epub3maker:latest
+    # Or build it yourself from a clone of the repository:
+    # build:
+    #   context: ../..
+    #   dockerfile: tools/Epub3Maker/Dockerfile
+    container_name: epub3maker
+    restart: unless-stopped
+    volumes:
+      - /srv/audiobookshelf/audiobooks:/library:ro
+      - /srv/audiobookshelf/readalong:/output
+      - epub3maker-data:/data
+    environment:
+      EPUB3MAKER_QUALITY: better        # light | better | best
+      # EPUB3MAKER_ANCHORS: medium      # sparse | medium | dense | seconds
+      EPUB3MAKER_WINDOW: "01:00-07:00"  # only at night; remove to work around the clock
+      EPUB3MAKER_WATCH: 60m             # look for new books every hour
+      TZ: Europe/Zagreb                 # the window is in this time zone
+    # Leave the server's other work room to breathe.
+    cpus: 1.5
+    # Give a book in progress time to save before the container is stopped.
+    stop_grace_period: 1m
+
+volumes:
+  epub3maker-data:

@@ -43,8 +43,12 @@ probe began, and each match yields two of them — one at each end of the window
 src/AudioBookReader.Core/   models, ebook parsing, alignment, sync map — no MAUI dependency
 src/AudioBookReader.App/    MAUI Android app, Media3 playback, on-device recognition
 src/AudioBookReader.Tuner/  console harness for working on alignment from a desktop
-tests/                      xUnit, 183 tests
+tools/Epub3Maker/           makes EPUB 3 read-along books on a PC or server — one book, or a whole library every night
+tests/                      xUnit tests for Core
 ```
+
+**[epub3maker](tools/Epub3Maker/README.md)** turns an ebook and its audiobook into an EPUB 3 with
+Media Overlays, and can run unattended next to Audiobookshelf on Windows, Linux or Docker.
 
 Core carries no MAUI dependency so the alignment engine can be exercised in seconds on a desktop
 rather than in minutes of deploy cycles. The tuner is a development tool and is not shipped —

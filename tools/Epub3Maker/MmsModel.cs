@@ -41,14 +41,14 @@ public sealed class MmsModel : IDisposable
         _wantsMask = session.InputMetadata.ContainsKey("attention_mask");
     }
 
-    public static async Task<MmsModel> LoadAsync(CancellationToken ct)
+    public static async Task<MmsModel> LoadAsync(int threads, CancellationToken ct)
     {
         var path = await Models.EnsureFileAsync(Url, "mms-300m-1130-forced-aligner.q8.onnx", ct);
 
         var options = new SessionOptions
         {
             GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,
-            IntraOpNumThreads = Environment.ProcessorCount,
+            IntraOpNumThreads = threads,
         };
 
         return new MmsModel(new InferenceSession(path, options));
@@ -61,24 +61,45 @@ public sealed class MmsModel : IDisposable
     /// The audio goes through in 30-second windows with a second of context on either side, of
     /// which only the middle is kept: a letter cut in half at a window's edge is heard wrongly, and
     /// the context is what lets the model hear it whole.
+    ///
+    /// Every window is also appended to <paramref name="checkpoint"/> as it is finished. On a slow
+    /// server a book is a night's work or more, and a job that stops at dawn, or a container that
+    /// is restarted, has to carry on from where it was rather than begin the book again - so a run
+    /// that finds the file reads back the windows already heard and starts after them.
     /// </summary>
-    public float[] Emissions(string audioPath, long durationMs, Action<double> progress, CancellationToken ct)
+    public float[] Emissions(string audioPath, long durationMs, string checkpoint, Action<double> progress, CancellationToken ct)
     {
         const int hop = 30 * 16_000;     // 1500 frames
         const int context = 16_000;      // 50 frames
+        const int framesPerHop = hop / SamplesPerFrame;
+        const int rowBytes = VocabularySize * sizeof(float);
 
         var totalFrames = (int)(durationMs / FrameMs) + 2;
         var emissions = new float[(long)totalFrames * VocabularySize];
 
+        var resumed = Resume(checkpoint, emissions, framesPerHop, totalFrames);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(checkpoint)!);
+        using var saved = new FileStream(checkpoint, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
+        saved.SetLength((long)resumed * rowBytes);
+        saved.Seek(0, SeekOrigin.End);
+
+        var firstStart = (long)resumed * SamplesPerFrame;
+        var decodeFrom = Math.Max(0, firstStart - context);
+
+        // Decoded from the very beginning and the part already heard thrown away, rather than
+        // seeking: a seek into AAC lands a few samples off, which shifted every time after a
+        // resume by milliseconds — measured, not supposed. Decoding is quick; listening is not.
         using var pcm = FfmpegDecoder.OpenStream(audioPath);
+        Skip(pcm.Stream, decodeFrom * sizeof(float), ct);
 
         // Holds audio from sample `bufferStart` on; never more than one window's worth.
         var buffer = new float[hop + 2 * context];
-        long bufferStart = 0;
+        long bufferStart = decodeFrom;
         var filled = 0;
         var ended = false;
 
-        for (long start = 0; ; start += hop)
+        for (long start = firstStart; ; start += hop)
         {
             ct.ThrowIfCancellationRequested();
 
@@ -117,12 +138,55 @@ public sealed class MmsModel : IDisposable
                     .CopyTo(emissions.AsSpan((int)(global * VocabularySize), VocabularySize));
             }
 
+            // The whole hop, so the file holds whole windows and a resume starts on a window edge.
+            var hopFrom = (int)(start / SamplesPerFrame);
+            var hopTo = Math.Min(totalFrames, hopFrom + framesPerHop);
+            if (hopTo > hopFrom)
+            {
+                saved.Write(MemoryMarshal.AsBytes(emissions.AsSpan(hopFrom * VocabularySize, (hopTo - hopFrom) * VocabularySize)));
+                saved.Flush();
+            }
+
             progress(Math.Min(1, (start + hop) / 16.0 / durationMs));
 
             if (ended && windowTo <= start + hop) break;
         }
 
         return emissions;
+    }
+
+    /// <summary>
+    /// Reads back the windows a previous run finished, and returns how many frames that was - a
+    /// whole number of windows, since a window only half written is heard again.
+    /// </summary>
+    private static int Resume(string checkpoint, float[] emissions, int framesPerHop, int totalFrames)
+    {
+        if (!File.Exists(checkpoint)) return 0;
+
+        var rowBytes = VocabularySize * sizeof(float);
+        var windows = new FileInfo(checkpoint).Length / ((long)framesPerHop * rowBytes);
+        var frames = (int)Math.Min(windows * framesPerHop, totalFrames);
+
+        if (frames <= 0) return 0;
+
+        using var stream = File.OpenRead(checkpoint);
+        stream.ReadExactly(MemoryMarshal.AsBytes(emissions.AsSpan(0, frames * VocabularySize)));
+
+        return frames;
+    }
+
+    private static void Skip(Stream stream, long bytes, CancellationToken ct)
+    {
+        var buffer = new byte[1 << 16];
+
+        while (bytes > 0)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var read = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, bytes));
+            if (read == 0) return;
+            bytes -= read;
+        }
     }
 
     /// <summary>One window through the model, returned as log-probabilities.</summary>
