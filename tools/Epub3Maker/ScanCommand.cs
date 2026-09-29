@@ -76,6 +76,10 @@ public static class ScanCommand
             return 0;
         }
 
+        // Before any book is touched: a missing FFmpeg is the machine's problem, not the books',
+        // and recording every book as failed over it left them all waiting for --retry.
+        BookJob.RequireFfmpeg();
+
         if (options.LowPriority) LowerPriority();
 
         output.Line($"epub3maker scan: {options.Library} → {options.Output}");

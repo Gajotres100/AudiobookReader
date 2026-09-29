@@ -212,11 +212,13 @@ public static class BookJob
         return Epub3Writer.TimesFromMap(extracted.Text, map);
     }
 
-    private static void RequireFfmpeg()
+    public static void RequireFfmpeg()
     {
         if (!FfmpegDecoder.IsAvailable())
             throw new InvalidOperationException(
-                "FFmpeg nije pronađen. Instaliraj ga (Windows: winget install Gyan.FFmpeg, Linux: apt install ffmpeg) ili zadaj --ffmpeg <putanja>.");
+                $"FFmpeg nije pronađen ('{FfmpegDecoder.Executable}'). Instaliraj ga — Windows: winget install Gyan.FFmpeg, ili " +
+                "raspakiraj https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip; Linux: apt install ffmpeg — " +
+                "ili zadaj --ffmpeg <putanja do ffmpeg.exe>.");
     }
 
     public static string Duration(long ms)
