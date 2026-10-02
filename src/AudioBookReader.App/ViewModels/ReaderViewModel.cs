@@ -562,24 +562,32 @@ public partial class ReaderViewModel(
     }
 
     /// <summary>
-    /// Where the voice should move to because the eye has read on past it, or null when it should
-    /// stay where it is.
+    /// Where the voice should move to because the eye has moved away from it, or null when it
+    /// should stay where it is.
     ///
-    /// Only ever forwards. The page reports the sentence at its top, and a voice paused halfway down
-    /// the page is ahead of that — moving it "to the page" would rewind up to a minute of listening
-    /// every time someone paused mid-page and closed the book. The case this exists for is the other
-    /// one: reading on in silence, pages beyond where the voice last was. Paging back to re-read
-    /// leaves the voice alone; a tapped sentence is still how it is moved by hand.
+    /// Forwards whenever the page is past the voice: reading on in silence. Backwards only when the
+    /// voice is past the whole page, not merely past its top. The page reports the sentence at its
+    /// top, and a voice paused halfway down the page is ahead of that — moving it "to the page"
+    /// would rewind up to a minute of listening every time someone paused mid-page and closed the
+    /// book. But scrolling back to an earlier page and reading there left the voice where it was,
+    /// and since it is the voice a paired book reopens at, the book reopened pages later than where
+    /// it was closed.
     /// </summary>
     private long? AudioPositionForSentence(int sentenceIndex)
     {
         if (_text is null || sentenceIndex < 0 || sentenceIndex >= _text.Sentences.Count) return null;
-        if (playback.BookId != BookId) return null;
+        if (playback.BookId != BookId || _sync is null) return null;
 
         var start = _text.Sentences[sentenceIndex].Start;
-        if (_sync?.AudioPositionAtOrAfterChar(start, LookAheadChars) is not { } at) return null;
+        if (_sync.AudioPositionAtOrAfterChar(start, LookAheadChars) is not { } at) return null;
 
-        return at - playback.PositionMs > CloseEnoughMs ? at : null;
+        if (at - playback.PositionMs > CloseEnoughMs) return at;
+
+        // A page and a half, so a voice paused anywhere on the page in front of the reader stays.
+        var page = Math.Max(CharsPerPage, 1_000) * 1.5;
+        var voice = _sync.CharOffsetAt(playback.PositionMs);
+
+        return voice is { } voiceAt && voiceAt > start + page && playback.PositionMs - at > CloseEnoughMs ? at : null;
     }
 
     /// <summary>
