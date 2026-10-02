@@ -1589,7 +1589,11 @@ public partial class ReaderViewModel(
         // also seeks, to a position PositionForTextAsync had to guess: for a paired book with no
         // map that guess is the start of the book, and writing it here would overwrite hours of
         // real listening with a zero a second after the reader was opened to glance at a name.
+        // Never a zero from a player that is not holding the book yet — turning the phone or coming
+        // back from the player can catch it between media — which would replace the whole book's
+        // progress with its first second.
         if (loadedThisBook && (playback.IsPlaying || _narrationTakenHere)
+            && playback.PositionMs > 0 && playback.DurationMs > 0
             && DateTime.UtcNow - _lastPositionSaved > TimeSpan.FromSeconds(5))
         {
             _lastPositionSaved = DateTime.UtcNow;
@@ -1734,7 +1738,12 @@ public partial class ReaderViewModel(
     {
         if (_text is null) return Task.CompletedTask;
 
-        var index = topSentenceIndex ?? _lastSentence;
+        // When the page cannot be asked — it is being torn down as the reader leaves — the last
+        // page it reported, not the last sentence the voice marked: reading in silence never moves
+        // that one, so it still pointed where the book had been opened, and leaving for the player
+        // saved the start of the session over everything read since.
+        var index = topSentenceIndex
+                    ?? (_topSentence >= 0 && _topSentence < _text.Sentences.Count ? _topSentence : _lastSentence);
         if (index < 0 || index >= _text.Sentences.Count) return Task.CompletedTask;
 
         // For a paired book read in silence, the page is where the reader actually is — and it is
@@ -1926,7 +1935,8 @@ public partial class ReaderViewModel(
     /// <summary>
     /// The sentence at the top of the page, as the page last reported it. Where the voice starts.
     /// </summary>
-    private int _topSentence;
+    /// <summary>The first sentence on the page, as last reported; -1 until the page has said, never "the start of the book".</summary>
+    private int _topSentence = -1;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SpeakLabel))]

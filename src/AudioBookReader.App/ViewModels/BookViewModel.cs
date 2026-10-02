@@ -735,8 +735,13 @@ public partial class BookViewModel(
         }
     }
 
+    /// <summary>
+    /// Not when the page never got a position from the player — it starts at zero and only learns
+    /// the real one once the player holds this book. Leaving before that saved the zero, and the
+    /// whole book's listening progress with it.
+    /// </summary>
     public Task SavePositionAsync() =>
-        HasAudio
+        HasAudio && PositionMs > 0 && playback.BookId == BookId && playback.DurationMs > 0
             ? database.SaveReadingStateAsync(BookId, PositionMs, speed: playback.Speed)
             : Task.CompletedTask;
 

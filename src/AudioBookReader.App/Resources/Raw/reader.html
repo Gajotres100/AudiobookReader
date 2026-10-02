@@ -111,8 +111,14 @@
   }
 
   function report() {
+    // A new layout first puts the remembered sentence back, which reports again from there.
+    if (typeof laidOutAs !== 'undefined' && relayout()) return;
+
     var page = pageNow();
     var top = topSentence();
+
+    // Only while the layout is the one the page was read in; see relayout below.
+    if (typeof laidOutAs !== 'undefined' && top !== '-1') anchorTop = top;
 
     // The sentence travels with the page so the host can name the chapter being read.
     // Scrolling is the only thing that moves it, and the host has no other way to know.
@@ -332,9 +338,28 @@
   // The first sentence visible, used to remember the reading position.
   function topSentence() {
     var spans = document.querySelectorAll('[data-idx]');
+    var top = content.getBoundingClientRect().top;
+
     for (var i = 0; i < spans.length; i++) {
       var box = spans[i].getBoundingClientRect();
-      if (box.bottom > 0 && box.top < content.clientHeight) return spans[i].getAttribute('data-idx');
+      if (!(box.bottom > top && box.top < top + content.clientHeight)) continue;
+
+      var idx = spans[i].getAttribute('data-idx');
+
+      // Begun above the screen and ending on its first line: read already. The sentence that
+      // starts on that same line is where the reading is.
+      if (box.top < top) {
+        for (var j = i + 1; j < spans.length; j++) {
+          var nextIdx = spans[j].getAttribute('data-idx');
+          if (nextIdx === idx) continue;
+
+          var next = spans[j].getBoundingClientRect();
+          if (next.top >= top - 1 && next.top < box.bottom) return nextIdx;
+          break;
+        }
+      }
+
+      return idx;
     }
     return '-1';
   }
@@ -885,7 +910,41 @@
     location.href = 'abr://font/' + Math.round(fontSize());
   }, { passive: true });
 
-  window.addEventListener('resize', measure);
+  // Turning the phone on its side and back reflows the whole document, and the scroll position
+  // stays the same number of pixels — which after a reflow is somewhere else in the text, or the
+  // end of the chapter when the shorter landscape layout clamps it. That lost the place every
+  // time the phone was turned. So the first sentence on screen is remembered while the layout
+  // stands, and put back at the top once the new one is laid out. Remembered from scrolling
+  // rather than read at the resize: by then the text has already moved.
+  //
+  // Checked from every report as well as on resize: a resize event is not guaranteed to arrive
+  // before the scroll the new layout causes, and the first real size arrives after this script
+  // has run.
+  function layoutKey() { return content.clientWidth + 'x' + content.clientHeight; }
+
+  var laidOutAs = layoutKey(), anchorTop = '-1';
+
+  function relayout() {
+    var key = layoutKey();
+    if (key === laidOutAs) return false;
+
+    var keep = anchorTop;
+    laidOutAs = key;
+    pageCount = Math.max(1, Math.ceil(content.scrollHeight / step()));
+
+    // Back at the very top, where it was, rather than a little way down as keepInView puts it:
+    // that left the sentences above it on screen, the first of them became the remembered one,
+    // and every turn of the phone moved the place back by a sentence or two.
+    var parts = keep !== '-1' ? document.querySelectorAll('[data-idx="' + keep + '"]') : [];
+    if (parts.length) content.scrollTop += parts[0].getBoundingClientRect().top - content.getBoundingClientRect().top;
+
+    report();
+    return true;
+  }
+
+  window.addEventListener('resize', relayout);
+  if (window.ResizeObserver) new ResizeObserver(function () { relayout(); }).observe(content);
+
   measure();
 </script>
 </body></html>
