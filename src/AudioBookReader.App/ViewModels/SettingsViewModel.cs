@@ -143,10 +143,17 @@ public partial class SettingsViewModel(
 
     partial void OnOpenServerOnStartChanged(bool value) => servers.OpenServerOnStart = value;
 
+    /// <summary>The reader's text gliding with the voice; read by the reader each time it builds a page.</summary>
+    [ObservableProperty]
+    public partial bool SmoothScroll { get; set; }
+
+    partial void OnSmoothScrollChanged(bool value) => ReaderViewModel.SmoothScroll = value;
+
     public void Load()
     {
         HasServer = servers.IsConfigured;
         OpenServerOnStart = servers.OpenServerOnStart;
+        SmoothScroll = ReaderViewModel.SmoothScroll;
 
         var current = settings.Budget;
 

@@ -195,6 +195,15 @@
   <data name="Settings_AlignmentNote" xml:space="preserve">
     <value>Poravnanje se samo pauzira i nastavlja — nikad ne gubi napredak. Uz to se samo usporava ako se telefon zagrije, bez obzira na odabrano.</value>
   </data>
+  <data name="Settings_ReadingSection" xml:space="preserve">
+    <value>Čitanje</value>
+  </data>
+  <data name="Settings_SmoothScroll" xml:space="preserve">
+    <value>Tekst klizi uz glas</value>
+  </data>
+  <data name="Settings_SmoothScrollNote" xml:space="preserve">
+    <value>Dok se knjiga čita naglas, tekst se polako pomiče prema gore brzinom pripovjedača, pa redak koji se čita ostaje na istom mjestu. Isključeno: tekst stoji i pomakne se za cijeli ekran kad glas dođe blizu dna. Dodir stranice ga načas zaustavi.</value>
+  </data>
   <data name="Settings_StartSection" xml:space="preserve">
     <value>Gdje se aplikacija otvara</value>
   </data>

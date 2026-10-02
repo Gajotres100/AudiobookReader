@@ -154,6 +154,12 @@ public static class Strings
     public static string Settings_OnlyScreenOff => Get(nameof(Settings_OnlyScreenOff));
     /// <summary>Aligning only pauses and resumes — it never loses progress. It also slows itself down if the…</summary>
     public static string Settings_AlignmentNote => Get(nameof(Settings_AlignmentNote));
+    /// <summary>Reading</summary>
+    public static string Settings_ReadingSection => Get(nameof(Settings_ReadingSection));
+    /// <summary>Text glides with the voice</summary>
+    public static string Settings_SmoothScroll => Get(nameof(Settings_SmoothScroll));
+    /// <summary>While a book is read aloud, the text moves up slowly at the narrator's pace…</summary>
+    public static string Settings_SmoothScrollNote => Get(nameof(Settings_SmoothScrollNote));
     /// <summary>Where the app opens</summary>
     public static string Settings_StartSection => Get(nameof(Settings_StartSection));
     /// <summary>Open the server shelf on start</summary>

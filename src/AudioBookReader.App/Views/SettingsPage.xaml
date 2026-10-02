@@ -177,6 +177,25 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!--  ======== Reading ========  -->
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="14">
+
+                    <Label Style="{StaticResource Section}" Text="{x:Static s:Strings.Settings_ReadingSection}" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label
+                            Grid.Column="0"
+                            Text="{x:Static s:Strings.Settings_SmoothScroll}"
+                            VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding SmoothScroll}" />
+                    </Grid>
+
+                    <Label Style="{StaticResource Muted}" Text="{x:Static s:Strings.Settings_SmoothScrollNote}" />
+                </VerticalStackLayout>
+            </Border>
+
             <!--  ======== Where the app opens ========  -->
 
             <Border IsVisible="{Binding HasServer}" Style="{StaticResource Card}">

@@ -226,7 +226,9 @@ public partial class ReaderPage : ContentPage
     /// </summary>
     private Task ShowSentenceAsync(int sentenceIndex) =>
         Reader.EvaluateJavaScriptAsync(
-            _viewModel.IsFollowing ? $"highlight({sentenceIndex})" : $"keepInView({sentenceIndex})");
+            _viewModel.IsFollowing
+                ? $"highlight({sentenceIndex}, {_viewModel.SentenceDurationMs(sentenceIndex)})"
+                : $"keepInView({sentenceIndex})");
 
     private async void OnHighlightRequested(object? sender, int sentenceIndex)
     {

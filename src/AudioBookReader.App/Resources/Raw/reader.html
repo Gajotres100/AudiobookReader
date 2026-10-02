@@ -151,12 +151,142 @@
     }
   });
 
+  // At most a few times a second rather than once scrolling stops: while the text glides with the
+  // voice it never stops, and the chapter name and the page count would never update.
   content.addEventListener('scroll', function () {
-    clearTimeout(window.__scrollReport);
-    window.__scrollReport = setTimeout(report, 120);
+    if (window.__scrollReport) return;
+    window.__scrollReport = setTimeout(function () {
+      window.__scrollReport = 0;
+      report();
+    }, 250);
   }, { passive: true });
 
-  function highlight(idx) {
+  // ---- Gliding with the voice ----
+  //
+  // The line being read stays at the same height while the text moves up under it, at the pace
+  // the narrator reads — a teleprompter rather than a page that stands still and then jumps a
+  // screenful. Each sentence comes with how long the voice will take over it, so the glide runs
+  // from its first line to its last in that time; the next sentence takes over from there.
+  //
+  // A finger on the page always wins: touching it stops the glide, and it picks up again a few
+  // seconds after the finger lets go — gently, from wherever the reader left the text.
+  var glideOn = {{GLIDE}};
+  var GLIDE_LINE = 0.35, GLIDE_EASE_MS = 450, GLIDE_RESUME_MS = 3000;
+  var glide = null, glideFrame = 0, glidePos = 0, glideLast = 0, touchedUntil = 0;
+
+  document.addEventListener('touchstart', function () {
+    touchedUntil = Infinity;
+  }, { passive: true });
+
+  document.addEventListener('touchend', function () {
+    touchedUntil = Date.now() + GLIDE_RESUME_MS;
+  }, { passive: true });
+
+  // The sentence as the pieces of line it occupies, in reading order and in page coordinates, so
+  // the place the voice has reached can be followed across the line as well as down the page:
+  // following only lines stood the text still for a whole line and then moved it, which is the
+  // stepping this exists to get rid of.
+  function linesOf(parts) {
+    var box = content.getBoundingClientRect();
+    var style = getComputedStyle(content);
+    var originY = content.scrollTop - box.top;
+    var left = box.left + parseFloat(style.paddingLeft);
+    var width = Math.max(1, content.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight));
+
+    var pieces = [], total = 0;
+    parts.forEach(function (part) {
+      var rects = part.getClientRects();
+      for (var i = 0; i < rects.length; i++) {
+        var r = rects[i];
+        if (r.width <= 0 || r.height <= 0) continue;
+        pieces.push({ x: r.left, w: r.width, top: r.top + originY, h: r.height, at: total });
+        total += r.width;
+      }
+    });
+
+    return { pieces: pieces, total: total, left: left, width: width };
+  }
+
+  // Where the voice is on the page, as a height: the line it is on, plus how far across that line
+  // it has got, so the height grows smoothly through the line instead of by whole lines.
+  function readingY(lines, progress) {
+    var target = lines.total * progress;
+
+    for (var i = 0; i < lines.pieces.length; i++) {
+      var p = lines.pieces[i];
+      if (target > p.at + p.w && i < lines.pieces.length - 1) continue;
+
+      var x = p.x + Math.min(p.w, Math.max(0, target - p.at));
+      var across = Math.min(1, Math.max(0, (x - lines.left) / lines.width));
+      return p.top + p.h * across;
+    }
+
+    return null;
+  }
+
+  function startGlide(parts, ms) {
+    var lines = linesOf(parts);
+    if (!lines.pieces.length) return;
+
+    glide = { lines: lines, start: Date.now(), ms: ms };
+
+    if (!glideFrame) {
+      glidePos = content.scrollTop;
+      glideWant = -1;
+      glideLast = 0;
+      glideFrame = requestAnimationFrame(glideStep);
+    }
+  }
+
+  var glideWant = -1;
+
+  function glideStep(time) {
+    glideFrame = 0;
+    if (!glide) return;
+
+    var dt = glideLast ? Math.min(time - glideLast, 100) : 16;
+    glideLast = time;
+
+    var progress = Math.min(1, (Date.now() - glide.start) / glide.ms);
+    var line = readingY(glide.lines, progress);
+    if (line === null) { glide = null; return; }
+
+    var bottom = Math.max(0, content.scrollHeight - content.clientHeight);
+    var want = Math.min(bottom, Math.max(0, line - content.clientHeight * GLIDE_LINE));
+
+    // Only ever onwards while reading on: a new sentence starting a little further left on the
+    // same line must not pull the text back down. A big step back is a real jump — a tapped
+    // sentence, a chapter chosen — and is followed.
+    if (glideWant >= 0 && want < glideWant && glideWant - want < content.clientHeight * 0.5) want = glideWant;
+    glideWant = want;
+
+    // Moved by something other than the glide — a fling still coasting after the finger lifted,
+    // a remote's arrow keys: the reader's doing, so it is treated like a touch.
+    if (Math.abs(content.scrollTop - glidePos) > 2) {
+      glidePos = content.scrollTop;
+      touchedUntil = Math.max(touchedUntil, Date.now() + GLIDE_RESUME_MS);
+    }
+
+    if (Date.now() < touchedUntil) {
+      // Wherever the reader has put it; carry on from there once they let go.
+      glidePos = content.scrollTop;
+    } else {
+      // Eased towards where the line should be, so a new sentence, a resumed glide or a reflow
+      // never moves the text with a jolt.
+      glidePos += (want - glidePos) * (1 - Math.exp(-dt / GLIDE_EASE_MS));
+      content.scrollTop = glidePos;
+
+      // The sentence read to its end and the text where it belongs: rest until the next one.
+      if (progress >= 1 && Math.abs(want - glidePos) < 0.5) {
+        glide = null;
+        return;
+      }
+    }
+
+    glideFrame = requestAnimationFrame(glideStep);
+  }
+
+  function highlight(idx, ms) {
     if (idx === current) return;
     document.querySelectorAll('span.hl').forEach(function (e) { e.classList.remove('hl'); });
 
@@ -165,6 +295,11 @@
     current = idx;
 
     if (!parts.length) return;
+
+    if (glideOn && ms > 0) {
+      startGlide(parts, ms);
+      return;
+    }
 
     // Scrolled only when the sentence has left the comfortable band, and then brought
     // to a third of the way down rather than to the top. Following the voice line by

@@ -200,6 +200,15 @@
   <data name="Settings_AlignmentNote" xml:space="preserve">
     <value>Aligning only pauses and resumes — it never loses progress. It also slows itself down if the phone gets warm, whatever is set here.</value>
   </data>
+  <data name="Settings_ReadingSection" xml:space="preserve">
+    <value>Reading</value>
+  </data>
+  <data name="Settings_SmoothScroll" xml:space="preserve">
+    <value>Text glides with the voice</value>
+  </data>
+  <data name="Settings_SmoothScrollNote" xml:space="preserve">
+    <value>While a book is read aloud, the text moves up slowly at the narrator's pace, so the line being read stays in the same place. Off: the text stays still and moves on a screenful once the voice nears the bottom. Touching the page pauses it for a moment.</value>
+  </data>
   <data name="Settings_StartSection" xml:space="preserve">
     <value>Where the app opens</value>
   </data>

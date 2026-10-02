@@ -644,6 +644,33 @@ public partial class ReaderViewModel(
     /// </summary>
     private const int AnticipationMs = 400;
 
+    /// <summary>
+    /// Whether the text glides along with the voice, keeping the line being read at the same
+    /// height, instead of standing still until the voice nears the bottom and then moving a
+    /// screenful in one go. Kept for the reader rather than per book, like the size and the theme.
+    /// </summary>
+    public static bool SmoothScroll
+    {
+        get => Preferences.Default.Get("reader.smoothScroll", true);
+        set => Preferences.Default.Set("reader.smoothScroll", value);
+    }
+
+    /// <summary>
+    /// How long the voice will take over a sentence at the current speed, so the page can glide
+    /// through it at the pace it is read. Zero when the map cannot say.
+    /// </summary>
+    public int SentenceDurationMs(int sentenceIndex)
+    {
+        if (_sync?.AudioPositionAtSentence(sentenceIndex) is not { } from
+            || _sync.AudioPositionAtSentence(sentenceIndex + 1) is not { } to
+            || to <= from)
+        {
+            return 0;
+        }
+
+        return (int)Math.Min((to - from) / Math.Max(playback.Speed, 0.5f), 60_000);
+    }
+
     public bool CanGoPrevious => SpineIndex > 0;
 
     public bool CanGoNext => _text is not null && SpineIndex < _text.Spine.Count - 1;
@@ -1884,6 +1911,7 @@ public partial class ReaderViewModel(
             .Replace("{{FONTSIZE}}", FontSize.ToString())
             .Replace("{{FONTFAMILY}}", FontCss)
             .Replace("{{LETTERSPACING}}", "normal")
+            .Replace("{{GLIDE}}", SmoothScroll ? "true" : "false")
             .Replace("{{BACKGROUND}}", Theme.Background)
             .Replace("{{FOREGROUND}}", Theme.Foreground)
             .Replace("{{HIGHLIGHT}}", Theme.Highlight)
