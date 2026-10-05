@@ -120,6 +120,17 @@ public partial class ReaderViewModel(
     /// or unpaired, it carries only the text offset, the same as one placed on the audio side
     /// before that book had text at all.
     /// </summary>
+    /// <summary>Whether this is a television, which has no finger to hold on a sentence and gets a bookmark button instead.</summary>
+    public bool IsTelevision { get; } = DeviceInfo.Current.Idiom == DeviceIdiom.TV;
+
+    /// <summary>Bookmarks the sentence being read aloud, or, in silence, the top of the page.</summary>
+    [RelayCommand]
+    private Task BookmarkHereAsync()
+    {
+        var index = playback.IsPlaying && _lastSentence >= 0 ? _lastSentence : _topSentence;
+        return index >= 0 ? SaveSelectionBookmarkAsync(index) : Task.CompletedTask;
+    }
+
     public async Task SaveSelectionBookmarkAsync(int sentenceIndex)
     {
         if (_text is null || sentenceIndex < 0 || sentenceIndex >= _text.Sentences.Count) return;
@@ -465,6 +476,35 @@ public partial class ReaderViewModel(
 
         LearnPageSize();
         NoteReadingProgress(topSentence);
+        SavePlaceAsRead(topSentence);
+    }
+
+    /// <summary>How far ahead of the saved page the voice may be and still be the voice paused on that page.</summary>
+    private const int VoiceAheadOfPageChars = 1_500;
+
+    private int _savedTopSentence = -1;
+
+    /// <summary>
+    /// Writes the place down as pages are read, not only when the reader is left.
+    ///
+    /// Leaving is not something an app can count on hearing about: the phone is locked, the app is
+    /// swiped away, the system closes it overnight. Every page that settles in silence is saved, so
+    /// whatever ends the session the book reopens at the page that was last on screen. Not while
+    /// the book is playing — the voice is saved as it goes then — and not while a book is still being
+    /// opened or a chapter jump is still landing, whose first report is the top of the document
+    /// before the page has been moved to the place.
+    /// </summary>
+    private void SavePlaceAsRead(int topSentence)
+    {
+        if (IsBusy || _holding is not null || playback.IsPlaying || _text is null) return;
+        if (topSentence < 0 || topSentence == _savedTopSentence) return;
+
+        // A document just loaded reports its top before the page is moved to the place it was
+        // opened for — saving that would put a reopened book at the start of its chapter.
+        if (DateTime.UtcNow - _documentShownAt < TimeSpan.FromSeconds(1.5)) return;
+
+        _savedTopSentence = topSentence;
+        _ = SafelyAsync("saving the page read", () => SavePositionAsync(topSentence));
     }
 
     // ---- The page in the whole book ----
@@ -818,9 +858,25 @@ public partial class ReaderViewModel(
         {
             var state = await database.GetReadingStateAsync(BookId);
 
-            offset = CanFollow && playback.PositionMs > 0
-                ? _sync!.CharOffsetAt(playback.PositionMs) ?? state?.TextOffset ?? 0
-                : state?.TextOffset ?? 0;
+            var page = state?.TextOffset;
+            var voice = CanFollow && playback.PositionMs > 0 ? _sync!.CharOffsetAt(playback.PositionMs) : null;
+
+            // The page, unless the voice has gone on past it. Listening on — in the player, in the
+            // car, from the lock screen — moves only the voice, so a voice further on than the page
+            // is where the book really is. A voice behind the page is the other thing: a page read
+            // on in silence whose voice was never moved after it, and it was the voice that won,
+            // reopening a book left at the top of chapter thirty at the top of chapter twenty-nine.
+            // A voice a little ahead is the one paused part way down the page that is showing.
+            offset = (page, voice) switch
+            {
+                ({ } p, { } v) when v > p + VoiceAheadOfPageChars => v,
+                ({ } p, _) => p,
+                (null, { } v) => v,
+                _ => 0,
+            };
+
+            AppLog.Info($"reader: opening book {BookId} at char {offset} (page {page?.ToString() ?? "-"}, " +
+                        $"voice {voice?.ToString() ?? "-"} at {playback.PositionMs} ms)");
         }
 
         ShowDocumentAt(offset);
@@ -930,8 +986,12 @@ public partial class ReaderViewModel(
         if (index == SpineIndex) return;
 
         SpineIndex = index;
+        _documentShownAt = DateTime.UtcNow;
         Html = BuildPage(_text.Spine[index].Html);
     }
+
+    /// <summary>When the document on screen was loaded; its first reports are from before it was put in place.</summary>
+    private DateTime _documentShownAt = DateTime.MinValue;
 
     /// <summary>
     /// Moves through the book by document.

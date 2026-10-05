@@ -133,9 +133,17 @@
         </ScrollView>
 
         <!--  Signing in. A card, so it reads as one form rather than a column of loose fields.  -->
-        <Border
+        <!--
+            Scrollable, over the space the book list takes once connected: on a television the
+            form is taller than the screen, and with nothing to scroll the remote's Down went from
+            the password straight to the tab bar and the Connect button could never be reached.
+            A scroll view brings whatever has focus into view.
+        -->
+        <ScrollView
             Grid.Row="2"
-            IsVisible="{Binding IsDisconnected}"
+            Grid.RowSpan="2"
+            IsVisible="{Binding IsDisconnected}">
+        <Border
             Margin="0,8"
             Style="{StaticResource Card}">
             <VerticalStackLayout Spacing="10">
@@ -175,6 +183,8 @@
                             Grid.Column="0"
                             IsPassword="True"
                             Placeholder="{x:Static s:Strings.Server_Password}"
+                            ReturnCommand="{Binding ConnectCommand}"
+                            ReturnType="Go"
                             Text="{Binding Password}" />
                         <ImageButton
                             Grid.Column="1"
@@ -201,6 +211,8 @@
                     IsPassword="True"
                     IsVisible="{Binding UsesToken}"
                     Placeholder="{x:Static s:Strings.Server_TokenPlaceholder}"
+                    ReturnCommand="{Binding ConnectCommand}"
+                    ReturnType="Go"
                     Text="{Binding Token}" />
 
                 <BoxView Style="{StaticResource Divider}" />
@@ -254,6 +266,7 @@
                     Text="{x:Static s:Strings.Server_SecurityNote}" />
             </VerticalStackLayout>
         </Border>
+        </ScrollView>
 
         <!--  Which library on the server, with the whole row to show its name in.  -->
         <Picker

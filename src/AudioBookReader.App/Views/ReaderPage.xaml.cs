@@ -64,6 +64,9 @@ public partial class ReaderPage : ContentPage
         _viewModel.HighlightRequested += OnHighlightRequested;
         _viewModel.PageJumpRequested += OnPageJumpRequested;
         _viewModel.AppearanceChanged += OnAppearanceChanged;
+
+        _window = Window;
+        if (_window is not null) _window.Stopped += OnWindowStopped;
     }
 
     private void Detach()
@@ -72,6 +75,32 @@ public partial class ReaderPage : ContentPage
         _viewModel.HighlightRequested -= OnHighlightRequested;
         _viewModel.PageJumpRequested -= OnPageJumpRequested;
         _viewModel.AppearanceChanged -= OnAppearanceChanged;
+
+        if (_window is not null) _window.Stopped -= OnWindowStopped;
+        _window = null;
+    }
+
+    private Window? _window;
+
+    /// <summary>
+    /// Writes the place down when the app goes to the background — the screen locked, the home
+    /// button, another app — and not only when the reader is left inside the app.
+    ///
+    /// Leaving the app does not take the page away, so nothing else saved anything: the place was
+    /// written only on the way out of the reader, and a book read to a new chapter and then simply
+    /// put down reopened wherever the voice had last been, a chapter or more back. The page is still
+    /// whole at this point, so it can still say what is on screen.
+    /// </summary>
+    private async void OnWindowStopped(object? sender, EventArgs e)
+    {
+        try
+        {
+            await _viewModel.SavePositionAsync(await ReadTopSentenceAsync(), leaving: true);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("saving the reading position on the way to the background", ex);
+        }
     }
 
     /// <summary>

@@ -26,7 +26,7 @@
             Padding="6,4"
             BackgroundColor="{AppThemeBinding Light={StaticResource Chrome},
                                               Dark={StaticResource ChromeDark}}"
-            ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto"
+            ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto"
             IsVisible="{Binding ChromeVisible}">
 
             <Button
@@ -73,16 +73,27 @@
                 Style="{StaticResource IconWide}"
                 Text="{Binding ThemeName}" />
 
-            <!--  Only when there is a narration to leave the text for.  -->
+            <!--
+                A television's only way to bookmark in the text: a phone holds a finger on the
+                sentence, and a remote has no finger. The sentence being read, or the top of the page.
+            -->
             <Button
                 Grid.Column="4"
+                Command="{Binding BookmarkHereCommand}"
+                IsVisible="{Binding IsTelevision}"
+                Style="{StaticResource Icon}"
+                Text="⚑" />
+
+            <!--  Only when there is a narration to leave the text for.  -->
+            <Button
+                Grid.Column="5"
                 Command="{Binding OpenPlayerCommand}"
                 IsVisible="{Binding HasAudio}"
                 Style="{StaticResource Icon}"
                 Text="🎧" />
 
             <Button
-                Grid.Column="5"
+                Grid.Column="6"
                 Command="{Binding OpenDetailsCommand}"
                 Style="{StaticResource Icon}"
                 Text="☰" />

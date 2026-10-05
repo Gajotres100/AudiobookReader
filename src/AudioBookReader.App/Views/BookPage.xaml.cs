@@ -1,3 +1,4 @@
+using AudioBookReader.App.Resources.Strings;
 using AudioBookReader.App.Services;
 using AudioBookReader.App.ViewModels;
 
@@ -90,8 +91,38 @@ public partial class BookPage : ContentPage
     /// MAUI has no long-press gesture, so it is timed here: holding past the threshold saves the
     /// spot and marks the press as spent, and a release before then opens the list instead.
     /// </summary>
+    /// <summary>When a finger last pressed or let go of the bookmark button; its click is then already dealt with.</summary>
+    private DateTime _touchedBookmarkAt = DateTime.MinValue;
+
+    /// <summary>
+    /// The remote's OK on the bookmark button. A remote has no press-and-hold — OK arrives as a
+    /// click, with no press or release around it — so on a television the button did nothing at
+    /// all. It asks instead which of the two the finger would have chosen.
+    /// </summary>
+    private async void OnBookmarkClicked(object? sender, EventArgs e)
+    {
+        if (DateTime.UtcNow - _touchedBookmarkAt < TimeSpan.FromSeconds(1)) return;
+
+        try
+        {
+            var add = Strings.Bookmarks_Add;
+            var list = Strings.Bookmarks_Title;
+
+            var choice = await Dialogs.ChooseAsync(Strings.Bookmarks_Title, Strings.Common_Cancel, null, [add, list]);
+
+            if (choice == add) _viewModel.AddBookmarkCommand.Execute(null);
+            else if (choice == list) _viewModel.OpenBookmarksCommand.Execute(null);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("bookmark choice", ex);
+        }
+    }
+
     private async void OnBookmarkPressed(object? sender, EventArgs e)
     {
+        _touchedBookmarkAt = DateTime.UtcNow;
+
         _holdingBookmark?.Cancel();
         _holdingBookmark = new CancellationTokenSource();
 
@@ -113,6 +144,8 @@ public partial class BookPage : ContentPage
 
     private void OnBookmarkReleased(object? sender, EventArgs e)
     {
+        _touchedBookmarkAt = DateTime.UtcNow;
+
         // Null means the hold already fired and saved a bookmark; this release is its tail.
         if (_holdingBookmark is null) return;
 
