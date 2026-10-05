@@ -828,6 +828,8 @@ public class PlaybackService : MediaLibraryService
         {
             if (spec?.Uri?.Scheme is not ("http" or "https") || StreamedAudio.Source is not { } source) return spec!;
 
+            spec = Sliced(spec);
+
             try
             {
                 // Blocking is fine here: this runs on the player's loading thread, never the UI's,
@@ -847,6 +849,27 @@ public class PlaybackService : MediaLibraryService
         }
 
         public global::Android.Net.Uri ResolveReportedUri(global::Android.Net.Uri? uri) => uri!;
+
+        /// <summary>
+        /// The narration of an EPUB 3 on the server, played straight out of the package: the
+        /// recording is a stretch of the package file, so every read the player makes is moved to
+        /// where that stretch starts and kept from running past its end. The player sees a file
+        /// of the recording's own length and never knows there is a book around it.
+        /// </summary>
+        private static AndroidX.Media3.DataSource.DataSpec Sliced(AndroidX.Media3.DataSource.DataSpec spec)
+        {
+            var url = spec.Uri!.ToString()!;
+            if (!StreamedAudio.TrySliceOfUrl(url, out var offset, out var length)) return spec;
+
+            var left = Math.Max(0, length - spec.Position);
+            var read = spec.Length == AndroidX.Media3.Common.C.LengthUnset ? left : Math.Min(spec.Length, left);
+
+            return spec.BuildUpon()!
+                .SetUri(global::Android.Net.Uri.Parse(StreamedAudio.WithoutSlice(url))!)!
+                .SetPosition(offset + spec.Position)!
+                .SetLength(read)!
+                .Build()!;
+        }
     }
 
     public void Play() => OnPlayer(() =>

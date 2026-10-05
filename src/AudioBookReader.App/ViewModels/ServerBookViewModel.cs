@@ -1,3 +1,4 @@
+using AudioBookReader.Core.Books;
 using AudioBookReader.App.Resources.Strings;
 using AudioBookReader.App.Services;
 using AudioBookReader.Core.Data;
@@ -275,6 +276,8 @@ public partial class ServerBookViewModel : ObservableObject
 
             DecideWhatIsMissing(here);
 
+            if (here is null) _ = OfferReadAlongStreamAsync();
+
             // A download for this book may already be running — started here and then left, or
             // still going from before this page existed. That outranks the empty line that means
             // nothing is happening.
@@ -363,6 +366,36 @@ public partial class ServerBookViewModel : ObservableObject
                 };
     }
 
+    /// <summary>
+    /// The narration inside the server's EPUB 3, when it can be played from there; null for an
+    /// ordinary ebook, and until the package has been looked into.
+    /// </summary>
+    private StoredNarration? _readAlong;
+
+    /// <summary>
+    /// Looks inside an EPUB on the server for narration that can be streamed, and offers to stream
+    /// it. In the background, after the page is up: it is a request or two to the end of the
+    /// package, and the page has nothing to wait for it about.
+    /// </summary>
+    private async Task OfferReadAlongStreamAsync()
+    {
+        if (_detail?.Ebook is not { } ebook || _detail.AudioFiles.Count > 0) return;
+
+        try
+        {
+            _readAlong = await _server.FindStreamableNarrationAsync(ItemId, ebook);
+            if (_readAlong is null) return;
+
+            CanStream = true;
+            Note = Strings.ServerBook_ReadAlongStreamable;
+        }
+        catch (Exception ex)
+        {
+            // Downloading it still works; streaming is only not offered.
+            AppLog.Info($"server: could not look inside '{ebook.FileName}' ({ex.Message})");
+        }
+    }
+
     private static string Describe(ServerBook book) => (book.HasAudio, book.HasEbook) switch
     {
         (true, true) => Strings.Server_HasBoth,
@@ -427,7 +460,9 @@ public partial class ServerBookViewModel : ObservableObject
                 Progress = p.Fraction;
             });
 
-            BookId = await _server.AddStreamingAsync(ItemId, progress, wantEbook: WantsEbook, attachTo: BookId);
+            BookId = _readAlong is not null && _detail.AudioFiles.Count == 0
+                ? await _server.AddStreamingReadAlongAsync(ItemId, progress, attachTo: BookId)
+                : await _server.AddStreamingAsync(ItemId, progress, wantEbook: WantsEbook, attachTo: BookId);
 
             Status = Strings.ServerBook_StreamReady;
             await ReconsiderAsync();

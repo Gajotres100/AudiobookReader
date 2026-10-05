@@ -71,6 +71,57 @@ public class MediaOverlayPackageTests : IDisposable
     }
 
     [Fact]
+    public async Task A_stored_narration_is_found_inside_the_package_and_the_text_comes_without_it()
+    {
+        var path = WriteBook();
+        await using var package = File.OpenRead(path);
+
+        var audioFiles = MediaOverlayPackage.AudioFiles(package);
+        Assert.Equal(["OEBPS/audio/book.m4b"], audioFiles);
+
+        var narration = await MediaOverlayPackage.FindStoredNarrationAsync(package, audioFiles!);
+        Assert.NotNull(narration);
+        Assert.Equal("OEBPS/audio/book.m4b", narration.Entry);
+        Assert.Equal(FakeAudio.Length, narration.Length);
+
+        // The stretch of the package file is the recording, byte for byte: what a player streams.
+        var played = new byte[narration.Length];
+        package.Seek(narration.Offset, SeekOrigin.Begin);
+        await package.ReadExactlyAsync(played);
+        Assert.Equal(FakeAudio, played);
+
+        // Only the text comes down, and it still reads along.
+        var slim = Path.Combine(_directory, "streamed.epub");
+        await MediaOverlayPackage.SplitAsync(package, narration.Entry, audioOut: null, slim);
+
+        using (var zip = ZipFile.OpenRead(slim))
+            Assert.Null(zip.GetEntry("OEBPS/audio/book.m4b"));
+
+        var text = (await new EpubTextExtractor().ExtractAsync(slim)).Text;
+        Assert.NotEmpty(MediaOverlayPackage.ReadAnchors(slim, text, narration.Entry));
+    }
+
+    [Fact]
+    public async Task A_compressed_narration_cannot_be_streamed()
+    {
+        var path = Path.Combine(_directory, "squeezed.epub");
+
+        using (var source = ZipFile.OpenRead(WriteBook()))
+        using (var target = ZipFile.Open(path, ZipArchiveMode.Create))
+        {
+            foreach (var entry in source.Entries)
+            {
+                await using var from = entry.Open();
+                await using var to = target.CreateEntry(entry.FullName, CompressionLevel.Optimal).Open();
+                await from.CopyToAsync(to);
+            }
+        }
+
+        await using var package = File.OpenRead(path);
+        Assert.Null(await MediaOverlayPackage.FindStoredNarrationAsync(package, ["OEBPS/audio/book.m4b"]));
+    }
+
+    [Fact]
     public void An_ordinary_epub_has_no_overlay_audio()
     {
         var path = new TestEpubBuilder().Add("one", "One", "<p>Hello.</p>").WriteTo(Path.Combine(_directory, "plain.epub"));

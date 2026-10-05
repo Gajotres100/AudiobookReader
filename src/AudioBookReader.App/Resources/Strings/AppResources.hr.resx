@@ -657,6 +657,12 @@
   <data name="Details_StreamedNoAlign" xml:space="preserve">
     <value>Ova knjiga svira sa servera. Za poravnanje teksta i naracije najprije preuzmi audio: otvori knjigu na stranici servera i preuzmi je.</value>
   </data>
+  <data name="ServerBook_ReadAlongStreamable" xml:space="preserve">
+    <value>EPUB 3 s naracijom. Strimanje skida samo tekst, par megabajta, a naraciju pušta sa servera dok tekst prati glas.</value>
+  </data>
+  <data name="Server_ReadAlongNotStreamable" xml:space="preserve">
+    <value>Naracija u ovom EPUB 3 je komprimirana ili podijeljena u više datoteka, pa se ne može puštati sa servera. Preuzmi ga.</value>
+  </data>
   <data name="ServerBook_StreamedHere" xml:space="preserve">
     <value>Ova knjiga već svira sa servera. Preuzmi audio za slušanje bez mreže ili za poravnanje teksta.</value>
   </data>

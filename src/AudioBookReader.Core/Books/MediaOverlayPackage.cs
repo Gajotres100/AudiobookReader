@@ -31,7 +31,21 @@ public static class MediaOverlayPackage
     {
         try
         {
-            using var zip = ZipFile.OpenRead(epubPath);
+            using var file = File.OpenRead(epubPath);
+            return AudioFiles(file);
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The same, from an open package — one still on a server, read a range at a time.</summary>
+    public static IReadOnlyList<string>? AudioFiles(Stream epub)
+    {
+        try
+        {
+            using var zip = new ZipArchive(epub, ZipArchiveMode.Read, leaveOpen: true);
             var package = Package.Load(zip);
 
             var audio = new List<string>();
@@ -57,13 +71,27 @@ public static class MediaOverlayPackage
     /// </summary>
     public static async Task SplitAsync(string epubPath, string audioEntry, Stream audioOut, string bookOut, CancellationToken ct = default)
     {
-        using var zip = ZipFile.OpenRead(epubPath);
+        await using var file = File.OpenRead(epubPath);
+        await SplitAsync(file, audioEntry, audioOut, bookOut, ct);
+    }
+
+    /// <summary>
+    /// The same from an open package. With no <paramref name="audioOut"/> the audio is left where it
+    /// is — the book is streamed, and only the text comes down: a package on a server is read a
+    /// range at a time, so the hours of narration in it are never fetched at all.
+    /// </summary>
+    public static async Task SplitAsync(Stream epub, string audioEntry, Stream? audioOut, string bookOut, CancellationToken ct = default)
+    {
+        using var zip = new ZipArchive(epub, ZipArchiveMode.Read, leaveOpen: true);
         var package = Package.Load(zip);
 
         var entry = zip.GetEntry(audioEntry) ?? throw new InvalidDataException($"The package has no '{audioEntry}'.");
 
-        await using (var source = entry.Open())
+        if (audioOut is not null)
+        {
+            await using var source = entry.Open();
             await source.CopyToAsync(audioOut, 1 << 20, ct);
+        }
 
         var audioEntries = package.AudioEntries();
 
@@ -94,6 +122,24 @@ public static class MediaOverlayPackage
                 await from.CopyToAsync(to, ct);
             }
         }
+    }
+
+    /// <summary>
+    /// Where the narration lies inside a package, when it can be played from there: one recording,
+    /// stored rather than compressed, so that its bytes are a single unbroken run of the file. Null
+    /// otherwise — several recordings, or one compressed — and the package has to be downloaded.
+    /// </summary>
+    public static async Task<StoredNarration?> FindStoredNarrationAsync(
+        Stream epub, IReadOnlyList<string> audioFiles, CancellationToken ct = default)
+    {
+        if (audioFiles.Count != 1) return null;
+
+        var layout = await ZipLayout.ReadAsync(epub, ct);
+        var entry = layout.FirstOrDefault(e => e.Name == audioFiles[0]);
+        if (entry is not { IsStored: true, Size: > 0 }) return null;
+
+        var offset = await ZipLayout.DataOffsetAsync(epub, entry, ct);
+        return new StoredNarration(entry.Name, offset, entry.Size);
     }
 
     /// <summary>
@@ -306,6 +352,9 @@ public static class MediaOverlayPackage
 }
 
 /// <summary>Paths inside an EPUB package, which are zip entry names joined by slashes.</summary>
+/// <summary>The narration of a package, as a stretch of the package file itself.</summary>
+public sealed record StoredNarration(string Entry, long Offset, long Length);
+
 public static class EpubPaths
 {
     public static string DirectoryOf(string entry)

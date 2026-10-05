@@ -422,6 +422,89 @@ public class ServerConnection(
         return id;
     }
 
+    // ---- EPUB 3 read-along, streamed ----
+
+    /// <summary>
+    /// The narration inside an EPUB 3 on the server, when it can be played from there — or null for
+    /// an ordinary ebook, or a package whose narration is compressed or split into several files.
+    ///
+    /// Read from the end of the package, where a zip keeps its directory: a request or two, never
+    /// the package itself, which with the narration inside it is hundreds of megabytes.
+    /// </summary>
+    public async Task<StoredNarration?> FindStreamableNarrationAsync(string itemId, ServerFile ebook, CancellationToken ct = default)
+    {
+        if (!ebook.FileName.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)) return null;
+
+        // On a worker: reading the directory seeks, and a seek can close a response, which Android
+        // will not let touch the network from the UI thread this is asked from.
+        return await Task.Run(async () =>
+        {
+            await using var package = await OpenStreamAsync(itemId, ebook.Ino, ct);
+
+            return MediaOverlayPackage.AudioFiles(package) is { } audio
+                ? await MediaOverlayPackage.FindStoredNarrationAsync(package, audio, ct)
+                : null;
+        }, ct);
+    }
+
+    /// <summary>
+    /// Adds an EPUB 3 read-along that plays from the server: the text, its pictures and its timings
+    /// come down — a few megabytes — and the narration is played straight out of the package where it
+    /// lies, a range at a time. The book opens already following along, as a downloaded one does,
+    /// with nothing the size of an audiobook ever stored on the device.
+    /// </summary>
+    public async Task<int> AddStreamingReadAlongAsync(
+        string itemId,
+        IProgress<ImportProgress>? progress = null,
+        CancellationToken ct = default,
+        int? attachTo = null)
+    {
+        var detail = await Wrap(() => _client.GetBookAsync(itemId, ct));
+        var ebook = detail.Ebook ?? throw new NotSupportedException(Strings.Server_NothingToDownload);
+
+        progress?.Report(new ImportProgress(Strings.Server_PreparingStream, 0));
+
+        var text = Path.Combine(FileSystem.CacheDirectory, $"streamed-{Guid.NewGuid():N}.epub");
+
+        try
+        {
+            var narration = await Task.Run(async () =>
+            {
+                await using var package = await OpenStreamAsync(itemId, ebook.Ino, ct);
+
+                var audio = MediaOverlayPackage.AudioFiles(package)
+                            ?? throw new NotSupportedException(Strings.Import_NotReadAlong);
+
+                var found = await MediaOverlayPackage.FindStoredNarrationAsync(package, audio, ct)
+                            ?? throw new NotSupportedException(Strings.Server_ReadAlongNotStreamable);
+
+                await MediaOverlayPackage.SplitAsync(package, found.Entry, audioOut: null, text, ct);
+                return found;
+            }, ct);
+
+            AppLog.Info($"streaming read-along: '{narration.Entry}' at {narration.Offset}, {narration.Length} bytes, in item {itemId}");
+
+            var location = StreamedAudio.Location(Id, itemId, ebook.Ino, narration.Offset, narration.Length);
+
+            var book = await importer.ImportStreamedReadAlongAsync(
+                new PickedMedia(text, ebook.FileName), location, narration.Entry, attachTo, progress, ct);
+
+            await database.LinkToServerAsync(book.Id, itemId, Id);
+            return book.Id;
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(text);
+            }
+            catch (IOException)
+            {
+                // A temporary file in the cache; the system clears it if this cannot.
+            }
+        }
+    }
+
     /// <summary>The server's chapter marks as the library keeps them, or the whole book as one when it has none.</summary>
     private static List<Chapter> ChaptersOf(ServerBookDetail detail, long durationMs)
     {

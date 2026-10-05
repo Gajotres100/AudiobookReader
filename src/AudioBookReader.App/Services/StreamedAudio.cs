@@ -15,13 +15,54 @@ namespace AudioBookReader.App.Services;
 ///
 /// To the rest of the app it is a reference like any other: owned by someone else, never deleted,
 /// and readable as a stream — which is also how a streamed book gets copied in if it is ever aligned.
+///
+/// The narration of an EPUB 3 on the server is a stretch of the package file rather than a file of
+/// its own, and carries that stretch after the file: <c>abs://server/item/file#slice=start-length</c>,
+/// in bytes. Everything that reads it — the players, hashing, probing — sees just that stretch, as if
+/// it were the whole file.
 /// </summary>
 public static class StreamedAudio
 {
     private const string Scheme = "abs://";
+    private const string SliceMark = "#slice=";
+
+    /// <summary>What the stretch is called on an address handed to a player, which reads it off again.</summary>
+    public const string UrlSliceMark = "#abr-slice=";
 
     public static string Location(string serverId, string itemId, string ino) =>
         $"{Scheme}{Uri.EscapeDataString(serverId)}/{Uri.EscapeDataString(itemId)}/{Uri.EscapeDataString(ino)}";
+
+    /// <summary>A stretch of a file on the server, played as if it were a file of its own.</summary>
+    public static string Location(string serverId, string itemId, string ino, long offset, long length) =>
+        $"{Location(serverId, itemId, ino)}{SliceMark}{offset}-{length}";
+
+    /// <summary>The stretch a location names, when it names one.</summary>
+    public static bool TrySlice(string? location, out long offset, out long length) =>
+        TryReadSlice(location, SliceMark, out offset, out length);
+
+    /// <summary>The same, from an address a player was given.</summary>
+    public static bool TrySliceOfUrl(string? url, out long offset, out long length) =>
+        TryReadSlice(url, UrlSliceMark, out offset, out length);
+
+    /// <summary>An address with the stretch taken off: what is actually asked of the server.</summary>
+    public static string WithoutSlice(string url)
+    {
+        var mark = url.IndexOf(UrlSliceMark, StringComparison.Ordinal);
+        return mark < 0 ? url : url[..mark];
+    }
+
+    private static bool TryReadSlice(string? text, string mark, out long offset, out long length)
+    {
+        offset = length = 0;
+
+        var at = text?.IndexOf(mark, StringComparison.Ordinal) ?? -1;
+        if (at < 0) return false;
+
+        var parts = text![(at + mark.Length)..].Split('-');
+        return parts.Length == 2
+               && long.TryParse(parts[0], out offset) && long.TryParse(parts[1], out length)
+               && offset >= 0 && length > 0;
+    }
 
     public static bool Is(string? location) =>
         location?.StartsWith(Scheme, StringComparison.OrdinalIgnoreCase) == true;
@@ -31,7 +72,11 @@ public static class StreamedAudio
         serverId = itemId = ino = "";
         if (!Is(location)) return false;
 
-        var parts = location![Scheme.Length..].Split('/');
+        var body = location![Scheme.Length..];
+        var hash = body.IndexOf('#');
+        if (hash >= 0) body = body[..hash];
+
+        var parts = body.Split('/');
 
         switch (parts.Length)
         {

@@ -245,7 +245,16 @@ public sealed class PlaybackService
     {
         var streamed = StreamedAudio.Is(audioPath);
 
-        _item = streamed ? StreamedItem(audioPath) : new AVPlayerItem(SecurityScopedBookmarks.UrlFor(audioPath));
+        // The narration of an EPUB 3 on the server is a stretch of the package, served to the player
+        // by a loader that signs every request itself, so it never needs re-signing below.
+        var sliced = StreamedAudio.TrySlice(audioPath, out _, out _);
+
+        _sliceLoader?.Dispose();
+        _sliceLoader = null;
+
+        _item = sliced ? SlicedAudioLoader.CreateItem(audioPath, out _sliceLoader)
+            : streamed ? StreamedItem(audioPath)
+            : new AVPlayerItem(SecurityScopedBookmarks.UrlFor(audioPath));
 
         // Preserves pitch while the rate changes, the same reason Android pins PlaybackParameters'
         // pitch at 1 — TimeDomain is tuned for speech, unlike the costlier Spectral meant for music.
@@ -254,8 +263,11 @@ public sealed class PlaybackService
         _player.ReplaceCurrentItemWithPlayerItem(_item);
         _loadedPath = audioPath;
         _publishedReady = false;
-        _signedAt = streamed ? DateTime.UtcNow : null;
+        _signedAt = streamed && !sliced ? DateTime.UtcNow : null;
     }
+
+    /// <summary>Feeds the item playing a stretch of a file on the server; held, since the asset holds it only weakly.</summary>
+    private SlicedAudioLoader? _sliceLoader;
 
     /// <summary>When the item playing from the server was signed, or null for a local file.</summary>
     private DateTime? _signedAt;

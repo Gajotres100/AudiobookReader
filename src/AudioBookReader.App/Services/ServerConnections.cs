@@ -1,3 +1,4 @@
+using AudioBookReader.Core.Books;
 using AudioBookReader.Core.Data;
 using AudioBookReader.Core.Models;
 
@@ -189,10 +190,16 @@ public class ServerConnections(BookImporter importer, DownloadFolder folder, Lib
 
     // ---- Streaming: each streamed book goes to its own server ----
 
-    string? IStreamSource.UrlFor(string location) =>
-        StreamedAudio.TryParse(location, out var serverId, out var itemId, out var ino)
-            ? For(serverId)?.StreamUrl(itemId, ino)
-            : null;
+    string? IStreamSource.UrlFor(string location)
+    {
+        if (!StreamedAudio.TryParse(location, out var serverId, out var itemId, out var ino)) return null;
+        if (For(serverId)?.StreamUrl(itemId, ino) is not { } url) return null;
+
+        // The stretch rides along on the address, for the player to turn into ranges of the file.
+        return StreamedAudio.TrySlice(location, out var offset, out var length)
+            ? $"{url}{StreamedAudio.UrlSliceMark}{offset}-{length}"
+            : url;
+    }
 
     Task<string?> IStreamSource.FreshTokenAsync(string address, CancellationToken ct)
     {
@@ -209,6 +216,13 @@ public class ServerConnections(BookImporter importer, DownloadFolder folder, Lib
             throw new ArgumentException($"Not a streamed location: {location}", nameof(location));
 
         var server = For(serverId) ?? throw new InvalidOperationException("The server this book plays from is no longer set up.");
-        return server.OpenStreamAsync(itemId, ino, ct);
+
+        return StreamedAudio.TrySlice(location, out var offset, out var length)
+            ? OpenSliceAsync(server, itemId, ino, offset, length, ct)
+            : server.OpenStreamAsync(itemId, ino, ct);
     }
+
+    private static async Task<Stream> OpenSliceAsync(
+        ServerConnection server, string itemId, string ino, long offset, long length, CancellationToken ct) =>
+        new SubStream(await server.OpenStreamAsync(itemId, ino, ct), offset, length);
 }

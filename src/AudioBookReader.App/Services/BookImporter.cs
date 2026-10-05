@@ -218,12 +218,28 @@ public class BookImporter(
         CancellationToken ct = default) =>
         ImportEbookAsync(picked, attachTo: null, readAlongOnly: true, progress, ct);
 
+    /// <summary>
+    /// Imports the text of an EPUB 3 whose narration stays on the server: <paramref name="picked"/>
+    /// is the package without its audio, and the narration plays from
+    /// <paramref name="narrationLocation"/>, a stretch of the package there. Opens already reading
+    /// along, exactly as a downloaded one does.
+    /// </summary>
+    public Task<Book> ImportStreamedReadAlongAsync(
+        PickedMedia picked,
+        string narrationLocation,
+        string narrationEntry,
+        int? attachTo = null,
+        IProgress<ImportProgress>? progress = null,
+        CancellationToken ct = default) =>
+        ImportEbookAsync(picked, attachTo, readAlongOnly: true, progress, ct, (narrationLocation, narrationEntry));
+
     private async Task<Book> ImportEbookAsync(
         PickedMedia picked,
         int? attachTo,
         bool readAlongOnly,
         IProgress<ImportProgress>? progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        (string Location, string Entry)? streamed = null)
     {
         using var busy = Busy();
 
@@ -238,9 +254,15 @@ public class BookImporter(
 
         try
         {
-            var overlayAudio = MediaOverlayPackage.AudioFiles(path);
+            // Streamed: the package came down without its audio, which plays from the server.
+            var overlayAudio = streamed is null ? MediaOverlayPackage.AudioFiles(path) : null;
 
-            if (readAlongOnly && overlayAudio is null)
+            if (streamed is { } fromServer)
+            {
+                narration = fromServer.Location;
+                narrationEntry = fromServer.Entry;
+            }
+            else if (readAlongOnly && overlayAudio is null)
                 throw new NotSupportedException(Strings.Import_NotReadAlong);
 
             if (overlayAudio is not null && await TakesNarrationAsync(attachTo))
@@ -289,7 +311,7 @@ public class BookImporter(
         catch
         {
             TryDelete(path);
-            if (narration is not null) TryDelete(narration);
+            if (narration is not null && streamed is null) TryDelete(narration);
             throw;
         }
     }
@@ -350,12 +372,15 @@ public class BookImporter(
     {
         progress?.Report(new ImportProgress(Strings.Progress_ReadingChapters, 1));
 
-        var info = await ProbeAsync(audioPath, Path.GetFileName(audioPath), referenced: false, ct);
+        // On a worker: narration streamed from the server is read through seeks, and Android will
+        // not let those touch the network from the thread an import is started on.
+        var referenced = references.IsReference(audioPath);
+        var info = await Task.Run(() => ProbeAsync(audioPath, Path.GetFileName(entry), referenced, ct), ct);
         if (info.DurationMs <= 0) throw new NotSupportedException(Strings.Import_NotAudio);
 
-        var hash = await HashAsync(audioPath, ct);
+        var hash = await Task.Run(() => HashAsync(audioPath, ct), ct);
         var coverPath = book.CoverPath is null && info.Cover is { Length: > 0 }
-            ? await SaveCoverAsync(info.Cover, Path.GetFileNameWithoutExtension(audioPath), ct)
+            ? await SaveCoverAsync(info.Cover, Path.GetFileNameWithoutExtension(entry), ct)
             : null;
 
         book = await library.AttachAudioAsync(book.Id, new AudioAttachment(
