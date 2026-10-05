@@ -1,6 +1,10 @@
 # Every workflow here is started by hand ("Start new build"): none has a triggering block. The free
 # tier is 500 build minutes a month and each of these takes about fifteen, so building on every push
 # would spend it on checks that already run locally — net10.0-ios compiles on Windows without a Mac.
+# Pinned, the SDK and the workload set both: the iOS workload in the newest set (10.0.401.1, iOS
+# 27.0) requires Xcode 27, which the build machines do not have yet, and an unpinned install picked it
+# up overnight and broke every build. 10.0.401 carries iOS 26.5, the one built and tested locally.
+# Move both together, and only once the machines' "latest" Xcode is what the new workload asks for.
 workflows:
   # Builds net10.0-ios for the iOS simulator — a simulator binary never needs code signing, so this
   # needs no Apple account and no secrets. A "does it build on a real Mac" check, nothing more.
@@ -15,11 +19,11 @@ workflows:
         script: |
           curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
           chmod +x dotnet-install.sh
-          ./dotnet-install.sh --channel 10.0 --install-dir "$HOME/.dotnet"
+          ./dotnet-install.sh --version 10.0.401 --install-dir "$HOME/.dotnet"
           echo "PATH=$HOME/.dotnet:$PATH" >> $CM_ENV
       - name: Install MAUI/iOS workloads
         script: |
-          dotnet workload restore src/AudioBookReader.App/AudioBookReader.App.csproj
+          dotnet workload restore src/AudioBookReader.App/AudioBookReader.App.csproj --version 10.0.401
       - name: Core tests
         script: |
           dotnet test tests/AudioBookReader.Core.Tests
@@ -52,11 +56,11 @@ workflows:
         script: |
           curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
           chmod +x dotnet-install.sh
-          ./dotnet-install.sh --channel 10.0 --install-dir "$HOME/.dotnet"
+          ./dotnet-install.sh --version 10.0.401 --install-dir "$HOME/.dotnet"
           echo "PATH=$HOME/.dotnet:$PATH" >> $CM_ENV
       - name: Install MAUI/iOS workloads
         script: |
-          dotnet workload restore src/AudioBookReader.App/AudioBookReader.App.csproj
+          dotnet workload restore src/AudioBookReader.App/AudioBookReader.App.csproj --version 10.0.401
       - name: Build the .app for a real device, no Apple signing identity involved
         script: |
           # EnableCodeSigning defaults to true in the iOS SDK, and on a Mac it then goes looking for
@@ -110,11 +114,11 @@ workflows:
         script: |
           curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
           chmod +x dotnet-install.sh
-          ./dotnet-install.sh --channel 10.0 --install-dir "$HOME/.dotnet"
+          ./dotnet-install.sh --version 10.0.401 --install-dir "$HOME/.dotnet"
           echo "PATH=$HOME/.dotnet:$PATH" >> $CM_ENV
       - name: Install MAUI/iOS workloads
         script: |
-          dotnet workload restore src/AudioBookReader.App/AudioBookReader.App.csproj
+          dotnet workload restore src/AudioBookReader.App/AudioBookReader.App.csproj --version 10.0.401
       - name: Fetch signing certificate and profile
         script: |
           keychain initialize
