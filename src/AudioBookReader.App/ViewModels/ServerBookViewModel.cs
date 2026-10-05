@@ -166,6 +166,10 @@ public partial class ServerBookViewModel : ObservableObject
 
     public bool ShowsStream => CanStream && IsIdle;
 
+    /// <summary>What streaming will do: listen to the audiobook, or read an EPUB 3 along with its narration.</summary>
+    [ObservableProperty]
+    public partial string StreamText { get; set; } = Strings.ServerBook_Stream;
+
     /// <summary>What the button says, which is what it will do — the whole book, or the half of it
     /// that is missing.</summary>
     [ObservableProperty]
@@ -387,6 +391,7 @@ public partial class ServerBookViewModel : ObservableObject
             if (_readAlong is null) return;
 
             CanStream = true;
+            StreamText = Strings.ServerBook_StreamReadAlong;
             Note = Strings.ServerBook_ReadAlongStreamable;
         }
         catch (Exception ex)

@@ -79,6 +79,9 @@ public class MediaOverlayPackageTests : IDisposable
         var audioFiles = MediaOverlayPackage.AudioFiles(package);
         Assert.Equal(["OEBPS/audio/book.m4b"], audioFiles);
 
+        // The quick answer, from the package document alone, agrees.
+        Assert.Equal(audioFiles, MediaOverlayPackage.DeclaredNarration(package));
+
         var narration = await MediaOverlayPackage.FindStoredNarrationAsync(package, audioFiles!);
         Assert.NotNull(narration);
         Assert.Equal("OEBPS/audio/book.m4b", narration.Entry);
@@ -127,6 +130,9 @@ public class MediaOverlayPackageTests : IDisposable
         var path = new TestEpubBuilder().Add("one", "One", "<p>Hello.</p>").WriteTo(Path.Combine(_directory, "plain.epub"));
 
         Assert.Null(MediaOverlayPackage.AudioFiles(path));
+
+        using var stream = File.OpenRead(path);
+        Assert.Null(MediaOverlayPackage.DeclaredNarration(stream));
     }
 
     [Fact]

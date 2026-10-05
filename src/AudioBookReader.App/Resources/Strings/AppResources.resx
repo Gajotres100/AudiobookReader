@@ -694,6 +694,9 @@
   <data name="Details_StreamedNoAlign" xml:space="preserve">
     <value>This book plays from the server. To align the text with the narration, download the audio first: open the book on the server page and download it.</value>
   </data>
+  <data name="ServerBook_StreamReadAlong" xml:space="preserve">
+    <value>Read along from the server: text with narration</value>
+  </data>
   <data name="ServerBook_ReadAlongStreamable" xml:space="preserve">
     <value>EPUB 3 with narration. Streaming brings down only the text, a few megabytes, and plays the narration from the server while the text follows it.</value>
   </data>

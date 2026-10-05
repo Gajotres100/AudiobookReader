@@ -441,7 +441,7 @@ public class ServerConnection(
         {
             await using var package = await OpenStreamAsync(itemId, ebook.Ino, ct);
 
-            return MediaOverlayPackage.AudioFiles(package) is { } audio
+            return MediaOverlayPackage.DeclaredNarration(package) is { } audio
                 ? await MediaOverlayPackage.FindStoredNarrationAsync(package, audio, ct)
                 : null;
         }, ct);
@@ -472,7 +472,7 @@ public class ServerConnection(
             {
                 await using var package = await OpenStreamAsync(itemId, ebook.Ino, ct);
 
-                var audio = MediaOverlayPackage.AudioFiles(package)
+                var audio = MediaOverlayPackage.DeclaredNarration(package)
                             ?? throw new NotSupportedException(Strings.Import_NotReadAlong);
 
                 var found = await MediaOverlayPackage.FindStoredNarrationAsync(package, audio, ct)

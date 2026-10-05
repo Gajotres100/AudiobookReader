@@ -125,6 +125,32 @@ public static class MediaOverlayPackage
     }
 
     /// <summary>
+    /// The audio a package declares, when it declares overlays at all — read from its package
+    /// document alone. Quicker than <see cref="AudioFiles(Stream)"/>, which reads every overlay to see
+    /// which recordings they play: for a package still on a server that is a request per chapter,
+    /// and on a television it kept the offer to stream from appearing for long enough that it was
+    /// never seen. Null for an ordinary EPUB.
+    /// </summary>
+    public static IReadOnlyList<string>? DeclaredNarration(Stream epub)
+    {
+        try
+        {
+            using var zip = new ZipArchive(epub, ZipArchiveMode.Read, leaveOpen: true);
+            var package = Package.Load(zip);
+
+            var hasOverlays = package.Items.Any(i =>
+                (string?)i.Attribute("media-type") == "application/smil+xml" || i.Attribute("media-overlay") is not null);
+
+            var audio = package.AudioEntries();
+            return hasOverlays && audio.Count > 0 ? [.. audio] : null;
+        }
+        catch (Exception e) when (e is InvalidDataException or System.Xml.XmlException or IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Where the narration lies inside a package, when it can be played from there: one recording,
     /// stored rather than compressed, so that its bytes are a single unbroken run of the file. Null
     /// otherwise — several recordings, or one compressed — and the package has to be downloaded.

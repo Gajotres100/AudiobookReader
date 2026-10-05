@@ -135,7 +135,7 @@
                 Command="{Binding StreamCommand}"
                 IsVisible="{Binding ShowsStream}"
                 Style="{StaticResource Secondary}"
-                Text="{x:Static s:Strings.ServerBook_Stream}" />
+                Text="{Binding StreamText}" />
 
             <!--
                 Offered only when both halves are missing, because only then is there a choice:

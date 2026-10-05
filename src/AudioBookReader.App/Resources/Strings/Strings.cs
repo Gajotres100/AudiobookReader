@@ -468,6 +468,8 @@ public static class Strings
     public static string Details_StreamedNoAlign => Get(nameof(Details_StreamedNoAlign));
     /// <summary>A streamed book, seen from the server page.</summary>
     public static string ServerBook_StreamedHere => Get(nameof(ServerBook_StreamedHere));
+    /// <summary>Button: stream an EPUB 3 read-along — the text comes down, the narration plays from the server.</summary>
+    public static string ServerBook_StreamReadAlong => Get(nameof(ServerBook_StreamReadAlong));
     /// <summary>An EPUB 3 on the server whose narration can be played from there.</summary>
     public static string ServerBook_ReadAlongStreamable => Get(nameof(ServerBook_ReadAlongStreamable));
     /// <summary>An EPUB 3 whose narration is compressed or split, so it has to be downloaded.</summary>
