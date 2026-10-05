@@ -151,6 +151,72 @@ public static class MediaOverlayPackage
     }
 
     /// <summary>
+    /// How long the narration runs, as the package declares it — the <c>media:duration</c> of the
+    /// book as a whole — or null when it does not say.
+    /// </summary>
+    public static long? DeclaredDurationMs(string epubPath)
+    {
+        try
+        {
+            using var zip = ZipFile.OpenRead(epubPath);
+            var package = Package.Load(zip);
+
+            var meta = package.Document.Root!.Element(Opf + "metadata")?.Elements(Opf + "meta")
+                .FirstOrDefault(m => (string?)m.Attribute("property") == "media:duration" && m.Attribute("refines") is null);
+
+            return meta is not null && SmilClock.TryParse(meta.Value.Trim(), out var ms) && ms > 0 ? ms : null;
+        }
+        catch (Exception e) when (e is InvalidDataException or System.Xml.XmlException or IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Chapters for narration whose own chapter marks cannot be read cheaply — one played from a
+    /// server, where reading them would mean fetching much of the recording: the text's chapters,
+    /// each beginning when the overlay has its first sentence spoken, and running to the next.
+    /// </summary>
+    public static List<Chapter> ChaptersFromText(IReadOnlyList<Chapter> textChapters, IReadOnlyList<Anchor> anchors, long durationMs)
+    {
+        var byText = anchors.OrderBy(a => a.CharOffset).ToList();
+        var starts = new List<(string Title, long Start)>();
+
+        foreach (var chapter in textChapters.Where(c => c.TextStart is not null).OrderBy(c => c.TextStart))
+        {
+            var from = chapter.TextStart!.Value;
+            var to = chapter.TextEnd ?? int.MaxValue;
+
+            var first = byText.FindIndex(a => a.CharOffset >= from && a.CharOffset < to);
+            if (first < 0) continue;
+
+            var at = byText[first].AudioMs;
+
+            // In the order they are spoken; a chapter that would start before the one before it is
+            // the map disagreeing with the contents page, and is left to the one before.
+            if (starts.Count > 0 && at <= starts[^1].Start) continue;
+
+            starts.Add((chapter.Title, at));
+        }
+
+        if (starts.Count == 0) starts.Add((string.Format(CoreStrings.Chapter_Numbered, 1), 0));
+
+        // The first chapter takes whatever is spoken before it — credits, an introduction.
+        starts[0] = (starts[0].Title, 0);
+
+        return
+        [
+            .. starts.Select((s, i) => new Chapter
+            {
+                Index = i,
+                Title = s.Title,
+                StartMs = s.Start,
+                EndMs = i + 1 < starts.Count ? starts[i + 1].Start : Math.Max(durationMs, s.Start + 1),
+            }),
+        ];
+    }
+
+    /// <summary>
     /// Where the narration lies inside a package, when it can be played from there: one recording,
     /// stored rather than compressed, so that its bytes are a single unbroken run of the file. Null
     /// otherwise — several recordings, or one compressed — and the package has to be downloaded.

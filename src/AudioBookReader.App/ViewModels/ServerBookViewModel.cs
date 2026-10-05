@@ -166,9 +166,13 @@ public partial class ServerBookViewModel : ObservableObject
 
     public bool ShowsStream => CanStream && IsIdle;
 
-    /// <summary>What streaming will do: listen to the audiobook, or read an EPUB 3 along with its narration.</summary>
+    /// <summary>
+    /// Whether the server's EPUB 3 carries narration that can be played from there — offered as its
+    /// own button beside the audiobook's, since an item can hold both and each is a different book
+    /// to have: the recording alone, or the text reading along with its voice.
+    /// </summary>
     [ObservableProperty]
-    public partial string StreamText { get; set; } = Strings.ServerBook_Stream;
+    public partial bool CanStreamReadAlong { get; set; }
 
     /// <summary>What the button says, which is what it will do — the whole book, or the half of it
     /// that is missing.</summary>
@@ -383,21 +387,66 @@ public partial class ServerBookViewModel : ObservableObject
     /// </summary>
     private async Task OfferReadAlongStreamAsync()
     {
-        if (_detail?.Ebook is not { } ebook || _detail.AudioFiles.Count > 0) return;
+        if (_detail?.Ebook is not { } ebook) return;
 
         try
         {
             _readAlong = await _server.FindStreamableNarrationAsync(ItemId, ebook);
             if (_readAlong is null) return;
 
-            CanStream = true;
-            StreamText = Strings.ServerBook_StreamReadAlong;
+            CanStreamReadAlong = true;
             Note = Strings.ServerBook_ReadAlongStreamable;
         }
         catch (Exception ex)
         {
             // Downloading it still works; streaming is only not offered.
             AppLog.Info($"server: could not look inside '{ebook.FileName}' ({ex.Message})");
+        }
+    }
+
+    /// <summary>Adds the server's EPUB 3 to read along with its narration, the narration staying on the server.</summary>
+    [RelayCommand]
+    private Task StreamReadAlongAsync() => AddFromServerAsync(
+        () => _server.AddStreamingReadAlongAsync(ItemId, Progressing(), attachTo: BookId));
+
+    private IProgress<ImportProgress> Progressing() => new Progress<ImportProgress>(p =>
+    {
+        Status = p.Message;
+        Progress = p.Fraction;
+    });
+
+    /// <summary>The shared run of adding a book that plays from the server: the busy state, the outcome, what is left to offer.</summary>
+    private async Task AddFromServerAsync(Func<Task<int>> add)
+    {
+        if (_detail is null || IsDownloading) return;
+
+        if (_downloads.Status.IsRunning)
+        {
+            Status = Strings.Download_AlreadyRunning;
+            return;
+        }
+
+        IsDownloading = true;
+        Progress = 0;
+        Percent = "";
+        Status = Strings.Server_PreparingStream;
+
+        try
+        {
+            BookId = await add();
+
+            Status = Strings.ServerBook_StreamReady;
+            CanStreamReadAlong = false;
+            await ReconsiderAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("adding a book to play from the server", ex);
+            Status = ex.Message;
+        }
+        finally
+        {
+            IsDownloading = false;
         }
     }
 
@@ -465,9 +514,10 @@ public partial class ServerBookViewModel : ObservableObject
                 Progress = p.Fraction;
             });
 
-            BookId = _readAlong is not null && _detail.AudioFiles.Count == 0
-                ? await _server.AddStreamingReadAlongAsync(ItemId, progress, attachTo: BookId)
-                : await _server.AddStreamingAsync(ItemId, progress, wantEbook: WantsEbook, attachTo: BookId);
+            // The text is left on the server when it is the EPUB 3: downloading it would bring the
+            // whole narration down inside it, which is what streaming is for avoiding. Reading along
+            // is the other button.
+            BookId = await _server.AddStreamingAsync(ItemId, progress, wantEbook: WantsEbook && _readAlong is null, attachTo: BookId);
 
             Status = Strings.ServerBook_StreamReady;
             await ReconsiderAsync();

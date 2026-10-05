@@ -372,12 +372,34 @@ public class BookImporter(
     {
         progress?.Report(new ImportProgress(Strings.Progress_ReadingChapters, 1));
 
-        // On a worker: narration streamed from the server is read through seeks, and Android will
-        // not let those touch the network from the thread an import is started on.
-        var referenced = references.IsReference(audioPath);
-        var info = await Task.Run(() => ProbeAsync(audioPath, Path.GetFileName(entry), referenced, ct), ct);
+        var anchors = await Task.Run(() => MediaOverlayPackage.ReadAnchors(ebookPath, extracted.Text, entry), ct);
+
+        AudioBookInfo info;
+
+        if (StreamedAudio.Is(audioPath))
+        {
+            // Played from the server: what the recording is comes from the package, which already
+            // says it, rather than from reading the recording's own tags — which for a ten-hour book
+            // on a server means fetching much of it, and on a television sat there for good with the
+            // book never arriving. The length is the package's own; the chapters are its text's, each
+            // starting where the overlay first speaks it.
+            var duration = MediaOverlayPackage.DeclaredDurationMs(ebookPath)
+                           ?? (anchors.Count > 0 ? anchors.Max(a => a.AudioMs) + 10_000 : 0);
+
+            info = new AudioBookInfo(
+                book.Title, book.Author, duration,
+                MediaOverlayPackage.ChaptersFromText(extracted.Chapters, anchors, duration),
+                [audioPath], null, null);
+        }
+        else
+        {
+            info = await Task.Run(() => ProbeAsync(audioPath, Path.GetFileName(entry), referenced: false, ct), ct);
+        }
+
         if (info.DurationMs <= 0) throw new NotSupportedException(Strings.Import_NotAudio);
 
+        // On a worker: narration streamed from the server is read through seeks, and Android will
+        // not let those touch the network from the thread an import is started on.
         var hash = await Task.Run(() => HashAsync(audioPath, ct), ct);
         var coverPath = book.CoverPath is null && info.Cover is { Length: > 0 }
             ? await SaveCoverAsync(info.Cover, Path.GetFileNameWithoutExtension(entry), ct)
@@ -386,7 +408,6 @@ public class BookImporter(
         book = await library.AttachAudioAsync(book.Id, new AudioAttachment(
             audioPath, hash, info.DurationMs, info.Chapters, info.Title, info.Author, coverPath));
 
-        var anchors = await Task.Run(() => MediaOverlayPackage.ReadAnchors(ebookPath, extracted.Text, entry), ct);
         var chapters = await database.GetChaptersAsync(book.Id);
         var (map, ranges) = MediaOverlayPackage.BuildMap(
             anchors, chapters, extracted.Text.PlainText.Length, book.AudioHash, book.EbookHash);

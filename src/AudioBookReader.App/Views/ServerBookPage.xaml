@@ -79,13 +79,67 @@
                     Style="{StaticResource Muted}" />
 
                 <!--
-                    Nothing about where it goes. That question is asked once, by Preuzmi, and asking
-                    it here as well made the same decision available in two places with no way to
-                    tell which one had won.
+                    Every way to have the book, inside the part that scrolls rather than pinned under
+                    it: on a television the page is taller than the screen, and buttons below a list
+                    that does not scroll were buttons the remote could not reach. A scroll view brings
+                    whichever one has focus into view.
+
+                    Nothing about where it goes. That question is asked once, by the download, and
+                    asking it here as well made the same decision available in two places.
                 -->
+                <VerticalStackLayout IsVisible="{Binding IsIdle}" Spacing="10">
+
+                    <Button
+                        Command="{Binding OpenCommand}"
+                        IsVisible="{Binding IsInLibrary}"
+                        Style="{StaticResource Primary}"
+                        Text="{x:Static s:Strings.ServerBook_OpenBook}" />
+
+                    <!--
+                        An EPUB 3 with its narration inside, played from the server: the text comes
+                        down, the voice stays there, and the book opens already reading along.
+                    -->
+                    <Button
+                        x:Name="ReadAlongButton"
+                        Command="{Binding StreamReadAlongCommand}"
+                        IsVisible="{Binding CanStreamReadAlong}"
+                        Style="{StaticResource Primary}"
+                        Text="{x:Static s:Strings.ServerBook_StreamReadAlong}" />
+
+                    <!--  The audiobook played from the server, for a device short of space or a book heard once.  -->
+                    <Button
+                        Command="{Binding StreamCommand}"
+                        IsVisible="{Binding CanStream}"
+                        Style="{StaticResource Secondary}"
+                        Text="{x:Static s:Strings.ServerBook_Stream}" />
+
+                    <Button
+                        Command="{Binding DownloadCommand}"
+                        IsEnabled="{Binding CanDownload}"
+                        IsVisible="{Binding CanDownload}"
+                        Style="{StaticResource Primary}"
+                        Text="{Binding DownloadText}" />
+
+                    <!--
+                        Offered only when both halves are missing, because only then is there a
+                        choice: the audio is a gigabyte and the text a rounding error beside it.
+                    -->
+                    <Button
+                        Command="{Binding DownloadAudioOnlyCommand}"
+                        IsVisible="{Binding CanChooseHalf}"
+                        Style="{StaticResource Secondary}"
+                        Text="{x:Static s:Strings.ServerBook_JustAudio}" />
+
+                    <Button
+                        Command="{Binding DownloadEbookOnlyCommand}"
+                        IsVisible="{Binding CanChooseHalf}"
+                        Style="{StaticResource Secondary}"
+                        Text="{x:Static s:Strings.ServerBook_JustEbook}" />
+                </VerticalStackLayout>
             </VerticalStackLayout>
         </ScrollView>
 
+        <!--  Only what a transfer in progress needs: how far it has got, and a way to stop it.  -->
         <VerticalStackLayout Grid.Row="2" Spacing="8">
 
             <ProgressBar IsVisible="{Binding IsDownloading}" Progress="{Binding Progress}" />
@@ -121,52 +175,10 @@
             </Grid>
 
             <Button
-                Command="{Binding DownloadCommand}"
-                IsEnabled="{Binding CanDownload}"
-                IsVisible="{Binding IsIdle}"
-                Style="{StaticResource Primary}"
-                Text="{Binding DownloadText}" />
-
-            <!--
-                Playing from the server instead of downloading, for a device short of space or a
-                book listened to once. The text still comes down; the audio stays where it is.
-            -->
-            <Button
-                Command="{Binding StreamCommand}"
-                IsVisible="{Binding ShowsStream}"
-                Style="{StaticResource Secondary}"
-                Text="{Binding StreamText}" />
-
-            <!--
-                Offered only when both halves are missing, because only then is there a choice:
-                the audio is a gigabyte over whatever connection is to hand and the text is a
-                rounding error beside it, and someone about to read on a train cares which arrives
-                first. With one half already here, the button above names the other and that is all
-                there is to say.
-            -->
-            <Button
-                Command="{Binding DownloadAudioOnlyCommand}"
-                IsVisible="{Binding ShowsHalfChoice}"
-                Style="{StaticResource Secondary}"
-                Text="{x:Static s:Strings.ServerBook_JustAudio}" />
-
-            <Button
-                Command="{Binding DownloadEbookOnlyCommand}"
-                IsVisible="{Binding ShowsHalfChoice}"
-                Style="{StaticResource Secondary}"
-                Text="{x:Static s:Strings.ServerBook_JustEbook}" />
-
-            <Button
                 Command="{Binding CancelCommand}"
                 IsVisible="{Binding IsDownloading}"
                 Style="{StaticResource Secondary}"
                 Text="{x:Static s:Strings.ServerBook_CancelDownload}" />
-
-            <Button
-                Command="{Binding OpenCommand}"
-                IsVisible="{Binding IsInLibrary}"
-                Style="{StaticResource Secondary}"
-                Text="{x:Static s:Strings.ServerBook_OpenBook}" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>
