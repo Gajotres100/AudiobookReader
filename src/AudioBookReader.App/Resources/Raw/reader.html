@@ -335,6 +335,17 @@
     report();
   }
 
+  // A book reopened where it was left: that sentence at the very top, as it was when it was saved.
+  // keepInView leaves room above it, and the sentence before then became the first one on screen —
+  // the one saved next time — so every reopening moved the place back a little.
+  function showAt(idx) {
+    var parts = document.querySelectorAll('[data-idx="' + idx + '"]');
+    if (!parts.length) return;
+
+    content.scrollTop += parts[0].getBoundingClientRect().top - content.getBoundingClientRect().top;
+    report();
+  }
+
   // The first sentence visible, used to remember the reading position.
   function topSentence() {
     var spans = document.querySelectorAll('[data-idx]');
@@ -920,7 +931,11 @@
   // Checked from every report as well as on resize: a resize event is not guaranteed to arrive
   // before the scroll the new layout causes, and the first real size arrives after this script
   // has run.
-  function layoutKey() { return content.clientWidth + 'x' + content.clientHeight; }
+  // The width alone: that is what reflows the text. The height changes whenever a bar above the
+  // text comes or goes — a status line, the controls — and treating that as a new layout put the
+  // page back at whatever sentence had last been seen, which on opening a book was the top of its
+  // chapter, undoing the move to where the book had been left.
+  function layoutKey() { return String(content.clientWidth); }
 
   var laidOutAs = layoutKey(), anchorTop = '-1';
 

@@ -87,7 +87,7 @@
                     Nothing about where it goes. That question is asked once, by the download, and
                     asking it here as well made the same decision available in two places.
                 -->
-                <VerticalStackLayout IsVisible="{Binding IsIdle}" Spacing="10">
+                <VerticalStackLayout IsVisible="{Binding ShowsActions}" Spacing="10">
 
                     <Button
                         Command="{Binding OpenCommand}"

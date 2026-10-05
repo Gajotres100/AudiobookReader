@@ -65,8 +65,11 @@ public partial class ReaderPage : ContentPage
         _viewModel.PageJumpRequested += OnPageJumpRequested;
         _viewModel.AppearanceChanged += OnAppearanceChanged;
 
-        _window = Window;
+        // The page's own window is not always set yet when it first appears; the app's one window
+        // is the same window, and is.
+        _window = Window ?? Application.Current?.Windows.FirstOrDefault();
         if (_window is not null) _window.Stopped += OnWindowStopped;
+        else AppLog.Info("reader: no window to hear the app going to the background from");
     }
 
     private void Detach()
@@ -389,6 +392,8 @@ public partial class ReaderPage : ContentPage
             // still on screen was asked of a script that did not exist yet.
             if (_viewModel.EntryPage is { } page)
                 await Reader.EvaluateJavaScriptAsync($"goToPage({page})");
+            else if (_viewModel.PlaceSentence >= 0)
+                await Reader.EvaluateJavaScriptAsync($"showAt({_viewModel.PlaceSentence})");
             else if (_viewModel.PendingHighlight >= 0)
                 await ShowSentenceAsync(_viewModel.PendingHighlight);
         }

@@ -423,6 +423,9 @@
   <data name="Reader_WillFollow" xml:space="preserve">
     <value>Tekst će pratiti naraciju kad poravnanje završi. Pokreni ga preko ☰.</value>
   </data>
+  <data name="Reader_StreamedWontFollow" xml:space="preserve">
+    <value>Zvuk se pušta sa servera, pa ga tekst ne može pratiti. Da prati, preuzmi audio sa stranice knjige na serveru, ili koristi EPUB 3 s naracijom.</value>
+  </data>
   <data name="Reader_MeasuringHere" xml:space="preserve">
     <value>Mjerim ovaj dio — tekst kreće za koji trenutak.</value>
   </data>
@@ -657,8 +660,20 @@
   <data name="Details_StreamedNoAlign" xml:space="preserve">
     <value>Ova knjiga svira sa servera. Za poravnanje teksta i naracije najprije preuzmi audio: otvori knjigu na stranici servera i preuzmi je.</value>
   </data>
+  <data name="ServerBook_TextReady" xml:space="preserve">
+    <value>Spremno — tekst je u biblioteci.</value>
+  </data>
+  <data name="ServerBook_ReadAlongReady" xml:space="preserve">
+    <value>Spremno — čita se uz naraciju sa servera.</value>
+  </data>
+  <data name="ServerBook_ReadAlongHere" xml:space="preserve">
+    <value>Ova se knjiga čita uz naraciju sa servera. Na telefonu je samo tekst, glas ostaje na serveru.</value>
+  </data>
+  <data name="ServerBook_CheckingEbook" xml:space="preserve">
+    <value>Provjeravam e-knjigu…</value>
+  </data>
   <data name="ServerBook_StreamText" xml:space="preserve">
-    <value>Čitaj e-knjigu sa servera (samo tekst)</value>
+    <value>Samo tekst sa servera, bez glasa</value>
   </data>
   <data name="ServerBook_StreamReadAlong" xml:space="preserve">
     <value>Čitaj uz naraciju sa servera (strimanje)</value>
@@ -873,6 +888,9 @@ Knjige možeš dodati i s Audiobookshelf servera (spremi ih u memoriju aplikacij
   </data>
   <data name="Server_BookCount" xml:space="preserve">
     <value>{0} knjiga</value>
+  </data>
+  <data name="Server_BookCountFew" xml:space="preserve">
+    <value>{0} knjige</value>
   </data>
   <data name="Server_RecentlyAdded" xml:space="preserve">
     <value>Nedavno dodano</value>

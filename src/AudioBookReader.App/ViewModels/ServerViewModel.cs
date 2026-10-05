@@ -56,7 +56,13 @@ public class Shelf(string name, IReadOnlyList<ServerBookRow> books) : List<Serve
 
     public string Summary { get; } = books.Count == 1
         ? Strings.Server_OneBook
-        : string.Format(Strings.Server_BookCount, books.Count);
+        : string.Format(IsFew(books.Count) ? Strings.Server_BookCountFew : Strings.Server_BookCount, books.Count);
+
+    /// <summary>
+    /// 2, 3 and 4 — and 22, 23, 104, but not 12 to 14 — which Croatian counts with another form:
+    /// three books are "3 knjige", not "3 knjiga". English uses the same form for both.
+    /// </summary>
+    private static bool IsFew(int count) => count % 10 is >= 2 and <= 4 && count % 100 is not (>= 12 and <= 14);
 }
 
 /// <summary>One configured server, as the row at the top of the server screen shows it.</summary>

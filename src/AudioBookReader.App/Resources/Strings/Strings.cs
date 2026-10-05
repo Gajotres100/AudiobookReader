@@ -308,6 +308,8 @@ public static class Strings
     public static string Dialog_DeleteBookmarkTitle => Get(nameof(Dialog_DeleteBookmarkTitle));
     /// <summary>The text will follow the narration once alignment finishes. Start it from ☰.</summary>
     public static string Reader_WillFollow => Get(nameof(Reader_WillFollow));
+    /// <summary>A streamed book's text cannot follow until its audio is downloaded.</summary>
+    public static string Reader_StreamedWontFollow => Get(nameof(Reader_StreamedWontFollow));
     /// <summary>Measuring this part — the text starts in a moment.</summary>
     public static string Reader_MeasuringHere => Get(nameof(Reader_MeasuringHere));
     /// <summary>This part of the book is not aligned yet.</summary>
@@ -468,6 +470,14 @@ public static class Strings
     public static string Details_StreamedNoAlign => Get(nameof(Details_StreamedNoAlign));
     /// <summary>A streamed book, seen from the server page.</summary>
     public static string ServerBook_StreamedHere => Get(nameof(ServerBook_StreamedHere));
+    /// <summary>After reading the ebook from the server: only its text came.</summary>
+    public static string ServerBook_TextReady => Get(nameof(ServerBook_TextReady));
+    /// <summary>After adding a read-along that plays from the server.</summary>
+    public static string ServerBook_ReadAlongReady => Get(nameof(ServerBook_ReadAlongReady));
+    /// <summary>A read-along streamed here, seen from the server page.</summary>
+    public static string ServerBook_ReadAlongHere => Get(nameof(ServerBook_ReadAlongHere));
+    /// <summary>While the page looks inside the server's ebook for narration.</summary>
+    public static string ServerBook_CheckingEbook => Get(nameof(ServerBook_CheckingEbook));
     /// <summary>Button: read the server's ebook; only its text comes down.</summary>
     public static string ServerBook_StreamText => Get(nameof(ServerBook_StreamText));
     /// <summary>Button: stream an EPUB 3 read-along — the text comes down, the narration plays from the server.</summary>
@@ -608,6 +618,8 @@ public static class Strings
     public static string Server_OneBook => Get(nameof(Server_OneBook));
     /// <summary>{0} books</summary>
     public static string Server_BookCount => Get(nameof(Server_BookCount));
+    /// <summary>{0} books, for 2-4, 22-24… where Croatian uses its own form.</summary>
+    public static string Server_BookCountFew => Get(nameof(Server_BookCountFew));
     /// <summary>Recently added</summary>
     public static string Server_RecentlyAdded => Get(nameof(Server_RecentlyAdded));
     /// <summary>Not in a series</summary>

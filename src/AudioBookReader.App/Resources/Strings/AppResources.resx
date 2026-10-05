@@ -441,6 +441,9 @@
   <data name="Reader_WillFollow" xml:space="preserve">
     <value>The text will follow the narration once alignment finishes. Start it from ☰.</value>
   </data>
+  <data name="Reader_StreamedWontFollow" xml:space="preserve">
+    <value>The audio plays from the server, so the text cannot follow it. To have it follow, download the audio from the book's server page, or use an EPUB 3 with narration.</value>
+  </data>
   <data name="Reader_MeasuringHere" xml:space="preserve">
     <value>Measuring this part — the text starts in a moment.</value>
   </data>
@@ -694,8 +697,20 @@
   <data name="Details_StreamedNoAlign" xml:space="preserve">
     <value>This book plays from the server. To align the text with the narration, download the audio first: open the book on the server page and download it.</value>
   </data>
+  <data name="ServerBook_TextReady" xml:space="preserve">
+    <value>Ready — the text is in your library.</value>
+  </data>
+  <data name="ServerBook_ReadAlongReady" xml:space="preserve">
+    <value>Ready — it reads along with the narration from the server.</value>
+  </data>
+  <data name="ServerBook_ReadAlongHere" xml:space="preserve">
+    <value>This book reads along with the narration from the server. Only the text is on the phone; the voice stays on the server.</value>
+  </data>
+  <data name="ServerBook_CheckingEbook" xml:space="preserve">
+    <value>Looking inside the ebook…</value>
+  </data>
   <data name="ServerBook_StreamText" xml:space="preserve">
-    <value>Read the ebook from the server (text only)</value>
+    <value>Text only from the server, no voice</value>
   </data>
   <data name="ServerBook_StreamReadAlong" xml:space="preserve">
     <value>Read along with the narration from the server (streaming)</value>
@@ -925,6 +940,9 @@ You can also add books from an Audiobookshelf server (saving them to app storage
     <value>1 book</value>
   </data>
   <data name="Server_BookCount" xml:space="preserve">
+    <value>{0} books</value>
+  </data>
+  <data name="Server_BookCountFew" xml:space="preserve">
     <value>{0} books</value>
   </data>
   <data name="Server_RecentlyAdded" xml:space="preserve">

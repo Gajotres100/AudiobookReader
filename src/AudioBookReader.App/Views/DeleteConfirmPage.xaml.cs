@@ -40,11 +40,20 @@ public partial class DeleteConfirmPage : ContentPage
 
     private async void OnCancel(object? sender, EventArgs e) => await CloseAsync(null);
 
+    private bool _closing;
+
+    /// <summary>
+    /// Closes the page, and only then answers.
+    ///
+    /// The other way round, the caller deleted the book and went back to the library while this
+    /// page was still on screen — a navigation the shell will not make from under a modal page, so
+    /// it was dropped and the details of a book that no longer existed came back, offering to
+    /// delete it again. Everyone pressed Delete twice.
+    /// </summary>
     private async Task CloseAsync(DeleteChoice? choice)
     {
-        // Guarded because the page can also go by the back gesture, which reaches OnDisappearing
-        // with nobody having pressed anything.
-        if (!_answer.TrySetResult(choice)) return;
+        if (_closing) return;
+        _closing = true;
 
         try
         {
@@ -54,13 +63,18 @@ public partial class DeleteConfirmPage : ContentPage
         {
             AppLog.Error("closing the delete confirmation", ex);
         }
+        finally
+        {
+            _answer.TrySetResult(choice);
+        }
     }
 
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
 
-        // Backed out of. Nothing was chosen, and the caller must not wait forever.
-        _answer.TrySetResult(null);
+        // Backed out of with the back gesture: nothing was chosen, and the caller must not wait
+        // forever. Not while closing on a choice, whose answer comes once the page is gone.
+        if (!_closing) _answer.TrySetResult(null);
     }
 }

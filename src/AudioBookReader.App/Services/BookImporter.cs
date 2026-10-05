@@ -277,6 +277,10 @@ public class BookImporter(
             else if (readAlongOnly && overlayAudio is null)
                 throw new NotSupportedException(Strings.Import_NotReadAlong);
 
+            // Timings to take from the package for audio the book already has: set when that audio
+            // is the very recording the package carries.
+            string? timingsFor = null;
+
             if (overlayAudio is not null && await TakesNarrationAsync(attachTo))
             {
                 // One recording is what a book here plays; a package split into a file per chapter
@@ -285,6 +289,14 @@ public class BookImporter(
 
                 narrationEntry = overlayAudio[0];
                 (path, narration) = await SplitNarrationAsync(path, narrationEntry, fileName, progress, ct);
+            }
+            else if (overlayAudio is { Count: 1 } && attachTo is { } keeping)
+            {
+                // The book already has its audio, so the package's own recording is not wanted - but
+                // kept inside the ebook it was hundreds of megabytes next to the same hours already
+                // here, and its timings were thrown away. The text comes out without it, and when the
+                // book's audio is that same recording, the timings come with the text.
+                (path, timingsFor) = await KeepTextOnlyAsync(path, overlayAudio[0], keeping, ct);
             }
 
             progress?.Report(new ImportProgress(Strings.Progress_ReadingText, 1));
@@ -315,6 +327,8 @@ public class BookImporter(
             var book = attachTo is { } bookId
                 ? await library.AttachTextAsync(bookId, attachment)
                 : await RememberNameAsync(await library.CreateFromTextAsync(attachment), picked.FileName);
+
+            if (timingsFor is not null) return await AdoptTimingsAsync(book, path, timingsFor, extracted);
 
             return narration is null
                 ? book
@@ -372,6 +386,61 @@ public class BookImporter(
 
         AppLog.Info($"epub 3 narration: '{entry}' taken out to '{audioPath}'");
         return (bookPath, audioPath);
+    }
+
+    /// <summary>
+    /// The text of a package whose narration the book does not need, because it already has audio:
+    /// written without the recording, the package itself deleted. Returns the entry to take timings
+    /// for when the book's audio is the recording the package carries, by the same sampled hash, so
+    /// the alignment the package brings still fits; null when it is some other recording.
+    /// </summary>
+    private async Task<(string Path, string? TimingsFor)> KeepTextOnlyAsync(string package, string entry, int bookId, CancellationToken ct)
+    {
+        var textPath = UniquePath(AppPaths.Books, SafeName(Path.GetFileNameWithoutExtension(package) + " (text).epub"));
+        string? sameRecording = null;
+
+        await Task.Run(async () =>
+        {
+            await using var file = File.OpenRead(package);
+
+            if (await MediaOverlayPackage.FindStoredNarrationAsync(file, [entry], ct) is { } stored
+                && await database.GetBookAsync(bookId) is { AudioHash: { } audioHash })
+            {
+                await using var recording = new SubStream(File.OpenRead(package), stored.Offset, stored.Length);
+                if (await ContentHash.ComputeAsync(recording, ct) == audioHash) sameRecording = entry;
+            }
+
+            file.Seek(0, SeekOrigin.Begin);
+            await MediaOverlayPackage.SplitAsync(file, entry, audioOut: null, textPath, ct);
+        }, ct);
+
+        TryDelete(package);
+        AppLog.Info($"epub 3 narration: left out of '{textPath}', the book has its own audio" +
+                    (sameRecording is null ? " (a different recording)" : " (the same recording; timings kept)"));
+
+        return (textPath, sameRecording);
+    }
+
+    /// <summary>
+    /// Turns the package's timings into the alignment of audio the book already has — the same
+    /// recording, checked by hash — so it follows along at once, as a read-along package does.
+    /// </summary>
+    private async Task<Book> AdoptTimingsAsync(Book book, string ebookPath, string entry, ExtractedBook extracted)
+    {
+        var anchors = await Task.Run(() => MediaOverlayPackage.ReadAnchors(ebookPath, extracted.Text, entry));
+        var chapters = await database.GetChaptersAsync(book.Id);
+        var (map, ranges) = MediaOverlayPackage.BuildMap(
+            anchors, chapters, extracted.Text.PlainText.Length, book.AudioHash, book.EbookHash);
+
+        book.MeasureWhileReading = false;
+        book.IsReadAlong = true;
+        await database.UpdateBookAsync(book);
+
+        var adopted = await library.AdoptAlignmentAsync(book.Id, map, ranges);
+        AppLog.Info($"epub 3 narration: {anchors.Count} timings for the book's own audio over {map.Chapters.Count} chapters, adopted {adopted}");
+
+        ShelfChanged();
+        return await database.GetBookAsync(book.Id) ?? book;
     }
 
     /// <summary>
@@ -463,7 +532,8 @@ public class BookImporter(
         // never copied in, where AudioPath is still the user's own reference.
         var path = audio ? book?.OriginalAudioPath ?? book?.AudioPath : book?.EbookPath;
 
-        return path is not null && references.IsReference(path) ? Readable(path) : null;
+        // Not a book played from a server: that file is the server's, never this phone's to delete.
+        return path is not null && references.IsReference(path) && !StreamedAudio.Is(path) ? Readable(path) : null;
     }
 
     /// <summary>

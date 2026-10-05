@@ -201,10 +201,15 @@ public partial class ServerBookViewModel : ObservableObject
     public partial string Obstacle { get; set; } = "";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsActions))]
     public partial bool IsBusy { get; set; }
+
+    /// <summary>The ways to have the book, once the page knows what they all are and nothing is in progress.</summary>
+    public bool ShowsActions => IsIdle && !IsBusy;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
+    [NotifyPropertyChangedFor(nameof(ShowsActions))]
     [NotifyPropertyChangedFor(nameof(ShowsHalfChoice))]
     [NotifyPropertyChangedFor(nameof(ShowsStream))]
     public partial bool IsDownloading { get; set; }
@@ -288,12 +293,23 @@ public partial class ServerBookViewModel : ObservableObject
 
             DecideWhatIsMissing(here);
 
-            if (here is null) _ = OfferReadAlongStreamAsync();
+            // Waited for, while the page still says it is busy: the buttons appear once, all of them,
+            // rather than the text-only one first and reading along a moment later — which got the
+            // first one pressed and a narrated book read out by the speech engine instead.
+            if (here is null || !here.HasText)
+            {
+                Status = Strings.ServerBook_CheckingEbook;
+                await OfferReadAlongStreamAsync();
+                Status = "";
+            }
 
             // A download for this book may already be running — started here and then left, or
             // still going from before this page existed. That outranks the empty line that means
             // nothing is happening.
-            Show(_downloads.Status.ItemId == ItemId ? _downloads.Status : new DownloadStatus());
+            // Only one still running: a finished one carries the id of the book it made, which may since
+            // have been deleted — and adopting that id sent the next stream to add to a book that was
+            // gone. A finished download's book is found in the library above, if it is still there.
+            Show(_downloads.Status.ItemId == ItemId && _downloads.Status.IsRunning ? _downloads.Status : new DownloadStatus());
         }
         catch (Exception ex)
         {
@@ -367,8 +383,14 @@ public partial class ServerBookViewModel : ObservableObject
 
         // Plain, and for telling the reader what they already have — which is the difference
         // between a button that looks redundant and one that says what it is for.
+        // Reading along with it is the one thing still on offer while the text is missing; once the
+        // text is here, the book has what that button would bring.
+        if (here?.HasText == true) CanStreamReadAlong = false;
+
         Note = here is null
             ? ""
+            : streamedHere && here.IsReadAlong
+                ? Strings.ServerBook_ReadAlongHere
             : streamedHere
                 ? Strings.ServerBook_StreamedHere
             : !CanDownload && Obstacle.Length == 0
@@ -414,12 +436,12 @@ public partial class ServerBookViewModel : ObservableObject
     /// <summary>Adds the server's ebook to read, its text alone coming down.</summary>
     [RelayCommand]
     private Task StreamTextAsync() => AddFromServerAsync(
-        () => _server.AddStreamingTextAsync(ItemId, Progressing(), attachTo: BookId));
+        () => _server.AddStreamingTextAsync(ItemId, Progressing(), attachTo: BookId), Strings.ServerBook_TextReady);
 
     /// <summary>Adds the server's EPUB 3 to read along with its narration, the narration staying on the server.</summary>
     [RelayCommand]
     private Task StreamReadAlongAsync() => AddFromServerAsync(
-        () => _server.AddStreamingReadAlongAsync(ItemId, Progressing(), attachTo: BookId));
+        () => _server.AddStreamingReadAlongAsync(ItemId, Progressing(), attachTo: BookId), Strings.ServerBook_ReadAlongReady);
 
     private IProgress<ImportProgress> Progressing() => new Progress<ImportProgress>(p =>
     {
@@ -428,7 +450,7 @@ public partial class ServerBookViewModel : ObservableObject
     });
 
     /// <summary>The shared run of adding a book that plays from the server: the busy state, the outcome, what is left to offer.</summary>
-    private async Task AddFromServerAsync(Func<Task<int>> add)
+    private async Task AddFromServerAsync(Func<Task<int>> add, string ready)
     {
         if (_detail is null || IsDownloading) return;
 
@@ -447,7 +469,7 @@ public partial class ServerBookViewModel : ObservableObject
         {
             BookId = await add();
 
-            Status = Strings.ServerBook_StreamReady;
+            Status = ready;
             CanStreamReadAlong = false;
             await ReconsiderAsync();
         }

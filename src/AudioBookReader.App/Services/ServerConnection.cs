@@ -303,8 +303,13 @@ public class ServerConnection(
 
             if (wantEbook && detail.Ebook is { } ebook)
             {
+                // An EPUB 3 with its narration is taken apart on import: the text and the recording
+                // are kept by the app on their own. Kept in the user's folder as well, the package
+                // was the whole book over again — hundreds of megabytes nobody would open.
+                var readAlong = !toAppStorage && await DeclaresNarrationAsync(itemId, ebook, ct);
+
                 var path = await DownloadAsync(
-                    toAppStorage ? null : Shelf(book),
+                    toAppStorage || readAlong ? null : Shelf(book),
                     ebook.FileName,
                     (to, report) => _client.DownloadEbookAsync(itemId, to, report, ct),
                     string.Format(Strings.Server_DownloadingText, book.Title),
@@ -423,6 +428,26 @@ public class ServerConnection(
     }
 
     // ---- EPUB 3 read-along, streamed ----
+
+    /// <summary>Whether the server's ebook is an EPUB 3 carrying narration, from its package document alone; false when that cannot be told.</summary>
+    private async Task<bool> DeclaresNarrationAsync(string itemId, ServerFile ebook, CancellationToken ct)
+    {
+        if (!ebook.FileName.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)) return false;
+
+        try
+        {
+            return await Task.Run(async () =>
+            {
+                await using var package = await OpenStreamAsync(itemId, ebook.Ino, ct);
+                return MediaOverlayPackage.DeclaredNarration(package) is { Count: > 0 };
+            }, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            AppLog.Info($"server: could not look inside '{ebook.FileName}' before downloading it ({ex.Message})");
+            return false;
+        }
+    }
 
     /// <summary>
     /// The narration inside an EPUB 3 on the server, when it can be played from there — or null for

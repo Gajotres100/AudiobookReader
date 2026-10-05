@@ -64,7 +64,9 @@ public partial class ReaderViewModel(
     /// itself. Silently doing nothing is the worst of the options here — it looks broken.
     /// </summary>
     public string FollowHint =>
-        Strings.Reader_WillFollow;
+        // A book played from the server cannot be aligned at all — the details page says so — and
+        // promising that the text would follow once alignment finished was promising the impossible.
+        StreamedAudio.Is(_book?.AudioPath) ? Strings.Reader_StreamedWontFollow : Strings.Reader_WillFollow;
 
     /// <summary>
     /// The general hint, shown only when nothing more specific is being said.
@@ -479,8 +481,15 @@ public partial class ReaderViewModel(
         SavePlaceAsRead(topSentence);
     }
 
-    /// <summary>How far ahead of the saved page the voice may be and still be the voice paused on that page.</summary>
-    private const int VoiceAheadOfPageChars = 1_500;
+    /// <summary>
+    /// A page of text, with a little to spare: how far ahead of the page the voice may be and still
+    /// be the voice paused on it. One measure for both saving and reopening — with two, a voice
+    /// between them was left behind by one and then believed by the other.
+    /// </summary>
+    private double OnePage => Math.Max(CharsPerPage, 1_000) * 1.1;
+
+    /// <summary>Whether the page was saved after the voice — read on in silence since listening stopped.</summary>
+    private string PageNewerKey => $"reader.pageNewer.{BookId}";
 
     private int _savedTopSentence = -1;
 
@@ -496,15 +505,31 @@ public partial class ReaderViewModel(
     /// </summary>
     private void SavePlaceAsRead(int topSentence)
     {
-        if (IsBusy || _holding is not null || playback.IsPlaying || _text is null) return;
-        if (topSentence < 0 || topSentence == _savedTopSentence) return;
+        var now = DateTime.UtcNow;
 
-        // A document just loaded reports its top before the page is moved to the place it was
-        // opened for — saving that would put a reopened book at the start of its chapter.
-        if (DateTime.UtcNow - _documentShownAt < TimeSpan.FromSeconds(1.5)) return;
+        if (playback.IsPlaying || _text is null) return;
+        if (topSentence < 0 || topSentence >= _text.Sentences.Count || topSentence == _savedTopSentence) return;
+
+        // Not before the book has been put at its place, and not in the moment after a document
+        // loads: both report the top of a document before the page is moved to where it was
+        // opened, and saving that would reopen the book at the start of its chapter.
+        if (now < _placedAt || now - _documentShownAt < TimeSpan.FromSeconds(1.5)) return;
 
         _savedTopSentence = topSentence;
-        _ = SafelyAsync("saving the page read", () => SavePositionAsync(topSentence));
+
+        // While the voice is still being placed — a chapter jump landing, or measuring finding where
+        // the reader is — the page is saved without moving the voice, which is that process's to move.
+        if (_holding is null)
+        {
+            _ = SafelyAsync("saving the page read", () => SavePositionAsync(topSentence));
+            return;
+        }
+
+        // The voice is not this one's to move just now, so it is left behind — and noted as left
+        // behind, so reopening believes the page rather than the older voice.
+        Preferences.Default.Set(PageNewerKey, true);
+        _ = SafelyAsync("saving the page read", () =>
+            database.SaveReadingStateAsync(BookId, textOffset: _text.Sentences[topSentence].Start));
     }
 
     // ---- The page in the whole book ----
@@ -623,11 +648,11 @@ public partial class ReaderViewModel(
 
         if (at - playback.PositionMs > CloseEnoughMs) return at;
 
-        // A page and a half, so a voice paused anywhere on the page in front of the reader stays.
-        var page = Math.Max(CharsPerPage, 1_000) * 1.5;
+        // Past the page in front of the reader — the same measure reopening uses to decide whether
+        // the voice or the page is where the book is, so the two never disagree.
         var voice = _sync.CharOffsetAt(playback.PositionMs);
 
-        return voice is { } voiceAt && voiceAt > start + page && playback.PositionMs - at > CloseEnoughMs ? at : null;
+        return voice is { } voiceAt && voiceAt > start + OnePage && playback.PositionMs - at > CloseEnoughMs ? at : null;
     }
 
     /// <summary>
@@ -733,6 +758,9 @@ public partial class ReaderViewModel(
 
             _book = await database.GetBookAsync(BookId);
             if (_book?.EbookPath is null) return;
+
+            // Which hint applies depends on the book — streamed or not — and the binding read it before there was one.
+            OnPropertyChanged(nameof(FollowHint));
 
             await database.MarkOpenedAsync(BookId);
 
@@ -867,11 +895,16 @@ public partial class ReaderViewModel(
             // on in silence whose voice was never moved after it, and it was the voice that won,
             // reopening a book left at the top of chapter thirty at the top of chapter twenty-nine.
             // A voice a little ahead is the one paused part way down the page that is showing.
+            // Whichever was saved last: pages read in silence since the voice stopped, or listening
+            // since the page was put down. Compared by when, not by where — every rule that guessed
+            // from the two positions alone had a case it got backwards. A voice on the very page
+            // saved is that page, which places the reader more exactly than the voice does.
             offset = (page, voice) switch
             {
-                ({ } p, { } v) when v > p + VoiceAheadOfPageChars => v,
-                ({ } p, _) => p,
-                (null, { } v) => v,
+                ({ } p, _) when Preferences.Default.Get(PageNewerKey, true) => p,
+                ({ } p, { } v) when v >= p && v <= p + OnePage => p,
+                (_, { } v) => v,
+                ({ } p, null) => p,
                 _ => 0,
             };
 
@@ -881,6 +914,18 @@ public partial class ReaderViewModel(
 
         ShowDocumentAt(offset);
         _narrationDocument = SpineIndex;
+
+        // The page goes to its place first, and the voice is placed after. The other way round the
+        // reader looked at the top of the chapter for as long as placing the voice took — tens of
+        // seconds on a book being measured — and nothing read in that time was saved.
+        if (_text!.SentenceAt(offset) is { } sentence)
+        {
+            _lastSentence = sentence.Index;
+            _placeSentence = sentence.Index;
+            HighlightRequested?.Invoke(this, sentence.Index);
+        }
+
+        _placedAt = DateTime.UtcNow;
 
         // The voice starts where the eye is, not where listening last stopped. In a read-along
         // those are usually the same place, and when they are not it is the page in front of the
@@ -894,13 +939,10 @@ public partial class ReaderViewModel(
         if (!playback.IsPlaying)
             await TakeNarrationToAsync(
                 offset, blockPlayWhileCorrecting: false, userMoved: false, exactPlace: asked);
-
-        if (_text!.SentenceAt(offset) is { } sentence)
-        {
-            _lastSentence = sentence.Index;
-            HighlightRequested?.Invoke(this, sentence.Index);
-        }
     }
+
+    /// <summary>When the book was put at its place on opening; nothing the page reports before that is the reader's.</summary>
+    private DateTime _placedAt = DateTime.MaxValue;
 
     /// <summary>
     /// Offers to carry on from where another device reached, when it got further — or elsewhere —
@@ -987,6 +1029,7 @@ public partial class ReaderViewModel(
 
         SpineIndex = index;
         _documentShownAt = DateTime.UtcNow;
+        _placeSentence = -1;
         Html = BuildPage(_text.Spine[index].Html);
     }
 
@@ -1657,7 +1700,17 @@ public partial class ReaderViewModel(
             && DateTime.UtcNow - _lastPositionSaved > TimeSpan.FromSeconds(5))
         {
             _lastPositionSaved = DateTime.UtcNow;
-            _ = database.SaveReadingStateAsync(BookId, audioPositionMs: playback.PositionMs, speed: playback.Speed);
+
+            // The page with it: what is being read aloud is what is on screen, and a page saved
+            // before listening began would otherwise outrank it on reopening — the book came back
+            // pages past where it had been paused.
+            if (playback.IsPlaying) Preferences.Default.Set(PageNewerKey, false);
+
+            _ = database.SaveReadingStateAsync(
+                BookId,
+                audioPositionMs: playback.PositionMs,
+                textOffset: CanFollow && playback.IsPlaying ? _sync?.CharOffsetAt(playback.PositionMs) : null,
+                speed: playback.Speed);
         }
 
         if (!IsFollowing || _sync is null || !playback.IsPlaying || !loadedThisBook)
@@ -1731,6 +1784,19 @@ public partial class ReaderViewModel(
 
     /// <summary>The sentence the page should highlight once a freshly loaded document is ready.</summary>
     public int PendingHighlight => _lastSentence;
+
+    /// <summary>The sentence a freshly loaded page should open at the top of, or -1; see <see cref="_placeSentence"/>.</summary>
+    public int PlaceSentence => _placeSentence;
+
+    /// <summary>
+    /// The sentence a freshly opened book is to be shown at, kept apart from <see cref="_lastSentence"/>.
+    ///
+    /// Placing the voice clears that one on purpose, and placing it takes as long as measuring
+    /// takes: when the page finished loading in the meantime, it asked where to go, got nothing,
+    /// and stayed at the top of the chapter. A book read to the middle of a chapter reopened at its
+    /// start whenever the voice was slow to settle.
+    /// </summary>
+    private int _placeSentence = -1;
 
     /// <summary>
     /// Called when the reader presses and holds a sentence: play from here.
@@ -1828,6 +1894,13 @@ public partial class ReaderViewModel(
         if (audio is { } moved && _book is { DurationMs: > 0 } book)
             ProgressSync.Current?.NoteAudio(BookId, moved, book.DurationMs, now: leaving);
 
+        // Moved with the page, the voice is as new as it; left where it was, the page is newer.
+        Preferences.Default.Set(PageNewerKey, audio is null);
+
+        // Every page read in silence passes through here, so only the save on the way out is
+        // logged as a matter of course; the rest with the detailed log switched on.
+        var line = $"reader: saved book {BookId} at char {offset}" + (audio is { } a ? $", voice moved to {a} ms" : "") + (leaving ? " (leaving)" : "");
+        if (leaving) AppLog.Info(line); else AppLog.Detail(() => line);
         return database.SaveReadingStateAsync(BookId, audioPositionMs: audio, textOffset: offset);
     }
 

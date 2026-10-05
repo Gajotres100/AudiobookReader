@@ -89,14 +89,15 @@
                                         Binding="{Binding IsActive}"
                                         TargetType="Border"
                                         Value="True">
-                                        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Accent}, Dark={StaticResource AccentDark}}" />
+                                        <!--  Background, not BackgroundColor: a Border took the stroke from a trigger and not the fill, leaving dark text on dark.  -->
+                                        <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource Accent}, Dark={StaticResource AccentDark}}" />
                                         <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Accent}, Dark={StaticResource AccentDark}}" />
                                     </DataTrigger>
                                     <DataTrigger
                                         Binding="{Binding IsActive}"
                                         TargetType="Border"
                                         Value="False">
-                                        <Setter Property="BackgroundColor" Value="Transparent" />
+                                        <Setter Property="Background" Value="Transparent" />
                                         <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Line}, Dark={StaticResource LineDark}}" />
                                     </DataTrigger>
                                 </Border.Triggers>
@@ -289,8 +290,14 @@
             stutter. Each shelf has a fixed height instead, so the outer list can measure a row
             without building the rest.
         -->
+        <!--
+            Only while connected. Empty but still there, it lay over the lower half of the sign-in
+            form, which shares this row while disconnected, and took every tap on the user name, the
+            password and Connect.
+        -->
         <CollectionView
             Grid.Row="3"
+            IsVisible="{Binding IsConnected}"
             ItemSizingStrategy="MeasureFirstItem"
             ItemsSource="{Binding Shelves}"
             Margin="0,8"
