@@ -478,7 +478,7 @@ public class ServerConnection(
                 var found = await MediaOverlayPackage.FindStoredNarrationAsync(package, audio, ct)
                             ?? throw new NotSupportedException(Strings.Server_ReadAlongNotStreamable);
 
-                await MediaOverlayPackage.SplitAsync(package, found.Entry, audioOut: null, text, ct);
+                await MediaOverlayPackage.SplitAroundAsync(package, found, text, ct);
                 return found;
             }, ct);
 
@@ -535,7 +535,12 @@ public class ServerConnection(
 
                 if (narration is { Count: > 0 })
                 {
-                    await MediaOverlayPackage.SplitAsync(package, narration[0], audioOut: null, text, ct);
+                    // Two requests around the recording when it lies in one stretch; file by file
+                    // otherwise, which is slower but still leaves the recording where it is.
+                    if (await MediaOverlayPackage.FindStoredNarrationAsync(package, narration, ct) is { } stored)
+                        await MediaOverlayPackage.SplitAroundAsync(package, stored, text, ct);
+                    else
+                        await MediaOverlayPackage.SplitAsync(package, narration[0], audioOut: null, text, ct);
                 }
                 else
                 {

@@ -224,3 +224,76 @@ public sealed class SubStream(Stream inner, long start, long length, bool ownsIn
         await base.DisposeAsync();
     }
 }
+
+/// <summary>
+/// A file read with one stretch of it missing — the bytes before and after, fetched in a piece each,
+/// standing in for the whole file.
+///
+/// For taking the text out of an EPUB 3 that is still on a server. Its narration is one unbroken
+/// stretch in the middle of the package, and everything else is a hundred small files on either
+/// side of it; read one by one, each cost a request of its own, and the text of one book took a
+/// hundred requests and as many megabytes. Fetched as the two runs either side of the recording it
+/// is two requests, and the zip reader finds every file where it expects it. The stretch left out
+/// reads as zeros: reading the text never asks for it.
+/// </summary>
+public sealed class GappedStream(byte[] head, long gapLength, byte[] tail) : Stream
+{
+    private long _position;
+
+    public override bool CanRead => true;
+    public override bool CanSeek => true;
+    public override bool CanWrite => false;
+    public override long Length => head.Length + gapLength + tail.Length;
+
+    public override long Position
+    {
+        get => _position;
+        set => _position = Math.Clamp(value, 0, Length);
+    }
+
+    public override long Seek(long offset, SeekOrigin origin) => Position = origin switch
+    {
+        SeekOrigin.Begin => offset,
+        SeekOrigin.Current => _position + offset,
+        _ => Length + offset,
+    };
+
+    public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+
+    public override int Read(Span<byte> buffer)
+    {
+        if (_position >= Length || buffer.Length == 0) return 0;
+
+        if (_position < head.Length)
+        {
+            var count = (int)Math.Min(buffer.Length, head.Length - _position);
+            head.AsSpan((int)_position, count).CopyTo(buffer);
+            _position += count;
+            return count;
+        }
+
+        var tailStart = head.Length + gapLength;
+        if (_position < tailStart)
+        {
+            // Zeros. The zip reader looks for its directory by reading backwards from the end in
+            // blocks, and a block can reach into the recording; zeros are never mistaken for the
+            // signature it is after, and nothing that reads the text ever reads in here.
+            var zeros = (int)Math.Min(buffer.Length, tailStart - _position);
+            buffer[..zeros].Clear();
+            _position += zeros;
+            return zeros;
+        }
+
+        var at = (int)(_position - tailStart);
+        var fromTail = Math.Min(buffer.Length, tail.Length - at);
+        tail.AsSpan(at, fromTail).CopyTo(buffer);
+        _position += fromTail;
+        return fromTail;
+    }
+
+    public override void Flush() { }
+
+    public override void SetLength(long value) => throw new NotSupportedException();
+
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+}

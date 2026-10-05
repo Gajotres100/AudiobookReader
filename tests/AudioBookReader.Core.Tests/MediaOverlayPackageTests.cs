@@ -102,6 +102,16 @@ public class MediaOverlayPackageTests : IDisposable
 
         var text = (await new EpubTextExtractor().ExtractAsync(slim)).Text;
         Assert.NotEmpty(MediaOverlayPackage.ReadAnchors(slim, text, narration.Entry));
+        // The same text with the package read as the runs either side of the recording, never
+        // touching the recording itself: what streaming fetches, in two requests.
+        var around = Path.Combine(_directory, "around.epub");
+        await MediaOverlayPackage.SplitAroundAsync(package, narration, around);
+
+        var aroundText = (await new EpubTextExtractor().ExtractAsync(around)).Text;
+        Assert.Equal(text.PlainText, aroundText.PlainText);
+        Assert.Equal(
+            MediaOverlayPackage.ReadAnchors(slim, text, narration.Entry),
+            MediaOverlayPackage.ReadAnchors(around, aroundText, narration.Entry));
     }
 
     [Fact]

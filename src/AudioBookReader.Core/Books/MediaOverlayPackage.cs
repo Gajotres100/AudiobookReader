@@ -151,6 +151,26 @@ public static class MediaOverlayPackage
     }
 
     /// <summary>
+    /// The text of a package whose narration is stored in one stretch, taken out with the package
+    /// read as the two runs either side of that stretch: two requests to a server, where reading the
+    /// files one by one was a request each — a hundred for a book, and as many megabytes.
+    /// </summary>
+    public static async Task SplitAroundAsync(Stream epub, StoredNarration narration, string bookOut, CancellationToken ct = default)
+    {
+        var head = new byte[narration.Offset];
+        epub.Seek(0, SeekOrigin.Begin);
+        await epub.ReadExactlyAsync(head, ct);
+
+        var tailStart = narration.Offset + narration.Length;
+        var tail = new byte[epub.Length - tailStart];
+        epub.Seek(tailStart, SeekOrigin.Begin);
+        await epub.ReadExactlyAsync(tail, ct);
+
+        await using var gapped = new GappedStream(head, narration.Length, tail);
+        await SplitAsync(gapped, narration.Entry, audioOut: null, bookOut, ct);
+    }
+
+    /// <summary>
     /// How long the narration runs, as the package declares it — the <c>media:duration</c> of the
     /// book as a whole — or null when it does not say.
     /// </summary>
