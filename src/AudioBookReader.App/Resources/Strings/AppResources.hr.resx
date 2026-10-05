@@ -649,7 +649,7 @@
     <value>Pripremam slušanje sa servera…</value>
   </data>
   <data name="ServerBook_Stream" xml:space="preserve">
-    <value>Slušaj sa servera, bez preuzimanja</value>
+    <value>Slušaj sa servera (strimanje)</value>
   </data>
   <data name="ServerBook_StreamReady" xml:space="preserve">
     <value>Spremno — svira sa servera i ne zauzima mjesto ovdje.</value>
@@ -657,8 +657,11 @@
   <data name="Details_StreamedNoAlign" xml:space="preserve">
     <value>Ova knjiga svira sa servera. Za poravnanje teksta i naracije najprije preuzmi audio: otvori knjigu na stranici servera i preuzmi je.</value>
   </data>
+  <data name="ServerBook_StreamText" xml:space="preserve">
+    <value>Čitaj e-knjigu sa servera (samo tekst)</value>
+  </data>
   <data name="ServerBook_StreamReadAlong" xml:space="preserve">
-    <value>Čitaj uz naraciju sa servera</value>
+    <value>Čitaj uz naraciju sa servera (strimanje)</value>
   </data>
   <data name="ServerBook_ReadAlongStreamable" xml:space="preserve">
     <value>EPUB 3 s naracijom. Strimanje skida samo tekst, par megabajta, a naraciju pušta sa servera dok tekst prati glas.</value>

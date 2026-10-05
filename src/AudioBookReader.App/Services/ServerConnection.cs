@@ -505,6 +505,65 @@ public class ServerConnection(
         }
     }
 
+    /// <summary>
+    /// Adds the server's ebook to read, bringing down only its text - into the app, with no question
+    /// of where to keep it. For an EPUB 3 that is the package without its narration: a few megabytes
+    /// rather than the hundreds the recording inside it would cost.
+    /// </summary>
+    public async Task<int> AddStreamingTextAsync(
+        string itemId,
+        IProgress<ImportProgress>? progress = null,
+        CancellationToken ct = default,
+        int? attachTo = null)
+    {
+        var detail = await Wrap(() => _client.GetBookAsync(itemId, ct));
+        var ebook = detail.Ebook ?? throw new NotSupportedException(Strings.Server_NothingToDownload);
+
+        progress?.Report(new ImportProgress(Strings.Server_PreparingStream, 0));
+
+        var text = Path.Combine(FileSystem.CacheDirectory, $"text-{Guid.NewGuid():N}{Path.GetExtension(ebook.FileName)}");
+
+        try
+        {
+            await Task.Run(async () =>
+            {
+                await using var package = await OpenStreamAsync(itemId, ebook.Ino, ct);
+
+                var narration = ebook.FileName.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)
+                    ? MediaOverlayPackage.DeclaredNarration(package)
+                    : null;
+
+                if (narration is { Count: > 0 })
+                {
+                    await MediaOverlayPackage.SplitAsync(package, narration[0], audioOut: null, text, ct);
+                }
+                else
+                {
+                    // An ordinary ebook is small and is the text: it comes down as it is.
+                    package.Seek(0, SeekOrigin.Begin);
+                    await using var to = File.Create(text);
+                    await package.CopyToAsync(to, 1 << 20, ct);
+                }
+            }, ct);
+
+            var book = await importer.ImportTextOnlyAsync(new PickedMedia(text, ebook.FileName), attachTo, progress, ct);
+
+            await database.LinkToServerAsync(book.Id, itemId, Id);
+            return book.Id;
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(text);
+            }
+            catch (IOException)
+            {
+                // A temporary file in the cache; the system clears it if this cannot.
+            }
+        }
+    }
+
     /// <summary>The server's chapter marks as the library keeps them, or the whole book as one when it has none.</summary>
     private static List<Chapter> ChaptersOf(ServerBookDetail detail, long durationMs)
     {

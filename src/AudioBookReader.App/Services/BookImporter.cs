@@ -233,13 +233,25 @@ public class BookImporter(
         CancellationToken ct = default) =>
         ImportEbookAsync(picked, attachTo, readAlongOnly: true, progress, ct, (narrationLocation, narrationEntry));
 
+    /// <summary>
+    /// Imports only the text of an ebook, narration or none: for an EPUB 3 read from the server
+    /// without its voice, whose package came down with the audio already left behind.
+    /// </summary>
+    public Task<Book> ImportTextOnlyAsync(
+        PickedMedia picked,
+        int? attachTo = null,
+        IProgress<ImportProgress>? progress = null,
+        CancellationToken ct = default) =>
+        ImportEbookAsync(picked, attachTo, readAlongOnly: false, progress, ct, textOnly: true);
+
     private async Task<Book> ImportEbookAsync(
         PickedMedia picked,
         int? attachTo,
         bool readAlongOnly,
         IProgress<ImportProgress>? progress,
         CancellationToken ct,
-        (string Location, string Entry)? streamed = null)
+        (string Location, string Entry)? streamed = null,
+        bool textOnly = false)
     {
         using var busy = Busy();
 
@@ -255,7 +267,7 @@ public class BookImporter(
         try
         {
             // Streamed: the package came down without its audio, which plays from the server.
-            var overlayAudio = streamed is null ? MediaOverlayPackage.AudioFiles(path) : null;
+            var overlayAudio = streamed is null && !textOnly ? MediaOverlayPackage.AudioFiles(path) : null;
 
             if (streamed is { } fromServer)
             {

@@ -174,6 +174,10 @@ public partial class ServerBookViewModel : ObservableObject
     [ObservableProperty]
     public partial bool CanStreamReadAlong { get; set; }
 
+    /// <summary>Whether the ebook can be read from the server: only its text comes down, into the app.</summary>
+    [ObservableProperty]
+    public partial bool CanStreamText { get; set; }
+
     /// <summary>What the button says, which is what it will do — the whole book, or the half of it
     /// that is missing.</summary>
     [ObservableProperty]
@@ -351,6 +355,9 @@ public partial class ServerBookViewModel : ObservableObject
         // for a book that already does.
         CanStream = WantsAudio && !streamedHere;
 
+        // Reading from the server: the text alone, wanted whenever it is not here yet.
+        CanStreamText = WantsEbook;
+
         // Red, and only for something genuinely in the way.
         Obstacle = !serverHasAudio && !serverHasEbook
             ? Strings.Server_NothingToDownload
@@ -403,6 +410,11 @@ public partial class ServerBookViewModel : ObservableObject
             AppLog.Info($"server: could not look inside '{ebook.FileName}' ({ex.Message})");
         }
     }
+
+    /// <summary>Adds the server's ebook to read, its text alone coming down.</summary>
+    [RelayCommand]
+    private Task StreamTextAsync() => AddFromServerAsync(
+        () => _server.AddStreamingTextAsync(ItemId, Progressing(), attachTo: BookId));
 
     /// <summary>Adds the server's EPUB 3 to read along with its narration, the narration staying on the server.</summary>
     [RelayCommand]

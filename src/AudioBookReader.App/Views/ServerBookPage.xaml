@@ -113,6 +113,13 @@
                         Style="{StaticResource Secondary}"
                         Text="{x:Static s:Strings.ServerBook_Stream}" />
 
+                    <!--  The ebook read from the server: its text alone comes down, into the app.  -->
+                    <Button
+                        Command="{Binding StreamTextCommand}"
+                        IsVisible="{Binding CanStreamText}"
+                        Style="{StaticResource Secondary}"
+                        Text="{x:Static s:Strings.ServerBook_StreamText}" />
+
                     <Button
                         Command="{Binding DownloadCommand}"
                         IsEnabled="{Binding CanDownload}"
