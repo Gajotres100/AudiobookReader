@@ -97,6 +97,13 @@ public static class BookJob
         if (times.Count == 0)
             throw new InvalidOperationException("Poravnanje nije pronašlo nijedno mjesto u tekstu. Jesu li audio i e-knjiga ista knjiga?");
 
+        times = Epub3Writer.RepairChapterOpenings(
+            extracted.Text, times, extracted.Chapters.Select(c => c.TextStart ?? 0), audio.Chapters.Select(c => c.StartMs ?? 0),
+            out var repaired);
+
+        if (repaired > 0)
+            output.Line($"  početci poglavlja: {repaired} rečenica bilo je stisnuto u kraj prethodnog poglavlja, vraćene na pravo mjesto");
+
         // ---- The EPUB 3 ----
 
         output.Line("Zapisujem EPUB 3…");

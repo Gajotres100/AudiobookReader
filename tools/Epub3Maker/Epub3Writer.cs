@@ -240,6 +240,67 @@ public static partial class Epub3Writer
         return times;
     }
 
+    /// <summary>
+    /// Sentence times with any chapter opening squeezed into the end of the chapter before put
+    /// back — see <see cref="MediaOverlayPackage.RepairChapterOpenings"/>. Whisper hears a chapter's
+    /// heading and first lines late, and the map then has them spoken in the last seconds of the
+    /// previous chapter, so a reader jumping to the chapter plays the end of the one before.
+    /// Sentences of a repaired opening are spread at the narrator's pace from the chapter's real
+    /// start; every other time stays as it was.
+    /// </summary>
+    /// <param name="repaired">How many sentences were given a new time.</param>
+    public static Dictionary<int, SentenceTime> RepairChapterOpenings(
+        BookText text, Dictionary<int, SentenceTime> times,
+        IEnumerable<int> textChapterStarts, IEnumerable<long> audioChapterStarts, out int repaired)
+    {
+        repaired = 0;
+
+        var timed = text.Sentences.Where(s => times.ContainsKey(s.Index)).OrderBy(s => s.Start).ToList();
+        var anchors = timed.Select(s => new Anchor(times[s.Index].BeginMs, s.Start, 1f)).ToList();
+
+        var fixedAnchors = MediaOverlayPackage.RepairChapterOpenings(anchors, textChapterStarts, audioChapterStarts);
+        if (fixedAnchors.SequenceEqual(anchors)) return times;
+
+        var chars = fixedAnchors.Select(a => a.CharOffset).ToArray();
+
+        long BeginAt(int offset)
+        {
+            var i = Array.BinarySearch(chars, offset);
+            if (i >= 0) return fixedAnchors[i].AudioMs;
+
+            i = ~i;
+            if (i == 0) return fixedAnchors[0].AudioMs;
+            if (i == chars.Length) return fixedAnchors[^1].AudioMs;
+
+            var (a, b) = (fixedAnchors[i - 1], fixedAnchors[i]);
+            return a.AudioMs + (long)((b.AudioMs - a.AudioMs) * (double)(offset - a.CharOffset) / (b.CharOffset - a.CharOffset));
+        }
+
+        var begins = timed.Select(s => BeginAt(s.Start)).ToArray();
+        var result = new Dictionary<int, SentenceTime>(times.Count);
+
+        for (var k = 0; k < timed.Count; k++)
+        {
+            var old = times[timed[k].Index];
+            var moved = begins[k] != old.BeginMs;
+            if (moved) repaired++;
+
+            var end = old.EndMs;
+            if (k + 1 < timed.Count)
+            {
+                var next = times[timed[k + 1].Index].BeginMs;
+
+                // A sentence that ran up to the next one still does, wherever the next one went; one
+                // that ended on its own last word keeps that end unless the next now starts sooner.
+                end = moved || old.EndMs >= next ? begins[k + 1] : Math.Min(old.EndMs, begins[k + 1]);
+            }
+
+            if (end > begins[k]) result[timed[k].Index] = new SentenceTime(begins[k], end);
+        }
+
+        return result;
+    }
+
     private static string BuildSmil(string documentEntry, string smilEntry, string audioEntry, List<Clip> clips)
     {
         var directory = DirectoryOf(smilEntry);
