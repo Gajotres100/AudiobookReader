@@ -16,7 +16,7 @@ public class MediaOverlayPackageTests : IDisposable
     private static readonly byte[] FakeAudio = [1, 2, 3, 4, 5, 6, 7, 8];
 
     /// <summary>Two chapters, each sentence with an id, and an overlay timing every sentence.</summary>
-    private string WriteBook()
+    private string WriteBook(string? two = null, string? twoSmil = null)
     {
         var path = Path.Combine(_directory, "book.epub");
 
@@ -50,7 +50,7 @@ public class MediaOverlayPackageTests : IDisposable
 
         Add("OEBPS/nav.xhtml", """<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>t</title></head><body><nav epub:type="toc"><ol><li><a href="Text/one.xhtml">One</a></li><li><a href="Text/two.xhtml">Two</a></li></ol></nav></body></html>""");
         Add("OEBPS/Text/one.xhtml", """<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>1</title></head><body><p><span id="a1">The keeper woke early.</span> <span id="a2">He climbed the stairs.</span></p></body></html>""");
-        Add("OEBPS/Text/two.xhtml", """<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>2</title></head><body><p><span id="b1">The storm came at night.</span></p></body></html>""");
+        Add("OEBPS/Text/two.xhtml", """<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>2</title></head><body>""" + (two ?? """<p><span id="b1">The storm came at night.</span></p>""") + """</body></html>""");
 
         Add("OEBPS/Text/one.smil", """
             <smil xmlns="http://www.w3.org/ns/SMIL" version="3.0"><body><seq>
@@ -58,11 +58,10 @@ public class MediaOverlayPackageTests : IDisposable
               <par><text src="one.xhtml#a2"/><audio src="../audio/book.m4b" clipBegin="3s" clipEnd="5.5s"/></par>
             </seq></body></smil>
             """);
-        Add("OEBPS/Text/two.smil", """
-            <smil xmlns="http://www.w3.org/ns/SMIL" version="3.0"><body><seq>
-              <par><text src="two.xhtml#b1"/><audio src="../audio/book.m4b" clipBegin="00:10.000" clipEnd="00:12.000"/></par>
-            </seq></body></smil>
-            """);
+        Add("OEBPS/Text/two.smil",
+            """<smil xmlns="http://www.w3.org/ns/SMIL" version="3.0"><body><seq>"""
+            + (twoSmil ?? """<par><text src="two.xhtml#b1"/><audio src="../audio/book.m4b" clipBegin="00:10.000" clipEnd="00:12.000"/></par>""")
+            + "</seq></body></smil>");
 
         using (var audio = zip.CreateEntry("OEBPS/audio/book.m4b", CompressionLevel.NoCompression).Open())
             audio.Write(FakeAudio);
@@ -135,6 +134,42 @@ public class MediaOverlayPackageTests : IDisposable
     }
 
     /// <summary>The case seen in a real package: a chapter's opening timed into the end of the chapter before.</summary>
+    [Fact]
+    public async Task A_package_with_a_squeezed_chapter_opening_is_rewritten_with_it_put_back()
+    {
+        // Chapter two's heading and first sentences timed into the last second of chapter one,
+        // the way Whisper heard them, then nothing until its fourth sentence at 40 s.
+        var path = WriteBook(
+            two: """<h1><span id="b0">Two</span></h1><p><span id="b1">The storm came at night, rolling over the hills and down into the valley where the keeper had lived all his long life.</span> <span id="b2">Nobody in the village slept that night at all.</span> <span id="b3">The end came.</span></p>""",
+            twoSmil: """
+                <par><text src="two.xhtml#b0"/><audio src="../audio/book.m4b" clipBegin="5.5s" clipEnd="5.6s"/></par>
+                <par><text src="two.xhtml#b1"/><audio src="../audio/book.m4b" clipBegin="5.6s" clipEnd="6.5s"/></par>
+                <par><text src="two.xhtml#b2"/><audio src="../audio/book.m4b" clipBegin="6.5s" clipEnd="7s"/></par>
+                <par><text src="two.xhtml#b3"/><audio src="../audio/book.m4b" clipBegin="40s" clipEnd="42s"/></par>
+                """);
+
+        var extracted = await new EpubTextExtractor().ExtractAsync(path);
+        var starts = extracted.Chapters.Select(c => c.TextStart ?? 0).ToList();
+
+        var moved = MediaOverlayPackage.RepairOverlayTimings(path, path, extracted.Text, "OEBPS/audio/book.m4b", starts, [0, 25_000]);
+
+        Assert.Equal(3, moved);
+
+        var anchors = MediaOverlayPackage.ReadAnchors(path, extracted.Text, "OEBPS/audio/book.m4b").OrderBy(a => a.CharOffset).ToList();
+        Assert.Equal([1000L, 3000L, 25_000L], anchors.Take(3).Select(a => a.AudioMs));
+        Assert.Equal(40_000L, anchors[^1].AudioMs);
+        Assert.True(anchors[3].AudioMs > 25_000 && anchors[4].AudioMs > anchors[3].AudioMs && anchors[4].AudioMs < 40_000);
+
+        using (var zip = ZipFile.OpenRead(path))
+        {
+            Assert.Equal("mimetype", zip.Entries[0].FullName);
+            var audio = zip.GetEntry("OEBPS/audio/book.m4b")!;
+            Assert.Equal(audio.Length, audio.CompressedLength);
+        }
+
+        Assert.Equal(0, MediaOverlayPackage.RepairOverlayTimings(path, path, extracted.Text, "OEBPS/audio/book.m4b", starts, [0, 25_000]));
+    }
+
     [Fact]
     public void A_chapter_opening_squeezed_into_the_previous_chapter_is_put_back()
     {

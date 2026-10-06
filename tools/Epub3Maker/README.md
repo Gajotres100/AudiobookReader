@@ -326,6 +326,20 @@ docker build -f tools/Epub3Maker/Dockerfile -t epub3maker .
 
 ---
 
+## Repairing EPUB 3s already made
+
+Versions before October 2026 could time a chapter's heading and first sentences into the last
+seconds of the chapter before, so a reader jumping to that chapter played the end of the previous
+one. New books are written correctly; books already made are put right in place, without listening
+again — a few minutes per book:
+
+```bash
+epub3maker repair "E:\ReadAlong"          # a folder, with its subfolders
+epub3maker repair "Blackwing.epub"         # or single books
+```
+
+A book with nothing to repair is left untouched, so running it twice is harmless.
+
 ## One book: every option
 
 ```

@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.IO.Compression;
+using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 using AudioBookReader.Core.Data;
 using AudioBookReader.Core.Models;
@@ -370,6 +372,158 @@ public static class MediaOverlayPackage
     }
 
     /// <summary>
+    /// Writes <paramref name="epubPath"/> again at <paramref name="outputPath"/> with its overlays'
+    /// chapter openings repaired (<see cref="RepairChapterOpenings"/>): the package a reader is
+    /// given, put right without hearing the narration again. Clips of a repaired opening are spread
+    /// at the narrator's pace from the chapter's real start; every other clip keeps its time, every
+    /// other entry its bytes and its compression. Returns how many clips moved — 0 writes nothing.
+    /// </summary>
+    public static int RepairOverlayTimings(
+        string epubPath, string outputPath, BookText text, string audioEntry,
+        IEnumerable<int> textChapterStarts, IEnumerable<long> audioChapterStarts)
+    {
+        using var zip = ZipFile.OpenRead(epubPath);
+        var package = Package.Load(zip);
+
+        var entries = zip.Entries.Select(e => e.FullName).ToHashSet(StringComparer.Ordinal);
+
+        var documents = new Dictionary<string, SpineDocument>(StringComparer.Ordinal);
+        foreach (var document in text.Spine)
+            if (EpubPaths.Resolve(document.Href, package.Directory, entries) is { } entry) documents[entry] = document;
+
+        // Every timed clip, with the sentence it belongs to — found exactly as ReadAnchors finds it.
+        var smils = new Dictionary<string, XDocument>(StringComparer.Ordinal);
+        var clips = new List<(XElement Audio, int CharOffset, long BeginMs, long EndMs, string Smil)>();
+
+        foreach (var smilEntry in package.OverlaysInReadingOrder())
+        {
+            if (zip.GetEntry(smilEntry) is not { } entry) continue;
+
+            XDocument smil;
+            using (var stream = entry.Open()) smil = XDocument.Load(stream, LoadOptions.PreserveWhitespace);
+            smils[smilEntry] = smil;
+
+            var directory = EpubPaths.DirectoryOf(smilEntry);
+
+            foreach (var par in smil.Descendants().Where(e => e.Name.LocalName == "par"))
+            {
+                var textSrc = (string?)par.Elements().FirstOrDefault(e => e.Name.LocalName == "text")?.Attribute("src");
+                var audio = par.Elements().FirstOrDefault(e => e.Name.LocalName == "audio");
+                var audioSrc = (string?)audio?.Attribute("src");
+                if (textSrc is null || audio is null || audioSrc is null) continue;
+                if (EpubPaths.Combine(directory, Uri.UnescapeDataString(audioSrc)) != audioEntry) continue;
+
+                if (!SmilClock.TryParse((string?)audio.Attribute("clipBegin") ?? "0", out var begin)) continue;
+                if (!SmilClock.TryParse((string?)audio.Attribute("clipEnd") ?? "", out var end)) continue;
+
+                var hash = textSrc.IndexOf('#');
+                var textEntry = EpubPaths.Combine(directory, Uri.UnescapeDataString(hash < 0 ? textSrc : textSrc[..hash]));
+                if (!documents.TryGetValue(textEntry, out var document)) continue;
+
+                int? offset = hash < 0
+                    ? document.TextStart
+                    : document.Anchors.TryGetValue(Uri.UnescapeDataString(textSrc[(hash + 1)..]), out var at) ? at : null;
+                if (offset is not { } charOffset) continue;
+
+                while (charOffset < text.PlainText.Length && char.IsWhiteSpace(text.PlainText[charOffset])) charOffset++;
+
+                clips.Add((audio, charOffset, begin, end, smilEntry));
+            }
+        }
+
+        clips = [.. clips.OrderBy(c => c.CharOffset)];
+
+        var anchors = clips.Select(c => new Anchor(c.BeginMs, c.CharOffset, 1f)).ToList();
+        var repaired = RepairChapterOpenings(anchors, textChapterStarts, audioChapterStarts);
+        if (repaired.SequenceEqual(anchors)) return 0;
+
+        var chars = repaired.Select(a => a.CharOffset).ToArray();
+
+        long BeginAt(int offset)
+        {
+            var i = Array.BinarySearch(chars, offset);
+            if (i >= 0) return repaired[i].AudioMs;
+
+            i = ~i;
+            if (i == 0) return repaired[0].AudioMs;
+            if (i == chars.Length) return repaired[^1].AudioMs;
+
+            var (a, b) = (repaired[i - 1], repaired[i]);
+            return a.AudioMs + (long)((b.AudioMs - a.AudioMs) * (double)(offset - a.CharOffset) / (b.CharOffset - a.CharOffset));
+        }
+
+        var begins = clips.Select(c => BeginAt(c.CharOffset)).ToArray();
+        var moved = 0;
+
+        for (var k = 0; k < clips.Count; k++)
+        {
+            var clip = clips[k];
+            var shifted = begins[k] != clip.BeginMs;
+            if (shifted) moved++;
+
+            var end = clip.EndMs;
+            if (k + 1 < clips.Count)
+            {
+                // A clip that ran up to the next one still does, wherever the next one went; one that
+                // ended on its own last word keeps that end unless the next now starts sooner.
+                end = shifted || clip.EndMs >= clips[k + 1].BeginMs
+                    ? begins[k + 1]
+                    : Math.Min(clip.EndMs, begins[k + 1]);
+            }
+
+            end = Math.Max(end, begins[k] + 1);
+            clip.Audio.SetAttributeValue("clipBegin", SmilClock.Format(begins[k]));
+            clip.Audio.SetAttributeValue("clipEnd", SmilClock.Format(end));
+            clips[k] = clip with { BeginMs = begins[k], EndMs = end };
+        }
+
+        // Each overlay declares how long it plays: the sum of its clips.
+        var metadata = package.Document.Root!.Element(Opf + "metadata");
+        foreach (var item in package.Items.Where(i => (string?)i.Attribute("media-type") == "application/smil+xml"))
+        {
+            var entry = package.EntryOf(item);
+            if (!smils.ContainsKey(entry) || (string?)item.Attribute("id") is not { } id) continue;
+
+            var duration = clips.Where(c => c.Smil == entry).Sum(c => c.EndMs - c.BeginMs);
+            var meta = metadata?.Elements(Opf + "meta").FirstOrDefault(m =>
+                (string?)m.Attribute("property") == "media:duration" && (string?)m.Attribute("refines") == "#" + id);
+            if (meta is not null && duration > 0) meta.Value = SmilClock.Format(duration);
+        }
+
+        var temporary = outputPath + ".part";
+
+        using (var output = ZipFile.Open(temporary, ZipArchiveMode.Create))
+        {
+            foreach (var entry in zip.Entries.OrderBy(e => e.FullName == "mimetype" ? 0 : 1))
+            {
+                if (entry.FullName.EndsWith('/')) continue;
+
+                // Stored stays stored: the mimetype must be, and narration is read by seeking into it.
+                var level = entry.CompressedLength == entry.Length ? CompressionLevel.NoCompression : CompressionLevel.Optimal;
+                using var to = output.CreateEntry(entry.FullName, level).Open();
+
+                XDocument? replaced = entry.FullName == package.Path ? package.Document
+                    : smils.TryGetValue(entry.FullName, out var smil) ? smil : null;
+
+                if (replaced is not null)
+                {
+                    using var writer = XmlWriter.Create(to, new XmlWriterSettings { Encoding = new UTF8Encoding(false), Indent = false });
+                    replaced.Save(writer);
+                }
+                else
+                {
+                    using var from = entry.Open();
+                    from.CopyTo(to);
+                }
+            }
+        }
+
+        zip.Dispose();
+        File.Move(temporary, outputPath, overwrite: true);
+        return moved;
+    }
+
+    /// <summary>
     /// The anchors laid out over the audio's chapters, as the map the library keeps and the text
     /// range each chapter turned out to cover.
     /// </summary>
@@ -581,6 +735,13 @@ public static class EpubPaths
 /// <summary>SMIL clock values, as Media Overlays write them.</summary>
 public static class SmilClock
 {
+    /// <summary>A full clock value, "1:02:03.500".</summary>
+    public static string Format(long ms)
+    {
+        var time = TimeSpan.FromMilliseconds(Math.Max(ms, 0));
+        return string.Create(CultureInfo.InvariantCulture, $"{(int)time.TotalHours}:{time.Minutes:00}:{time.Seconds:00}.{time.Milliseconds:000}");
+    }
+
     /// <summary>
     /// "1:02:03.5", "02:03.5", "12.5s", "2.5min", "1.5h", "345ms" or plain seconds, in milliseconds.
     /// </summary>

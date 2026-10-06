@@ -4,6 +4,7 @@ using Epub3Maker;
 
 // epub3maker <book.epub> <audiobook.m4b> [options]     one book, now
 // epub3maker scan <library> --output <folder> [options]  every book in a library, unattended
+// epub3maker repair <book.epub | folder>                 put right EPUB 3s already made
 //
 // Aligns ebooks with their audiobooks and writes EPUB 3s whose Media Overlays let any reading
 // system that supports them follow the narration sentence by sentence.
@@ -39,6 +40,9 @@ try
 {
     if (args.Length > 0 && ScanCommand.IsCommand(args[0]))
         return await ScanCommand.RunAsync(args[1..], cancellation.Token);
+
+    if (args.Length > 0 && RepairCommand.IsCommand(args[0]))
+        return await RepairCommand.RunAsync(args[1..], cancellation.Token);
 
     return await SingleBook.RunAsync(args, cancellation.Token);
 }
@@ -130,6 +134,9 @@ static class Help
 
             A whole library, unattended (see: epub3maker scan --help):
               epub3maker scan <library> --output <folder> [options]
+
+            EPUB 3s already made, timings put right without listening again (see: epub3maker repair --help):
+              epub3maker repair <book.epub | folder>
 
             Options:
               -o, --output <file>       where to write (default: "<book> - EPUB3.epub" next to the ebook)
