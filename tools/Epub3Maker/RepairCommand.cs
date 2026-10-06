@@ -72,9 +72,10 @@ static class RepairCommand
         var extracted = await new BookTextExtractors().ExtractAsync(path, ct);
 
         // The recording's chapter marks say where each chapter really begins. Reading them needs the
-        // audio as a file of its own, for a moment, next to the book.
+        // audio as a file of its own for a moment — in the temporary folder, not next to the book,
+        // where a library server watching the folder would take it for a new audiobook.
         var marks = new List<long>();
-        var temporary = path + ".marks" + Path.GetExtension(audio[0]);
+        var temporary = Path.Combine(Path.GetTempPath(), $"epub3maker-{Guid.NewGuid():N}{Path.GetExtension(audio[0])}");
 
         try
         {
