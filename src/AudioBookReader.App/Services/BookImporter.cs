@@ -422,13 +422,70 @@ public class BookImporter(
     }
 
     /// <summary>
+    /// A package's timings with any chapter opening squeezed into the chapter before put back — see
+    /// <see cref="MediaOverlayPackage.RepairChapterOpenings"/>. Logged, because a package that needed
+    /// it was made wrongly, and that is worth knowing about the tool that made it.
+    /// </summary>
+    private static List<Anchor> RepairedTimings(List<Anchor> anchors, ExtractedBook extracted, IEnumerable<long> audioChapterStarts)
+    {
+        var repaired = MediaOverlayPackage.RepairChapterOpenings(
+            anchors, extracted.Chapters.Select(c => c.TextStart ?? 0), audioChapterStarts);
+
+        if (repaired.Count != anchors.Count)
+            AppLog.Info($"epub 3 narration: {anchors.Count - repaired.Count} timings at chapter openings were squeezed into the chapter before; put back");
+
+        return repaired;
+    }
+
+    /// <summary>
+    /// Re-reads the timings of every read-along already in the library, once, with chapter
+    /// openings repaired. Books imported before the repair existed carried timings that played the
+    /// end of the previous chapter on a jump to the next one; the package's own timings are still in
+    /// the ebook file kept for the text, so nothing has to be downloaded again.
+    /// </summary>
+    public async Task RepairReadAlongTimingsAsync()
+    {
+        foreach (var book in await database.GetBooksAsync())
+        {
+            var key = $"readalong.openingsRepaired.{book.Id}";
+            if (!book.IsReadAlong || book.EbookPath is not { } ebookPath || Preferences.Default.Get(key, false)) continue;
+
+            try
+            {
+                if (MediaOverlayPackage.AudioFiles(ebookPath) is not { Count: 1 } audio) continue;
+
+                var extracted = await extractors.ExtractAsync(ebookPath);
+                var chapters = await database.GetChaptersAsync(book.Id);
+
+                var anchors = RepairedTimings(
+                    await Task.Run(() => MediaOverlayPackage.ReadAnchors(ebookPath, extracted.Text, audio[0])),
+                    extracted, chapters.Select(c => c.StartMs ?? 0));
+
+                var (map, ranges) = MediaOverlayPackage.BuildMap(
+                    anchors, chapters, extracted.Text.PlainText.Length, book.AudioHash, book.EbookHash);
+
+                var adopted = await library.AdoptAlignmentAsync(book.Id, map, ranges);
+                AppLog.Info($"read-along timings of book {book.Id} re-read with chapter openings repaired, adopted {adopted}");
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error($"repairing the read-along timings of book {book.Id}", ex);
+            }
+
+            Preferences.Default.Set(key, true);
+        }
+    }
+
+    /// <summary>
     /// Turns the package's timings into the alignment of audio the book already has — the same
     /// recording, checked by hash — so it follows along at once, as a read-along package does.
     /// </summary>
     private async Task<Book> AdoptTimingsAsync(Book book, string ebookPath, string entry, ExtractedBook extracted)
     {
-        var anchors = await Task.Run(() => MediaOverlayPackage.ReadAnchors(ebookPath, extracted.Text, entry));
         var chapters = await database.GetChaptersAsync(book.Id);
+        var anchors = RepairedTimings(
+            await Task.Run(() => MediaOverlayPackage.ReadAnchors(ebookPath, extracted.Text, entry)),
+            extracted, chapters.Select(c => c.StartMs ?? 0));
         var (map, ranges) = MediaOverlayPackage.BuildMap(
             anchors, chapters, extracted.Text.PlainText.Length, book.AudioHash, book.EbookHash);
 
@@ -464,6 +521,8 @@ public class BookImporter(
             // on a server means fetching much of it, and on a television sat there for good with the
             // book never arriving. The length is the package's own; the chapters are its text's, each
             // starting where the overlay first speaks it.
+            anchors = RepairedTimings(anchors, extracted, audioChapterStarts: []);
+
             var duration = MediaOverlayPackage.DeclaredDurationMs(ebookPath)
                            ?? (anchors.Count > 0 ? anchors.Max(a => a.AudioMs) + 10_000 : 0);
 
@@ -475,6 +534,7 @@ public class BookImporter(
         else
         {
             info = await Task.Run(() => ProbeAsync(audioPath, Path.GetFileName(entry), referenced: false, ct), ct);
+            anchors = RepairedTimings(anchors, extracted, info.Chapters.Select(c => c.StartMs ?? 0));
         }
 
         if (info.DurationMs <= 0) throw new NotSupportedException(Strings.Import_NotAudio);

@@ -171,6 +171,77 @@ public static class MediaOverlayPackage
     }
 
     /// <summary>
+    /// Puts back the opening of a chapter that the timings squeezed into the end of the chapter
+    /// before it.
+    ///
+    /// Seen in a real package: the heading of chapter thirty-four and its first eight sentences
+    /// were timed into the last eight seconds of chapter thirty-three — six hundred characters at
+    /// eighty a second, four times faster than anyone narrates — followed by a gap of forty-five
+    /// seconds before the next timing, which is where those sentences are really spoken. Followed
+    /// faithfully, jumping to chapter thirty-four played the end of thirty-three, and listening
+    /// turned the page to thirty-four ten seconds before the narrator got there.
+    ///
+    /// For each chapter of the text: if the timings that open it run at an impossible pace and then
+    /// stop for a long pause, they are dropped, and the chapter's first character is put where the
+    /// next believable timing says it must begin — on the recording's own chapter mark when one is
+    /// close to that, since a mark is where the chapter actually starts.
+    /// </summary>
+    /// <param name="textChapterStarts">Where the text's chapters begin: their headings.</param>
+    /// <param name="audioChapterStarts">The recording's chapter marks, if it has any.</param>
+    public static List<Anchor> RepairChapterOpenings(
+        IReadOnlyList<Anchor> anchors, IEnumerable<int> textChapterStarts, IEnumerable<long> audioChapterStarts)
+    {
+        const double PlausibleCharsPerSecond = 15;
+        const double ImpossibleCharsPerSecond = 40;
+        const long PauseMs = 15_000;
+        const int OpeningChars = 3_000;
+
+        var list = anchors.OrderBy(a => a.CharOffset).ToList();
+        var marks = audioChapterStarts.Where(m => m > 0).OrderBy(m => m).ToList();
+
+        foreach (var start in textChapterStarts.Where(t => t > 0).Distinct().OrderBy(t => t))
+        {
+            var first = list.FindIndex(a => a.CharOffset >= start);
+            if (first < 0) continue;
+
+            // The run that opens the chapter, up to its first long pause.
+            var last = -1;
+            for (var i = first; i + 1 < list.Count && list[i + 1].CharOffset - start <= OpeningChars; i++)
+            {
+                if (list[i + 1].AudioMs - list[i].AudioMs > PauseMs)
+                {
+                    last = i;
+                    break;
+                }
+            }
+
+            if (last < 0) continue;
+
+            var chars = list[last].CharOffset - start;
+            var seconds = Math.Max((list[last].AudioMs - list[first].AudioMs) / 1000.0, 0.001);
+            if (chars < 100 || chars / seconds < ImpossibleCharsPerSecond) continue;
+
+            var after = list[last + 1];
+            var before = first > 0 ? list[first - 1].AudioMs : 0;
+
+            // Where the opening must begin to be read at an ordinary pace before the next timing,
+            // moved onto a chapter mark of the recording when one is near enough to be this one.
+            var estimate = after.AudioMs - (long)((after.CharOffset - start) / PlausibleCharsPerSecond * 1000);
+            var mark = marks.Where(m => m > before && m < after.AudioMs && Math.Abs(m - estimate) < 30_000)
+                .OrderBy(m => Math.Abs(m - estimate))
+                .Select(m => (long?)m)
+                .FirstOrDefault();
+
+            var at = Math.Clamp(mark ?? estimate, before + 1, after.AudioMs - 1);
+
+            list.RemoveRange(first, last - first + 1);
+            list.Insert(first, new Anchor(at, start, 1f));
+        }
+
+        return list;
+    }
+
+    /// <summary>
     /// How long the narration runs, as the package declares it — the <c>media:duration</c> of the
     /// book as a whole — or null when it does not say.
     /// </summary>

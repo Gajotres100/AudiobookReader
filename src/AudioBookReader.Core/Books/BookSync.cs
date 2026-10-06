@@ -34,6 +34,9 @@ public class BookSync(BookText text, SyncMap map, IReadOnlyList<Chapter> chapter
     public bool IsAligned(int chapterIndex) =>
         map.ForChapter(chapterIndex)?.HasMeasurement(ChapterSyncMap.BoundaryConfidence) == true;
 
+    /// <summary>How long after its last timed sentence a measured chapter is still taken to be reading it.</summary>
+    private const long ChapterTailMs = 30_000;
+
     public Chapter? ChapterAt(long audioMs) =>
         chapters.FirstOrDefault(c => c.HasAudioRange && audioMs >= c.StartMs && audioMs < c.EndMs)
         ?? chapters.LastOrDefault(c => c.HasAudioRange);
@@ -52,10 +55,23 @@ public class BookSync(BookText text, SyncMap map, IReadOnlyList<Chapter> chapter
         // highlight on one sentence while reporting that all is well, so the reader never learns
         // that this part of the book has simply not been measured yet.
         if (!chapterMap.Covers(audioMs))
-            return ExtrapolateAheadMs > 0
-                   && chapterMap.TryExtrapolateCharOffset(audioMs, ExtrapolateAheadMs, out var ahead)
-                ? ahead
-                : null;
+        {
+            if (ExtrapolateAheadMs > 0 && chapterMap.TryExtrapolateCharOffset(audioMs, ExtrapolateAheadMs, out var ahead))
+                return ahead;
+
+            // The end of a chapter that has been measured: its last sentence still being read, and
+            // the pause before the next chapter. That is the last sentence, not an unmeasured part —
+            // saying otherwise flashed "not aligned yet" at the close of every chapter.
+            if (chapterMap.Anchors.Count > 1
+                && audioMs > chapterMap.Anchors[^1].AudioMs
+                && audioMs - chapterMap.Anchors[^1].AudioMs < ChapterTailMs
+                && IsAligned(chapter.Index))
+            {
+                return chapterMap.Anchors[^1].CharOffset;
+            }
+
+            return null;
+        }
 
         return chapterMap.TryGetCharOffset(audioMs, out var offset) ? offset : null;
     }

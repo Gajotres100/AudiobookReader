@@ -134,6 +134,64 @@ public class MediaOverlayPackageTests : IDisposable
         Assert.Null(await MediaOverlayPackage.FindStoredNarrationAsync(package, ["OEBPS/audio/book.m4b"]));
     }
 
+    /// <summary>The case seen in a real package: a chapter's opening timed into the end of the chapter before.</summary>
+    [Fact]
+    public void A_chapter_opening_squeezed_into_the_previous_chapter_is_put_back()
+    {
+        var anchors = new List<Anchor>
+        {
+            new(10_000, 1_000, 1f),
+            new(20_000, 1_150, 1f),      // the previous chapter, read at 15 a second
+            new(21_000, 1_200, 1f),      // heading of the next chapter, at 1200 ...
+            new(22_000, 1_300, 1f),      // ... and its opening at 100 a second, impossible ...
+            new(23_000, 1_400, 1f),
+            new(24_000, 1_500, 1f),
+            new(60_000, 1_600, 1f),      // ... then a long pause before the next real timing
+            new(70_000, 1_750, 1f),
+        };
+
+        var repaired = MediaOverlayPackage.RepairChapterOpenings(anchors, [1_200], [55_000]);
+
+        // The squeezed run is gone, and the chapter starts on the recording's chapter mark.
+        Assert.DoesNotContain(repaired, a => a.CharOffset is 1_300 or 1_400 or 1_500);
+        Assert.Contains(new Anchor(55_000, 1_200, 1f), repaired);
+        Assert.Contains(new Anchor(20_000, 1_150, 1f), repaired);
+        Assert.Contains(new Anchor(60_000, 1_600, 1f), repaired);
+    }
+
+    [Fact]
+    public void Without_a_chapter_mark_the_opening_is_placed_at_an_ordinary_pace_before_the_next_timing()
+    {
+        var anchors = new List<Anchor>
+        {
+            new(20_000, 1_150, 1f),
+            new(21_000, 1_200, 1f),
+            new(22_000, 1_350, 1f),
+            new(23_000, 1_500, 1f),
+            new(60_000, 1_650, 1f),
+        };
+
+        var repaired = MediaOverlayPackage.RepairChapterOpenings(anchors, [1_200], []);
+
+        // 450 characters before the next timing, at fifteen a second: thirty seconds earlier.
+        Assert.Contains(new Anchor(30_000, 1_200, 1f), repaired);
+    }
+
+    [Fact]
+    public void An_opening_read_at_an_ordinary_pace_is_left_alone()
+    {
+        var anchors = new List<Anchor>
+        {
+            new(20_000, 1_150, 1f),
+            new(23_000, 1_200, 1f),
+            new(30_000, 1_300, 1f),
+            new(37_000, 1_400, 1f),
+            new(60_000, 1_500, 1f),
+        };
+
+        Assert.Equal(anchors, MediaOverlayPackage.RepairChapterOpenings(anchors, [1_200], [22_000]));
+    }
+
     [Fact]
     public void An_ordinary_epub_has_no_overlay_audio()
     {

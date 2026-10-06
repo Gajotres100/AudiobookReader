@@ -29,6 +29,14 @@ public partial class App : Application
 				await sweep.RunAsync();
 			});
 
+		// Read-alongs imported before chapter openings were repaired get their timings re-read once.
+		if (activationState?.Context.Services.GetService<Services.BookImporter>() is { } importer)
+			_ = Task.Run(async () =>
+			{
+				await Task.Delay(TimeSpan.FromSeconds(3));
+				await importer.RepairReadAlongTimingsAsync();
+			});
+
 		return new Window(new AppShell());
 	}
 }
