@@ -385,6 +385,12 @@
   // the first tap has to wait a moment to see whether a second one is coming, which is the
   // one place this reads slower than a plain tap handler would.
   var startX = 0, startY = 0, swiped = false, holdTimer = 0, held = false;
+
+  // A second finger makes the touch a pinch, which resizes the text and is nothing else: not a
+  // swipe when the fingers come apart sideways, not a tap, not a press and hold. Without this the
+  // fingers spreading across the screen read as a swipe when they lifted, and every attempt to
+  // resize the text turned to the next or previous chapter. Holds until the last finger is up.
+  var pinching = false;
   var lastTapAt = 0, lastTapX = 0, lastTapY = 0, tapTimer = 0;
   var DOUBLE_TAP_MS = 300, TAP_SLOP = 30;
 
@@ -690,6 +696,17 @@
   var suppressClick = false;
 
   document.addEventListener('touchstart', function (e) {
+    if (e.touches.length > 1 && !pinching) {
+      pinching = true;
+      swiped = true;
+      cancelHold();
+      draggingHandle = null;
+      stopDragging();
+      stopMagnifier();
+      document.getElementById('content').classList.remove('no-scroll');
+    }
+    if (pinching) return;
+
     startX = e.changedTouches[0].clientX;
     startY = e.changedTouches[0].clientY;
     swiped = false;
@@ -745,6 +762,8 @@
   }, { passive: true });
 
   document.addEventListener('touchmove', function (e) {
+    if (pinching) return;
+
     var x = e.touches[0].clientX, y = e.touches[0].clientY;
 
     if (draggingHandle) {
@@ -765,6 +784,12 @@
 
   document.addEventListener('touchend', function (e) {
     cancelHold();
+
+    if (pinching) {
+      swiped = true;
+      if (e.touches.length === 0) pinching = false;
+      return;
+    }
 
     if (draggingHandle) {
       draggingHandle = null;
@@ -803,7 +828,8 @@
     if (Math.abs(dx) > 12 || Math.abs(dy) > 12) swiped = true;
   }, { passive: true });
 
-  document.addEventListener('touchcancel', function () {
+  document.addEventListener('touchcancel', function (e) {
+    if (e.touches.length === 0) pinching = false;
     draggingHandle = null;
     stopDragging();
     stopMagnifier();
