@@ -1318,7 +1318,7 @@ public partial class BookViewModel(
             // newer one's close button landing back here instead of leaving the book. The same
             // reset is why opening a bookmark behaves itself (see BookmarksViewModel.OpenAsync).
             await Shell.Current.GoToAsync("//library");
-            await Shell.Current.GoToAsync($"reader?id={BookId}&offset={location.Value.CharOffset}");
+            await ReaderViewModel.OpenAtAsync(BookId, location.Value.CharOffset);
         }
         catch (Exception ex)
         {

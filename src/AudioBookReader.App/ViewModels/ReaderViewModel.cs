@@ -29,6 +29,22 @@ public partial class ReaderViewModel(
     public partial int EntryOffset { get; set; } = -1;
 
     /// <summary>
+    /// Opens the reader at a named place — a bookmark, a photographed page.
+    ///
+    /// The place goes as single-use navigation data, never in the route's query string. Shell keeps
+    /// a route's query for the life of the page and applies it again every time the page is
+    /// returned to, so a reader opened at a bookmark went back to that bookmark each time it came
+    /// back from the player — and moved the paused voice there with it: chapter thirty-nine, a look
+    /// at the player, and the book was in chapter thirty-five again.
+    /// </summary>
+    public static Task OpenAtAsync(int bookId, int offset) =>
+        Shell.Current.GoToAsync("reader", new ShellNavigationQueryParameters
+        {
+            ["id"] = bookId,
+            ["offset"] = offset,
+        });
+
+    /// <summary>
     /// Whether this book measures the passage being read as it is read, rather than having been
     /// aligned in advance. A property of the book, chosen on its own page.
     /// </summary>

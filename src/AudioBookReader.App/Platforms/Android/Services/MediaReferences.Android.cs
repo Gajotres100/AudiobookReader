@@ -94,21 +94,77 @@ public partial class MediaReferences
     {
         if (!IsReference(location)) return false;
 
+        var uri = AndroidUri.Parse(location)!;
+
         try
         {
             // The provider decides. A document from a tree the user granted is deletable; one from
             // a cloud provider that only streams may not be, and saying so is better than pretending.
-            var deleted = global::Android.Provider.DocumentsContract.DeleteDocument(
-                Context.ContentResolver!, AndroidUri.Parse(location)!);
+            var deleted = global::Android.Provider.DocumentsContract.DeleteDocument(Context.ContentResolver!, uri);
 
             AppLog.Info($"reference: delete {(deleted ? "succeeded" : "refused")} for {location}");
             return deleted;
+        }
+        catch (Java.Lang.SecurityException ex) when (ThroughGrantedFolder(uri) is { } inFolder)
+        {
+            // A file picked on its own is granted for reading, not deleting — but the same file is
+            // often inside a folder the user granted whole, and that grant may delete it. A book
+            // imported as a single file before its folder was granted left its audiobook behind,
+            // 1.3 GB of it, after "delete the file too".
+            try
+            {
+                var deleted = global::Android.Provider.DocumentsContract.DeleteDocument(Context.ContentResolver!, inFolder);
+                AppLog.Info($"reference: delete {(deleted ? "succeeded" : "refused")} for {location} through its folder ({ex.Message})");
+                return deleted;
+            }
+            catch (Exception again)
+            {
+                AppLog.Info($"reference: delete failed for {location}, also through its folder ({again.GetType().Name}: {again.Message})");
+                return false;
+            }
         }
         catch (Exception ex)
         {
             AppLog.Info($"reference: delete failed for {location} ({ex.GetType().Name}: {ex.Message})");
             return false;
         }
+    }
+
+    /// <summary>
+    /// The same document reached through a folder the user granted with write access, or null —
+    /// a tree whose own document is an ancestor of this one, in the same provider.
+    /// </summary>
+    private static AndroidUri? ThroughGrantedFolder(AndroidUri document)
+    {
+        try
+        {
+            if (!global::Android.Provider.DocumentsContract.IsDocumentUri(Context, document)) return null;
+
+            var id = global::Android.Provider.DocumentsContract.GetDocumentId(document);
+            if (string.IsNullOrEmpty(id)) return null;
+
+            foreach (var grant in Context.ContentResolver!.PersistedUriPermissions)
+            {
+                if (!grant.IsWritePermission || grant.Uri is not { } tree || tree.Authority != document.Authority) continue;
+                if (!(tree.PathSegments is { Count: >= 2 } segments && segments[0] == "tree")) continue;
+
+                var treeId = global::Android.Provider.DocumentsContract.GetTreeDocumentId(tree);
+                if (string.IsNullOrEmpty(treeId)) continue;
+
+                // "primary:Audiobooks" holds "primary:Audiobooks/Author/Book.m4b"; the root of a
+                // volume, "primary:", holds everything on it.
+                var inside = id == treeId
+                             || id.StartsWith(treeId.EndsWith(':') ? treeId : treeId + "/", StringComparison.Ordinal);
+
+                if (inside) return global::Android.Provider.DocumentsContract.BuildDocumentUriUsingTree(tree, id);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Info($"reference: no folder grant found for {document} ({ex.GetType().Name}: {ex.Message})");
+        }
+
+        return null;
     }
 
     private partial Stream OpenReadCore(string location)

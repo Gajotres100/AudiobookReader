@@ -205,7 +205,7 @@ public partial class BookmarksViewModel(
             // guarantees a single, fresh reader on the stack, so closing it behaves the same as
             // opening that same bookmark from anywhere else would.
             await Shell.Current.GoToAsync("//library");
-            await Shell.Current.GoToAsync($"reader?id={BookId}&offset={offset}");
+            await ReaderViewModel.OpenAtAsync(BookId, offset);
             return;
         }
 
